@@ -26,5 +26,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 - Each module keeps a `README.md`: scope, status, how to run, next step. Update it before ending a session.
 - Never commit secrets (`.env`, OAuth tokens, `client_secret*.json`) or media/DB files.
 - Never add detection-evasion edits (speed-up, pitch shift, mirroring, heavy filters).
+- **Build loop:** agent finishes → PR opens itself → CI → if red, the agent is asked to fix it (max 2) → **Lucas merges** → the next ready issue starts. Keep CI green; never weaken or skip tests.
+- Issues run in order via the agent queue. Put `Depends on: #N` at the top of an issue body to sequence it. Labels: `agent` (queue it), `hold` (stop), `in-progress` (running), `needs-hq` (decision needed).
 - Every PR: tests for new code (`pytest`, sample data, no network), module README updated, `DECISIONS.md` untouched (HQ only).
 - Lucas wants short, direct answers and the whole system in mind; ask when unsure instead of assuming.
