@@ -11,7 +11,7 @@ GOOD = {"score": 0.8, "in": 100.0, "out": 140.0,
 
 def mock_llm(monkeypatch, plans):
     seen = []
-    monkeypatch.setattr(W, "llm", lambda prompt, schema: seen.append(prompt) or dict(plans[len(seen) - 1]))
+    monkeypatch.setattr(W, "llm", lambda prompt, schema, **kw: seen.append(prompt) or dict(plans[len(seen) - 1]))
     return seen
 
 
@@ -20,6 +20,16 @@ def test_write_clip_ok_and_prompt_has_inputs(monkeypatch):
     out = W.write_clip("[100.0-110.0] hello chat", "Kai Cenat", {"views_per_hour": 900})
     assert out["in"] == 100.0 and len(out["hooks"]) == 3
     assert "Kai Cenat" in seen[0] and "hello chat" in seen[0] and "900" in seen[0]
+
+
+def test_prompt_split_static_vs_per_clip(monkeypatch):
+    system, user = W.load_prompt()
+    assert "hook .30" in system and "{creator}" not in system and "{transcript}" in user
+    got = {}
+    monkeypatch.setattr(W, "llm", lambda prompt, schema, **kw: got.update(kw, prompt=prompt) or dict(GOOD))
+    W.write_clip("[1-2] line", "Kai Cenat", clip_id=7)
+    assert got["system"] == system and got["clip_id"] == 7
+    assert "line" in got["prompt"] and "hook .30" not in got["prompt"]
 
 
 def test_over_60s_gets_retry_then_ok(monkeypatch):
