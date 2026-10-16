@@ -11,6 +11,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,6 +23,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))  # radar.twitch
 
 import scout_data as data  # noqa: E402
+import scout_resolve as resolve  # noqa: E402
 import scout_stats as stats  # noqa: E402
 
 MODEL = "claude-sonnet-5-5"
@@ -120,8 +122,11 @@ LB_COLS = [("Streamer", lambda r: r["streamer"]), ("Shorts", lambda r: r["shorts
            ("Test slot", lambda r: "YES" if r["test_slot"] else "")]
 
 
-def render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes):
+def render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes, fixme=()):
     parts = []
+    if fixme:
+        parts.append("## Fix me: unresolved channels (correct in config/competitors.yaml)\n\n"
+                     + "\n".join(f"- {h}" for h in fixme))
     if llm_report:
         lines = llm_report.strip().splitlines()[:REPORT_MAX_LINES]
         parts.append("\n".join(lines))
@@ -149,13 +154,17 @@ def render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes):
 
 
 def scout(competitors, library, report, now=None, session=None, twitch=None, llm=None,
-          api_key=None, creators=None, ytdlp=data.fetch_ytdlp):
+          api_key=None, creators=None, ytdlp=data.fetch_ytdlp, resolve_run=subprocess.run):
     now = now or datetime.now(timezone.utc)
     cfg = load_yaml(competitors)
     logins = creator_logins() if creators is None else creators
     notes = []
 
-    videos = data.fetch_all(cfg.get("channels", []), api_key, session, ytdlp)
+    channels, fixme, rnotes = resolve.resolve_channels(
+        cfg.get("channels"), cfg.get("discover"), Path(competitors).parent / "channel_cache.json",
+        api_key, session, resolve_run)
+    notes += rnotes
+    videos = data.fetch_all(channels, api_key, session, ytdlp)
     if not videos:
         notes.append("no competitor data fetched")
     clip_vel = twitch_clip_velocity(twitch, logins, now) if twitch else {}
@@ -198,7 +207,7 @@ def scout(competitors, library, report, now=None, session=None, twitch=None, llm
     (out_dir / "creator_weights.json").write_text(json.dumps(weights, indent=2) + "\n")
     if new_lib:
         library.write_text(new_lib.rstrip() + "\n")
-    Path(report).write_text(render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes))
+    Path(report).write_text(render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes, fixme))
     return summary
 
 

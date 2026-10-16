@@ -11,6 +11,7 @@ Competitor streamer-clip Shorts, **metadata only** (never downloads or stores vi
 python clipper/analyst/trend_scout.py --library clipper/formats/library.md --report report.md
 ```
 
+- Channels (`scout_resolve.py`): `config/competitors.yaml` takes `handle: "@Name"` (channel_id optional). Resolved each run: cache (`config/channel_cache.json`) -> `channels.list?forHandle=` if `YOUTUBE_API_KEY` -> `yt-dlp --skip-download -J --playlist-items 0`. `discover:` slots (IShowSpeed / Kai Cenat / CaseOh) use `search.list` type=channel for `"<streamer> clips" shorts`, top `count` (default 1) by subscribers; needs the key, else skipped with a note. Unresolved handles show under **Fix me** at the top of the report.
 - Data (`scout_data.py`): YouTube RSS per channel in `config/competitors.yaml`; if `YOUTUBE_API_KEY` is set, `videos.list` adds duration + exact stats; yt-dlp `--skip-download -J` only if RSS fails (bot-blocked on CI is logged and skipped).
 - Stats (`scout_stats.py`): views/hour, top 20 of the last 7 days, title templates, length buckets, upload hour (UTC + Asunción UTC-3), streamer leaderboard (Shorts, views, total/avg v/h, clippers = crowding). `test_slot` = above-median avg v/h, at most 2 clippers, not in `creators.yaml`.
 - Daily ranking (D33): Twitch clips of the last 24 h for the top-50 EN streamers + `radar/config/creators.yaml`. Score = clip v/h × Shorts v/h ÷ clippers, written to `creators_ranking.json` (`{streamer, platform, score, weight, trend: up/down/new}`). Top-5 entrants are `new`.
@@ -23,8 +24,9 @@ python clipper/analyst/trend_scout.py --library clipper/formats/library.md --rep
 **Tests:** `pytest -q clipper/analyst` (fixtures: RSS XML, API JSON, yt-dlp JSON; LLM and Twitch mocked).
 
 **Open / needs HQ:**
-- `config/competitors.yaml` has 10 seed channels with **empty `channel_id`** (skipped with a warning). Real UC… ids can't be verified offline.
+- Seed handles (CreatorDB Aug 2026) are unverified: the first live run shows bad spellings under 'Fix me'. The cache only persists if the workflow commits `channel_cache.json` (HQ-owned workflow); otherwise it re-resolves daily (cheap).
+- Discovery slots: `count: 1` per streamer (issue text was ambiguous: one slot per streamer vs top 3); change `count` if wanted.
 - The workflow must `pip install -r clipper/requirements.txt` (now includes `anthropic`).
 - Streamer detection in titles is alias matching (config + creators.yaml + Twitch names); short aliases like "Speed" can false-positive.
 
-**Next:** fill channel ids; YouTube Analytics API puller → `post_metrics`.
+**Next:** correct 'Fix me' handles after the first live run; YouTube Analytics API puller → `post_metrics`.
