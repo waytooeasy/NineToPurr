@@ -1,0 +1,55 @@
+name: Agent queue
+
+# Starts the next ready agent issue, one at a time. Never merges anything.
+# Ready = open, labeled `agent`, not hold/needs-hq/in-progress, and every "Depends on: #N" is closed.
+# Kill switch: repo variable AGENTS_PAUSED=true.
+on:
+  issues:
+    types: [closed, labeled, opened]
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: agent-queue
+  cancel-in-progress: false
+
+jobs:
+  next:
+    if: vars.AGENTS_PAUSED != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Start next ready issue
+        env:
+          GH_TOKEN: ${{ secrets.PRM_BOT_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "PRM_BOT_TOKEN not set"; exit 0; }
+
+          open_prs=$(gh pr list -R "$REPO" --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("claude/"))] | length')
+          [ "$open_prs" = "0" ] || { echo "agent PR waiting for Lucas"; exit 0; }
+          busy=$(gh api "repos/$REPO/actions/workflows/claude.yml/runs?per_page=20" --jq '[.workflow_runs[] | select(.status != "completed")] | length')
+          [ "$busy" = "0" ] || { echo "agent already running"; exit 0; }
+          inprog=$(gh issue list -R "$REPO" --state open --label in-progress --json number --jq length)
+          [ "$inprog" = "0" ] || { echo "an issue is in progress"; exit 0; }
+
+          for n in $(gh issue list -R "$REPO" --state open --label agent --json number,labels \
+                     --jq '.[] | select([.labels[].name] | (index("hold") or index("needs-hq") or index("in-progress")) | not) | .number' | sort -n); do
+            deps=$(gh api "repos/$REPO/issues/$n" --jq .body | grep -iE '^[*_ ]*depends on' | grep -oE '#[0-9]+' | tr -d '#' || true)
+            ready=1
+            for d in $deps; do
+              st=$(gh api "repos/$REPO/issues/$d" --jq .state 2>/dev/null || echo open)
+              [ "$st" = "closed" ] || ready=0
+            done
+            [ "$ready" = "1" ] || { echo "#$n waiting on: $deps"; continue; }
+            gh issue edit "$n" -R "$REPO" --add-label in-progress
+            gh issue comment "$n" -R "$REPO" --body "@claude build this (auto-queued)"
+            echo "started #$n"
+            exit 0
+          done
+          echo "nothing ready"

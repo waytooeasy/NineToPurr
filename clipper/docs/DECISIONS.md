@@ -31,3 +31,4 @@ Owned by PRM · 00 HQ. One line per decision. Newest at the bottom. Build sessio
 | D25 | 2026-10-16 | English/US only for now; Spanish auto-translate dropped. | D1; focus |
 | D26 | 2026-10-16 | Migrations run via `clipper/db/migrate.py` (tracks `schema_migrations`), called by `setup.sh` and on every deploy. | Existing VM DBs need 002/003+ |
 | D27 | 2026-10-16 | Re-render loop: `needs_rerender` → Editor re-renders with the new `hook_text` → `qc_passed` (clears `approval_sent_at`). QC v1 = ≤60 s, duplicate hash, daily cap 5, `music_risk` → flagged in Telegram. | Closes the approval loop |
+| D28 | 2026-10-16 | **Build loop:** agent → PR opens itself → CI → red CI goes back to the agent (max 2) → **Lucas merges (one tap)** → next ready issue starts (`Depends on: #N`). No auto-merge. Repo-scoped token `PRM_BOT_TOKEN`; kill switch `AGENTS_PAUSED=true`. | Automate everything except the merge; code runs on the home PC with keys |
