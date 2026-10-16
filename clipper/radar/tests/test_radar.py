@@ -14,6 +14,11 @@ DB_DIR = Path(__file__).resolve().parents[2] / "db"
 NOW = datetime(2026, 10, 16, 12, 0, tzinfo=timezone.utc)
 
 
+def migrate_db(db):
+    for f in ["schema.sql", "ledger.sql", *sorted(p.relative_to(DB_DIR).as_posix() for p in (DB_DIR / "migrations").glob("*.sql"))]:
+        db.executescript((DB_DIR / f).read_text())
+
+
 def fx(name):
     return json.loads((FIX / name).read_text())
 
@@ -104,8 +109,7 @@ def test_collect_no_widen_when_enough(tw):
 
 def test_store_migration_and_picks(tw):
     db = sqlite3.connect(":memory:")
-    for f in ["schema.sql", "ledger.sql", "migrations/002_radar.sql"]:
-        db.executescript((DB_DIR / f).read_text())
+    migrate_db(db)
     cands = top_clips.collect(tw, ["kaicenat"], 2, now=NOW)
     top_clips.store(db, cands)
     top_clips.store(db, cands)  # idempotent
@@ -122,8 +126,7 @@ def test_load_creators():
 
 def test_capture_runs_ytdlp_and_marks_captured(tmp_path):
     db = sqlite3.connect(":memory:")
-    for f in ["schema.sql", "ledger.sql", "migrations/002_radar.sql"]:
-        db.executescript((DB_DIR / f).read_text())
+    migrate_db(db)
     top_clips.store(db, [top_clips.normalize(fx("clips_page1.json")["data"][0], "kaicenat", NOW)])
     calls = []
     paths = capture.capture([{"clip_id": "ClipA", "source_url": "https://clips.twitch.tv/ClipA"}],
@@ -131,3 +134,19 @@ def test_capture_runs_ytdlp_and_marks_captured(tmp_path):
     assert calls[0][0] == "yt-dlp" and calls[0][-1] == "https://clips.twitch.tv/ClipA"
     assert paths["ClipA"] == tmp_path / "ClipA.mp4"
     assert db.execute("select status from radar_candidates").fetchone()[0] == "captured"
+
+
+def test_register_clips_found_and_linked(tmp_path):
+    db = sqlite3.connect(":memory:")
+    migrate_db(db)
+    cands = top_clips.collect(Twitch("cid", "secret", session=FakeSession(), cache_path=tmp_path / "t.json"),
+                              ["kaicenat"], 2, now=NOW)
+    top_clips.store(db, cands)
+    ids = top_clips.register_clips(db, cands[:2])
+    assert len(ids) == 2
+    assert top_clips.register_clips(db, cands[:2]) == []  # idempotent
+    state, end_s = db.execute("select state, end_s from clips where id=?", (ids[0],)).fetchone()
+    assert state == "found" and end_s <= 60
+    linked = db.execute("select clips_id from radar_candidates where clip_id=?", (cands[0]["clip_id"],)).fetchone()[0]
+    assert linked == ids[0]
+    assert db.execute("select count(*) from radar_candidates where clips_id is null").fetchone()[0] == len(cands) - 2

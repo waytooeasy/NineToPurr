@@ -41,12 +41,8 @@ sudo chown -R "$USER":"$USER" $DATA
 $DATA/venv/bin/pip install --upgrade pip wheel
 $DATA/venv/bin/pip install --upgrade -r "$CLIP/requirements.txt"
 
-echo "== 5. Database"
-if [[ ! -f $DATA/db/clip.db ]]; then
-  sqlite3 $DATA/db/clip.db < "$CLIP/db/schema.sql"
-  sqlite3 $DATA/db/clip.db < "$CLIP/db/ledger.sql"
-  echo "created $DATA/db/clip.db"
-fi
+echo "== 5. Database (schema + ledger on a new DB, then pending migrations; idempotent)"
+CLIPPER_DB=$DATA/db/clip.db $DATA/venv/bin/python "$CLIP/db/migrate.py"
 
 echo "== 6. Keep yt-dlp fresh (daily)"
 ( crontab -l 2>/dev/null | grep -v 'yt-dlp' ; \

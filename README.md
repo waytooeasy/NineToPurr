@@ -19,7 +19,7 @@
 clipper/
 ├── docs/        strategy + module notes
 ├── infra/       setup.sh, systemd units
-├── db/          schema.sql, math.sql, ledger.sql
+├── db/          schema.sql, math.sql, ledger.sql, migrate.py, migrations/
 ├── radar/       find hot moments (Twitch)
 ├── editor/      clip.py: cut, 9:16, captions
 ├── publisher/   YouTube uploads
