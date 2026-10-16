@@ -1,0 +1,43 @@
+# Streamer-clip Shorts channels Trend Scout studies (D29: format research only, metadata only,
+# never downloaded or re-uploaded). channel_id = the UC... id (youtube.com/channel/UC...).
+# Entries with an empty channel_id are skipped with a warning: fill them in (HQ).
+# streamers = who the channel mostly clips (fallback when a title names nobody).
+channels:
+  - name: Kai Cenat clips 1
+    channel_id: ""
+    streamers: [Kai Cenat]
+  - name: Kai Cenat clips 2
+    channel_id: ""
+    streamers: [Kai Cenat]
+  - name: Kai Cenat clips 3
+    channel_id: ""
+    streamers: [Kai Cenat]
+  - name: IShowSpeed clips 1
+    channel_id: ""
+    streamers: [IShowSpeed]
+  - name: IShowSpeed clips 2
+    channel_id: ""
+    streamers: [IShowSpeed]
+  - name: Druski clips 1
+    channel_id: ""
+    streamers: [Druski]
+  - name: Druski clips 2
+    channel_id: ""
+    streamers: [Druski]
+  - name: Adin Ross clips 1
+    channel_id: ""
+    streamers: [Adin Ross]
+  - name: Adin Ross clips 2
+    channel_id: ""
+    streamers: [Adin Ross]
+  - name: Multi-streamer clips
+    channel_id: ""
+    streamers: []
+
+# Name -> aliases matched in titles/hashtags (case-insensitive). Streamers from
+# radar/config/creators.yaml and the Twitch watchlist are matched by their login too.
+aliases:
+  Kai Cenat: [kai cenat, kaicenat, kai]
+  IShowSpeed: [ishowspeed, speed]
+  Druski: [druski]
+  Adin Ross: [adin ross, adinross, adin]

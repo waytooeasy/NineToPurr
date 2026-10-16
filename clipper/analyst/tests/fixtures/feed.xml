@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <entry><yt:videoId>v1</yt:videoId><title>Kai Cenat can't believe Speed did this #shorts</title>
+  <published>2026-10-16T08:00:00+00:00</published>
+  <media:group><media:community><media:statistics views="120000"/></media:community></media:group></entry>
+ <entry><yt:videoId>v2</yt:videoId><title>Kai Cenat rages for 3 minutes #newguy</title>
+  <published>2026-10-15T02:00:00+00:00</published>
+  <media:group><media:community><media:statistics views="48000"/></media:community></media:group></entry>
+ <entry><yt:videoId>v3</yt:videoId><title>Druski pranks chat #newguy</title>
+  <published>2026-10-10T20:00:00+00:00</published>
+  <media:group><media:community><media:statistics views="5000"/></media:community></media:group></entry>
+ <entry><yt:videoId>v4</yt:videoId><title>Old one</title>
+  <published>2026-08-01T20:00:00+00:00</published>
+  <media:group><media:community><media:statistics views="9999999"/></media:community></media:group></entry>
+</feed>
