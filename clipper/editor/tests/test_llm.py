@@ -9,7 +9,7 @@ SCHEMA = {"type": "object", "required": ["a"],
 def fake(monkeypatch, replies):
     calls = []
 
-    def raw(prompt):
+    def raw(prompt, system=None, clip_id=None):
         calls.append(prompt)
         return replies[len(calls) - 1]
     monkeypatch.setattr(L, "_raw", raw)
@@ -44,8 +44,8 @@ def test_default_provider_is_haiku(monkeypatch):
     assert L.DEFAULT_ANTHROPIC_MODEL == "claude-haiku-5-5"
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     seen = []
-    monkeypatch.setattr(L, "_call_anthropic", lambda p: seen.append("a") or '{"a": 0}')
-    monkeypatch.setattr(L, "_call_gemini", lambda p: seen.append("g") or '{"a": 0}')
+    monkeypatch.setattr(L, "_call_anthropic", lambda p, *a: seen.append("a") or '{"a": 0}')
+    monkeypatch.setattr(L, "_call_gemini", lambda p, *a: seen.append("g") or '{"a": 0}')
     L.llm("p", SCHEMA)
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     L.llm("p", SCHEMA)
