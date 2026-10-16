@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from approvals import connect, record_error
+from approvals import DEFAULT_DB, connect, record_error
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 APPROVED = "approved"
@@ -351,7 +351,7 @@ def main(argv=None) -> int:
     if args.test_upload:
         print(test_upload(args.test_upload, args.privacy, cfg))
         return 0
-    con = connect(os.environ.get("CLIPPER_DB", "/opt/clipper/clipper.db"))
+    con = connect(os.environ.get("CLIPPER_DB", DEFAULT_DB))
     if args.dry_run:
         print(dry_run(con, cfg))
         return 0

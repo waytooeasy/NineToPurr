@@ -1,6 +1,6 @@
 """Telegram approval bot (long polling). Gate between qc_passed and approved/killed/needs_rerender.
 
-Env: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_CHAT_ID, CLIPPER_DB (default /opt/clipper/clipper.db).
+Env: TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_CHAT_ID, CLIPPER_DB (default /opt/clipper/db/clip.db).
 """
 import asyncio
 import logging
@@ -146,7 +146,7 @@ def main() -> None:
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_ALLOWED_CHAT_ID")
     if not token or not chat:
         sys.exit("TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_CHAT_ID are required")
-    app = build_app(token, int(chat), os.environ.get("CLIPPER_DB", "/opt/clipper/clipper.db"))
+    app = build_app(token, int(chat), os.environ.get("CLIPPER_DB", approvals.DEFAULT_DB))
     app.run_polling()
 
 
