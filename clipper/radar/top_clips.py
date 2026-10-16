@@ -92,11 +92,33 @@ def dedupe(clips):
     return kept
 
 
-def collect(tw, creators, min_candidates, now=None, days=(1, 7)):
-    """Per creator: last 24 h; widen to 7 days if fewer than min_candidates after dedupe."""
+def filter_allowed(creators, allowed=None):
+    """Heat Index hook (D33): keep only creators in `allowed` (case-insensitive). None = no filter."""
+    if allowed is None:
+        return list(creators)
+    ok = {a.lower() for a in allowed}
+    return [c for c in creators if c.lower() in ok]
+
+
+def apply_allocation(cands, slots, ids=None):
+    """Rank moments only within allocated streamers: from a ranked list keep the best `slots[streamer]`
+    per streamer. `ids` maps a creator login (lowercase) to its streamer name; default = the login."""
+    left = {k.lower(): n for k, n in slots.items()}
+    out = []
+    for c in cands:
+        key = (ids or {}).get(c["creator"].lower(), c["creator"]).lower()
+        if left.get(key, 0) > 0:
+            left[key] -= 1
+            out.append(c)
+    return out
+
+
+def collect(tw, creators, min_candidates, now=None, days=(1, 7), allowed=None):
+    """Per creator: last 24 h; widen to 7 days if fewer than min_candidates after dedupe.
+    `allowed`: optional creator allow-list (Heat Index allocation); None = all."""
     now = now or datetime.now(timezone.utc)
     allc = []
-    for login in creators:
+    for login in filter_allowed(creators, allowed):
         bid = tw.broadcaster_id(login)
         found = []
         for d in days:
@@ -180,16 +202,28 @@ def main(argv=None):
     ap.add_argument("--config", help="creators.yaml path")
     ap.add_argument("--youtube", action="store_true",
                     help="also add moments from creators' own YouTube live VODs (D29)")
+    ap.add_argument("--allocation", metavar="FILE",
+                    help="allocation.json from `python -m radar.heat`: rank only allocated streamers (D33)")
     a = ap.parse_args(argv)
 
+    alloc = json.loads(Path(a.allocation).read_text()) if a.allocation else None
+    ids = alloc.get("ids") if alloc else None
+    allowed = None
+    if alloc:
+        allowed = [k for k, n in alloc["slots"].items() if n > 0]
+        allowed += [login for login, name in (ids or {}).items() if name in allowed]
     from .twitch import Twitch
-    cands = collect(Twitch(), load_creators(a.config), max(a.min_candidates, a.picks or 0))
+    cands = collect(Twitch(), load_creators(a.config), max(a.min_candidates, a.picks or 0), allowed=allowed)
     db = connect()
     if a.youtube:
         from . import youtube_vods
-        cands = sorted(cands + youtube_vods.collect(load_creator_configs(a.config), db),
+        yt_cfgs = [c for c in load_creator_configs(a.config)
+                   if filter_allowed([c["twitch"]], allowed)]
+        cands = sorted(cands + youtube_vods.collect(yt_cfgs, db),
                        key=lambda x: x["views_per_hour"], reverse=True)
     store(db, cands)
+    if alloc:
+        cands = apply_allocation(cands, alloc["slots"], ids)
     for i, c in enumerate(cands, 1):
         print(f"{i:>3}. {c['views_per_hour']:>9.1f} v/h  {c['view_count']:>7} views  "
               f"{c['creator']}  {c['title'][:50]!r}  {c['url']}")

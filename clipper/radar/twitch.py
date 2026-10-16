@@ -68,6 +68,10 @@ class Twitch:
             raise ValueError(f"unknown Twitch login: {login}")
         return data[0]["id"]
 
+    def is_live(self, login):
+        """Get Streams: True when `login` is live right now."""
+        return bool(self._get("streams", {"user_login": login}).get("data"))
+
     def get_clips(self, broadcaster_id, started_at, ended_at, max_clips=500):
         """Clips in [started_at, ended_at] (aware datetimes), following pagination."""
         params = {"broadcaster_id": broadcaster_id, "first": 100,
