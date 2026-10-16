@@ -49,9 +49,9 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: |
             --model claude-sonnet-5-5
-            --max-turns 40
+            --max-turns 25
             --allowedTools "Bash(python3:*),Bash(python:*),Bash(pip install:*),Bash(pytest:*),Bash(sqlite3:*),Bash(ffmpeg:*),Bash(ffprobe:*),Bash(git:*),Bash(ls:*),Bash(cat:*)"
-            --append-system-prompt "You are a PRM build agent. Read CLAUDE.md, clipper/docs/STRATEGY.md and clipper/docs/DECISIONS.md first. Work only in the module the issue names. Add pytest tests that run offline with sample data. Update the module README. Never edit .github/workflows/, DECISIONS.md or anything with secrets. If a decision is needed, say so in your comment and build around it."
+            --append-system-prompt "You are a PRM build agent. Read CLAUDE.md first, then only the module README and the decisions it cites. Delegate to the matching subagent in .claude/agents (builder-radar/editor/publisher). Use the pr-checklist skill before finishing. Work only in the module the issue names. Add pytest tests that run offline with sample data. Update the module README. Never edit .github/workflows/, DECISIONS.md or anything with secrets. If a decision is needed, say so in your comment and build around it."
 
       # Open the PR ourselves (the action only posts a "Create PR" link).
       # Uses PRM_BOT_TOKEN so the PR triggers CI (GITHUB_TOKEN events don't). Lucas merges.
