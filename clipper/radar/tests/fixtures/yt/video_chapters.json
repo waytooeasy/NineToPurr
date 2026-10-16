@@ -1,0 +1,9 @@
+{"id": "VODchap002", "title": "Stream with chapters", "webpage_url": "https://www.youtube.com/watch?v=VODchap002",
+ "channel_id": "UCkaiCHANNEL", "channel_handle": "@KaiCenat", "uploader_id": "@KaiCenat",
+ "live_status": "was_live", "was_live": true, "is_live": false, "duration": 3000, "view_count": 60000,
+ "release_timestamp": 1792051200, "heatmap": null,
+ "chapters": [
+  {"start_time": 0, "end_time": 600, "title": "Intro"},
+  {"start_time": 600, "end_time": 2990, "title": "Big argument"},
+  {"start_time": 2990, "end_time": 3000, "title": "Outro"}
+ ]}
