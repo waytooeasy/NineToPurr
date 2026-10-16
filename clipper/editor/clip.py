@@ -183,14 +183,15 @@ def writer_picks(work, n, creator, meta=None):
     return picks
 
 
-def draft_pick(work, pick, creator, meta=None):
-    """Writer on the transcript inside one Radar pick -> pick with hook/hooks/context_line/title/score."""
+def draft_pick(work, pick, creator, meta=None, clip_id=None):
+    """Writer on the transcript inside one Radar pick -> pick with hook/hooks/context_line/title/score.
+    `clip_id` = clips.id; tags the llm_usage rows."""
     from writer import write_clip
     lines = [ln for ln in (work / "transcript.txt").read_text().splitlines()
              if (m := re.match(r"\[(\d+(?:\.\d+)?)-", ln)) and pick["start"] <= float(m.group(1)) < pick["end"]]
     if not lines:
         raise ValueError("no transcript inside the pick")
-    pl = write_clip("\n".join(lines), creator, meta)
+    pl = write_clip("\n".join(lines), creator, meta, clip_id=clip_id)
     start, end = max(pick["start"], pl["in"]), min(pick["end"], pl["out"])
     if end <= start:
         start, end = pick["start"], pick["end"]
@@ -305,7 +306,8 @@ def render_picks(src, picks, a, out, con=None, slug=None):
         row = clip_row(con, p)
         try:
             if a.auto and p.get("source_url") and "hook" not in p:
-                p = draft_pick(work, p, a.creator or p.get("creator", ""), {**meta, "clip_id": p.get("clip_id")})
+                p = draft_pick(work, p, a.creator or p.get("creator", ""), {**meta, "clip_id": p.get("clip_id")},
+                               clip_id=row)
             p = cap_pick(p)
             if row:
                 save_draft(con, row, p)

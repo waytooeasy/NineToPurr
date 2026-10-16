@@ -32,6 +32,8 @@
 - Work dirs now live under `$CLIPPER_WORK/<clip_id>/` (default `work/` when unset).
 
 - D31: Writer prompt split into cached system part + per-clip input; `write_clip(..., clip_id=)` tags `llm_usage` rows. Models only cache prompts above a minimum length and the current Writer prompt is short, so `cache_read_tokens` may stay 0 until the rubric/examples grow; `llm_usage` will show it.
+- `draft_pick(..., clip_id=)` passes `clips.id` to the Writer, so Radar picks get `llm_usage.clip_id`. Window scoring in `writer_picks` (no `clips` row yet) stays NULL.
+- `log_usage` warns (logger `llm`) instead of staying silent if `llm_usage` is missing. **Deploy: run `db/migrate.py` first** (migration 006). It connects with `timeout=30`, like `run_pipeline.py`.
 - `llm_batch` is not called by any pipeline step yet (the re-scoring job is a follow-up). Usage rows are `kind='batch'`; the Analyst applies the 50% rate.
 
 ## Run

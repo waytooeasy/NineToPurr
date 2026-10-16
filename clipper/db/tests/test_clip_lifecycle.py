@@ -60,7 +60,7 @@ def test_found_captured_drafted_edited(tmp_path, monkeypatch):
 
     # Editor: pre-seeded transcript, mocked Writer + render
     seed_work(tmp_path)
-    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None: PLAN)
+    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None, clip_id=None: PLAN)
     seen = {}
 
     def fake_render(video, pick, ass, out):
@@ -89,7 +89,7 @@ def test_no_db_file_still_renders(tmp_path, monkeypatch):
     monkeypatch.setenv("CLIPPER_DB", str(tmp_path / "missing.db"))
     monkeypatch.chdir(tmp_path)
     seed_work(tmp_path)
-    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None: PLAN)
+    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None, clip_id=None: PLAN)
     monkeypatch.setattr(clip, "download", lambda src, w: tmp_path / "v.mp4")
     monkeypatch.setattr(clip, "render", lambda v, p, a, o: Path(o).write_bytes(b"m"))
     pf = tmp_path / "p.json"

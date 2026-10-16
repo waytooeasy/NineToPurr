@@ -86,3 +86,16 @@ def test_synthetic_render_capped_and_context_visible(tmp_path):
         return subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", "2", "-i", str(mp4), "-frames:v", "1",
                                "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
     assert frame(with_ctx) != frame(no_ctx)  # context line is actually drawn
+
+
+def test_draft_pick_passes_clip_id_to_writer(tmp_path, monkeypatch):
+    import writer
+    (tmp_path / "transcript.txt").write_text("[1.0-4.0] hello there")
+    seen = {}
+
+    def fake(win, creator, meta=None, clip_id=None):
+        seen["clip_id"] = clip_id
+        return {**PLAN, "in": 0.0, "out": 10.0}
+    monkeypatch.setattr(writer, "write_clip", fake)
+    clip.draft_pick(tmp_path, {"start": 0.0, "end": 10.0}, "Kai Cenat", {}, clip_id=42)
+    assert seen["clip_id"] == 42
