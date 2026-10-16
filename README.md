@@ -8,10 +8,11 @@
 | [`clipper/`](clipper/) | YouTube Shorts channel of big-streamer clips, run by agents | Phase 0 |
 
 ## Clipper at a glance
-- Our own Shorts channel. Streamer audio, big hook captions, trending edit formats, many Shorts/day. Kai Cenat first.
+- One Shorts channel, multi-streamer (Kai Cenat first). Every clip gets our angle: context line + story captions. ≤60 s, 3–5/day.
 - Paid by YouTube Shorts ads. Goal ≈ 6.7M PYG/month net.
+- Python + systemd + SQLite + Telegram approvals; Gemini Flash-Lite writes per-clip text.
 - Runs on a home Ubuntu VM (VMware), reached over Tailscale.
-- Strategy: [`clipper/docs/STRATEGY.md`](clipper/docs/STRATEGY.md)
+- Strategy: [`clipper/docs/STRATEGY.md`](clipper/docs/STRATEGY.md) · Decisions: [`clipper/docs/DECISIONS.md`](clipper/docs/DECISIONS.md)
 
 ## Layout
 ```
