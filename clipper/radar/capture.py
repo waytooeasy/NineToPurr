@@ -28,6 +28,9 @@ def capture(picks, work=None, db=None, runner=subprocess.run):
             db.execute("UPDATE radar_candidates SET status='captured', file_path=?, "
                        "updated_at=datetime('now') WHERE clip_id=? AND status='found'",
                        (str(out), p["clip_id"]))
+            db.execute("UPDATE clips SET state='captured', file_path=?, state_changed_at=datetime('now') "
+                       "WHERE state='found' AND id=(SELECT clips_id FROM radar_candidates WHERE clip_id=?)",
+                       (str(out), p["clip_id"]))
     if db is not None:
         db.commit()
     return paths

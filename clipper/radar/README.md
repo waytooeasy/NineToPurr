@@ -10,7 +10,8 @@
 - `config/creators.yaml` — Twitch logins (`kaicenat`); add a line to add a streamer.
 - `twitch.py` — app token (client credentials, cached in `/opt/clipper/twitch_token.json`), login → broadcaster id, paginated Get Clips.
 - `top_clips.py` — last 24 h per creator (7 days if < N candidates after dedupe) → score → dedupe → `radar_candidates` → ranked list → `--picks N` writes `picks.json`.
-- `capture.py` — yt-dlp download of picked clips into `$CLIPPER_WORK`; marks rows `captured`.
+- `capture.py` — yt-dlp download of picked clips into `$CLIPPER_WORK`; marks rows `captured` and the linked `clips` row `captured` + `file_path`.
+- `top_clips.register_clips` — with `--picks N`, the chosen candidates become `clips` rows with `state='found'`, linked via `radar_candidates.clips_id` (D22). Idempotent.
 
 ## Rules in code
 - Score = views / hours since `created_at` (age floored at 15 min).
@@ -30,12 +31,12 @@ pytest radar
 | `CLIPPER_DB` | default `/opt/clipper/db/clip.db` |
 | `CLIPPER_WORK` | default `/opt/clipper/work` |
 
-The DB needs `002_radar.sql` applied: `sqlite3 /opt/clipper/db/clip.db < db/migrations/002_radar.sql`.
+The DB is built by `python db/migrate.py` (needs 002 + 004).
 
 **Needs:** Twitch app (dev.twitch.tv/console, 2FA, redirect `http://localhost`).
 
 **Infra:** proposed `infra/systemd/clipper-radar.{service,timer}` (every 20 min). Assumes repo at `/opt/clipper/repo`; adjust `WorkingDirectory` if different.
 
-**Open note for HQ/Editor:** Editor's `clip.py` currently takes a VOD/file plus `start`/`end`. Picks here point at a Twitch clip URL with `start: 0`; Editor needs to read `source_url` per pick.
+**Editor** now reads `source_url` per pick (D23) and moves the `clips` row on (see `../db/README.md`). Open: `creators.name` is the Twitch login, which may duplicate a hand-made display-name row.
 
 **Next:** chat spikes (live chat message-rate peaks → extra candidates).

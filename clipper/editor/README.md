@@ -20,7 +20,9 @@
 - `--auto` now uses `writer.py` (no direct Anthropic call). Needs `--creator "Kai Cenat"`; `--meta '<json>'` passes Radar metadata.
 - `cap_pick()` enforces ≤60 s on every pick (also `--picks` files) and `render()` cuts with `-t`.
 - Context line drawn under the hook (first 8 s); word captions unchanged.
-- `clips_log.csv` gains `hook_variant`, `context_line`, `title`, `score`, `music_risk` (old logs are migrated in place). No DB write yet: `db/schema.sql` is untouched; the Build session wires the DB when the publisher/QC module lands.
+- Radar picks (D23): `python clip.py --picks picks.json --auto` reads `source_url` per pick (uses the captured file when the DB has one), runs the Writer on the transcript inside `start`/`end`, renders. `src` is optional in this mode.
+- DB (D24, D22): if `$CLIPPER_DB` (default `/opt/clipper/db/clip.db`) exists and has a `clips` row for the pick, the Writer output (`model_score`, `context_line`, `hooks_json`, `hook_text`, `title`, `music_risk`) is written and the state goes `captured → drafted`; after render `edited` + `file_path`. No DB file → DB writes skipped. A failing pick sets `clips.last_error` and the run continues.
+- `clips_log.csv` is now a debug log only; it gains `hook_variant`, `context_line`, `title`, `score`, `music_risk` (old logs are migrated in place).
 - Tested on synthetic video only. `--lang es` no longer auto-translates (the old pick prompt did); Spanish captions need `es_words` in a picks file.
 - `music_risk` is logged but not yet acted on (QC step).
 
@@ -33,4 +35,4 @@ python clip.py <url> --auto -n 5 --creator "Kai Cenat" # Writer picks + renders
 Tests (offline, LLM mocked, no key needed; render test needs ffmpeg and takes ~2 min): `pytest clipper/editor`
 
 ## Next
-Face-tracked crop (MediaPipe), hook A/B selection (`hook_variant`), QC rules using `music_risk`, DB logging.
+Face-tracked crop (MediaPipe), hook A/B selection (`hook_variant`), QC rules using `music_risk`.

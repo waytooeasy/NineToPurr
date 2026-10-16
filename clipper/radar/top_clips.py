@@ -106,6 +106,30 @@ def store(db, cands):
     db.commit()
 
 
+def register_clips(db, cands):
+    """Chosen candidates become `clips` rows with state='found' (D22); radar_candidates.clips_id links them.
+    Idempotent: a candidate that already has a clips row is skipped. Returns the new clips ids."""
+    ids = []
+    for c in cands:
+        row = db.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()
+        if row is None or row[0] is not None:
+            continue
+        db.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, 'twitch', ?)",
+                   (c["creator"], f"https://twitch.tv/{c['creator']}"))
+        creator_id = db.execute("SELECT id FROM creators WHERE name=?", (c["creator"],)).fetchone()[0]
+        db.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
+                   (creator_id, c["url"], c["title"], c["view_count"]))
+        source_id = db.execute("SELECT id FROM sources WHERE url=?", (c["url"],)).fetchone()[0]
+        cur = db.execute(
+            "INSERT INTO clips (source_id, start_s, end_s, picked_by, state, state_changed_at) "
+            "VALUES (?, 0, ?, 'ai', 'found', datetime('now'))",
+            (source_id, min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S)))
+        db.execute("UPDATE radar_candidates SET clips_id=? WHERE clip_id=?", (cur.lastrowid, c["clip_id"]))
+        ids.append(cur.lastrowid)
+    db.commit()
+    return ids
+
+
 def to_picks(cands, n):
     """Editor format. start/end are seconds inside the downloaded Twitch clip file."""
     return [{"start": 0, "end": min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S),
@@ -128,11 +152,13 @@ def main(argv=None):
 
     from .twitch import Twitch
     cands = collect(Twitch(), load_creators(a.config), max(a.min_candidates, a.picks or 0))
-    store(connect(), cands)
+    db = connect()
+    store(db, cands)
     for i, c in enumerate(cands, 1):
         print(f"{i:>3}. {c['views_per_hour']:>9.1f} v/h  {c['view_count']:>7} views  "
               f"{c['creator']}  {c['title'][:50]!r}  {c['url']}")
     if a.picks:
+        register_clips(db, cands[:a.picks])
         Path(a.out).write_text(json.dumps(to_picks(cands, a.picks), indent=2))
         print(f"wrote {a.out}")
 
