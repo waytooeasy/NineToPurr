@@ -14,6 +14,8 @@
 | `llm.py` | `llm(prompt, schema) -> dict`. Anthropic `claude-haiku-5-5` by default (`CLAUDE_MODEL` overrides); `LLM_PROVIDER=gemini` uses Gemini (`GEMINI_API_KEY`, `GEMINI_MODEL`). Output is validated against the schema; one retry on invalid JSON. SDK/HTTP imported lazily. |
 | `writer.py` | `write_clip(transcript_window, creator, meta) -> dict`: `score` (0–1), `in`/`out` (≤60 s), 3 `hooks` (≤7 words), `context_line` (≤12 words), `title` (≤70 chars, names the streamer), `music_risk`. Retries once if limits are broken, then raises. |
 | `prompts/writer.md` | Writer prompt + score rubric (hook .30, coherence .25, emotion .20, value .15, payoff .10). Edit here, no code change. |
+| `qc.py` | QC v1 (D27): `edited → qc_passed` if the file is ≤60 s (ffprobe), its sha256 is not already in the library (`clips.file_hash`), and fewer than 5 clips passed today (UTC). Otherwise sets `last_error` and leaves the state. `music_risk` passes and stays on the row for the Telegram flag. |
+| `rerender.py` | `needs_rerender → qc_passed`: re-cuts the captured source with the new `hook_text` (same start/end + context line), replaces the Short in place, refreshes `file_hash`, clears `approval_sent_at`. |
 | `clip.py` | Download → Whisper → (`--auto`: Writer on 120 s transcript windows, best N non-overlapping) → render → CSV log. |
 
 ## Status
@@ -24,7 +26,10 @@
 - DB (D24, D22): if `$CLIPPER_DB` (default `/opt/clipper/db/clip.db`) exists and has a `clips` row for the pick, the Writer output (`model_score`, `context_line`, `hooks_json`, `hook_text`, `title`, `music_risk`) is written and the state goes `captured → drafted`; after render `edited` + `file_path`. No DB file → DB writes skipped. A failing pick sets `clips.last_error` and the run continues.
 - `clips_log.csv` is now a debug log only; it gains `hook_variant`, `context_line`, `title`, `score`, `music_risk` (old logs are migrated in place).
 - Tested on synthetic video only. `--lang es` no longer auto-translates (the old pick prompt did); Spanish captions need `es_words` in a picks file.
-- `music_risk` is logged but not yet acted on (QC step).
+- `music_risk` is stored on the row; QC passes it. The Telegram message should show it (publisher change, not done here).
+- QC + re-render (D27) are driven by `clipper/run_pipeline.py` (radar → capture → editor → qc → rerender, flock-locked, safe every 20 min). A failed capture/editor/re-render step sets `last_error` and is retried after 2 h.
+- Duplicate check = exact file hash. Perceptual hash is not built yet (re-renders with a different hook hash differently).
+- Work dirs now live under `$CLIPPER_WORK/<clip_id>/` (default `work/` when unset).
 
 ## Run
 ```
@@ -35,4 +40,4 @@ python clip.py <url> --auto -n 5 --creator "Kai Cenat" # Writer picks + renders
 Tests (offline, LLM mocked, no key needed; render test needs ffmpeg and takes ~2 min): `pytest clipper/editor`
 
 ## Next
-Face-tracked crop (MediaPipe), hook A/B selection (`hook_variant`), QC rules using `music_risk`.
+Face-tracked crop (MediaPipe), hook A/B selection (`hook_variant`), perceptual-hash duplicate check.
