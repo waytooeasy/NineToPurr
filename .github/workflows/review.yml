@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -31,9 +32,10 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            Use the reviewer subagent on PR #${{ github.event.pull_request.number }} (diff vs origin/main).
-            Post its verdict as one PR comment with `gh pr comment ${{ github.event.pull_request.number }} --body-file -`.
+            Use the reviewer subagent on PR #${{ github.event.pull_request.number }}.
+            The PR is already checked out. Diff: `git diff origin/main...HEAD` (do not fetch). Tests: run exactly `pytest -q clipper` from the repo root (no cd).
+            ALWAYS post a verdict comment, even if partial (say what was not checked), with `gh pr comment ${{ github.event.pull_request.number }} --body-file -`. Posting it is the priority: post by turn 14 at the latest.
           claude_args: |
             --model claude-sonnet-5-5
-            --max-turns 12
-            --allowedTools "Read,Grep,Glob,Task,Bash(git diff:*),Bash(git log:*),Bash(pytest:*),Bash(python3:*),Bash(gh pr comment:*)"
+            --max-turns 16
+            --allowedTools "Read,Grep,Glob,Task,Bash(git diff:*),Bash(git log:*),Bash(pytest:*),Bash(python -m pytest:*),Bash(python3:*),Bash(gh pr comment:*)"
