@@ -1,0 +1,11 @@
+# PROPOSED for Infra (Radar v1): every 20 minutes.
+[Unit]
+Description=Run Clipper Radar every 20 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=20min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

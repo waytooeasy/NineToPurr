@@ -1,0 +1,14 @@
+# PROPOSED for Infra (Radar v1). Install: copy to /etc/systemd/system/, then
+#   systemctl daemon-reload && systemctl enable --now clipper-radar.timer
+[Unit]
+Description=Clipper Radar: pull Twitch top clips into radar_candidates
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/clipper/repo/clipper
+EnvironmentFile=/opt/clipper/.env
+Environment=CLIPPER_DB=/opt/clipper/db/clip.db
+Environment=CLIPPER_WORK=/opt/clipper/work
+ExecStart=/opt/clipper/venv/bin/python -m radar.top_clips
