@@ -5,8 +5,9 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 **Read first, every session:** `clipper/docs/STRATEGY.md` and `clipper/docs/DECISIONS.md`.
 
 ## Clipper (active)
-- One YouTube Shorts channel, multi-streamer brand (Kai Cenat first). No ties to streamers. Paid by YouTube Shorts ads.
-- Every clip gets our angle: context line + storytelling captions. ≤60 s. 3–5/day. Streamer audio, no raw re-uploads.
+- One YouTube Shorts channel, multi-streamer brand with a point-of-view name (Kai Cenat + 2–3 less-clipped US streamers). No ties to streamers. Paid by YouTube Shorts ads, long-form recaps next. Strategy v5: start now, ~5 h/day, sin miedo al éxito.
+- Every clip gets our angle: context line + storytelling captions, Lucas's voice on the top 1–2/day. ≤60 s. 3–5/day. Streamer audio, no raw re-uploads.
+- Build order (D33): Publisher → live capture → metrics puller → voice track → long-form renderer.
 - Stack: Python + systemd timers + SQLite + Telegram approval bot. Per-clip LLM = **Claude Haiku 5.5** (Anthropic API); daily Analyst = Sonnet 5.5. Runtime n8n/agent team only after the gate in STRATEGY.md.
 - **Anthropic API = Lucas's own account only. Never a second account.** `ANTHROPIC_API_KEY` lives in GitHub secrets and `/opt/clipper/.env`, never in git or logs.
 - Build agents run via the Claude GitHub Action: Lucas comments `@claude` on an issue → agent builds → opens a PR. Agents never merge, never edit `.github/workflows/`, never touch secrets.

@@ -35,3 +35,11 @@ Owned by PRM · 00 HQ. One line per decision. Newest at the bottom. Build sessio
 | D29 | 2026-10-16 | Sources = streamers' own footage: Twitch clips **and** Twitch/YouTube live VODs (yt-dlp). Competitor Shorts = format research (Trend Scout), never downloaded or re-uploaded. | Lucas: learn from Shorts channels; their edits are their copyright |
 | D30 | 2026-10-16 | Agents: `.claude/agents` (builders per module, reviewer, security) + skills `pr-checklist`, `shorts-format`. Every agent PR gets a reviewer verdict before Lucas merges. Third-party skills only after a read-through. | Quality + one-tap merges |
 | D31 | 2026-10-16 | Token budget: build max-turns 25, review 12; Writer uses prompt caching; non-urgent LLM jobs via Batch API (−50%). | Cost |
+| D32 | 2026-10-16 | **v5: start now, ~5 h/day, "sin miedo al éxito".** No waiting on probation. | Old-rules YPP window (10M/90d) closes Feb 1, 2027 |
+| D33 | 2026-10-16 | **Post before build:** first Shorts uploaded by hand this weekend while code continues. Build order: Publisher → live capture → metrics puller → voice track → long-form renderer. Nothing else until data. | 0 Shorts posted; data beats code |
+| D34 | 2026-10-16 | **Gates tied to the Feb 2027 floor.** Wk 1–2 signal: ≥1 Short >10K engaged. Dec 31: on pace for 10M/90d by Jan 31 → apply. **Kill Jan 15 if <3M views/month.** Supersedes the D11 gate and the 3M/90d kill rule. | Old gates passed a channel that earns $0 |
+| D35 | 2026-10-16 | **Angle = point of view.** Channel name carries a premise a viewer can repeat; Kai + 2–3 less-clipped US streamers in `creators.yaml`. Lucas picks the name. | 759 accounts clip Kai; captions alone read as templates |
+| D36 | 2026-10-16 | **Lucas's own voice** on the top 1–2 Shorts/day (real opinion/context). No synthetic AI narration. | Strongest originality signal; moat |
+| D37 | 2026-10-16 | **Live capture** (Twitch Create Clip on live spikes) is build priority #2. | Speed beats VOD clippers ~1 h late |
+| D38 | 2026-10-16 | **Weekly long-form recap test** in weeks 3–4. Exception to Shorts-only. | Long-form ~10–30× RPM of Shorts |
+| D39 | 2026-10-16 | Track **copyright strikes** per streamer (not just claims); drop sources that strike. Whop/Vyro only after a Paraguay payout is confirmed. | 3 strikes = termination; payouts unverified |
