@@ -6,7 +6,7 @@
 
 ## Files
 - `schema.sql`, `ledger.sql` — base (recorded as `001_base`). `math.sql` — reference queries.
-- `migrations/NNN_name.sql` — everything after: `002_radar`, `003_approvals` (state machine + `approvals`), `004_clip_wiring` (`clips.title`, `clips.music_risk`, `radar_candidates.clips_id`), `005_qc` (`clips.file_hash`, `clips.qc_passed_at`).
+- `migrations/NNN_name.sql` — everything after: `002_radar`, `003_approvals` (state machine + `approvals`), `004_clip_wiring` (`clips.title`, `clips.music_risk`, `radar_candidates.clips_id`), `005_qc` (`clips.file_hash`, `clips.qc_passed_at`), `008_streamer_heat` (`streamer_heat`: Heat Index snapshots, D33).
 - `migrate.py` — applies base on a new DB, then each migration not in `schema_migrations(version, applied_at)`, in order, one transaction per file. Idempotent. A failure rolls that file back and stops.
 
 ## Run
