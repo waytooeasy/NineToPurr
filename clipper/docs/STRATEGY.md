@@ -1,4 +1,4 @@
-# PRM — Clipper strategy (v4, Oct 16, 2026)
+# PRM — Clipper strategy (v4.1, Oct 16, 2026)
 
 PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [`DECISIONS.md`](DECISIONS.md). Evidence: [`research/ai-shorts-2026.md`](research/ai-shorts-2026.md).
 
@@ -16,7 +16,7 @@ PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [
 | Multiple channels | **One channel** until it holds ≥20M Shorts views/90d | From Feb 1, 2027, Shorts pay only in months with ≥10M views/rolling 90d. One AdSense per person; one termination bars every channel. |
 | Kai only | **Multi-streamer config**, Kai first | 759 accounts clip Kai; he streams irregularly. |
 | Any length | **≤60 s hard cap** + music flag | A Short over 60 s with any copyright claim is blocked worldwide. |
-| Claude API / scheduled chats as the brain | **Gemini 3.1 Flash-Lite API** writes per-clip text. Claude builds the code. | Anthropic API unavailable on this account; Gemini costs cents. |
+| Claude API / scheduled chats as the brain | **Claude API (restored Oct 16):** Haiku 5.5 writes per-clip text, Sonnet 5.5 runs the daily report, Claude GitHub Action agents build the code from issues. | Ban lifted; Haiku is the cheapest option; build team runs without the home PC. |
 | n8n agent team now | **Plain Python + systemd + SQLite + Telegram bot.** n8n/agent team unlock at a gate. | Bottleneck is views, not tooling. Automate only what has worked by hand. |
 | 7 chats | **HQ + one Build session** in the repo (module chats optional) | Hand-off pain came from the split. |
 
@@ -31,7 +31,7 @@ YPP today: 1k subs + 10M Shorts views/90d. **From Feb 1, 2027:** new applicants 
 
 ## Pipeline
 ```
-Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Gemini: score, 3 hooks, context line, title)
+Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Claude Haiku: score, 3 hooks, context line, title)
 → Editor (Whisper captions, face-tracked 9:16, ≤60 s) → QC (rules) → Telegram approve/edit/kill → Publisher (YouTube API)
 → Metrics (engaged views, viewed-vs-swiped, claims) → daily report
 ```
@@ -44,7 +44,7 @@ Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Ge
 |---|---|---|
 | **0. Validate (2 weeks)** | VM up. 15 Shorts: script cuts + captions, Lucas approves the angle, upload by hand or one API test upload. 3/day. | ≥1 Short over 10K engaged views. None → change format before more code. |
 | **1. Automate the proven steps** | Radar + Writer + Editor + Telegram bot + API publisher. 3–5/day. Add 1–2 streamers. | ≥1M engaged views/month pace |
-| **2. Learning loop** | Daily metrics, weekly "what won" prompt update, 1 daily `claude -p` report (official CLI, own account, `setup-token`). Optional Feb 1 YPP push if pace allows (~111K views/day). | YPP accepted; ≥10M/90d sustained |
+| **2. Learning loop** | Daily metrics, weekly "what won" prompt update, 1 daily Sonnet report via the API. Optional Feb 1 YPP push if pace allows (~111K views/day). | YPP accepted; ≥10M/90d sustained |
 | **3. Scale** | n8n / agent team, recap format, more streamers. 2nd channel only with a distinct format and the 1st ≥20M/90d. | ≥$1,100 net for 2 months |
 
 **Kill:** <3M views in the first 90 days → stop the ad model.
@@ -54,14 +54,14 @@ Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Ge
 - No detection-evasion edits (speed-up, pitch shift, mirror, heavy filters, crop tricks). Those are spam strikes.
 - ≤60 s. Flag music segments. Track claims per streamer; drop sources that claim.
 - No duplicate files. Cap 5/day.
-- Never a backup channel. Never a second Anthropic account. No `ANTHROPIC_API_KEY`, no `--bare`.
+- Never a backup channel. Never a second Anthropic account. API key only in secrets / `.env`; Console spend limit always on.
 - US tax form (W-8BEN) in AdSense on day 1; contador for Paraguay IRP.
 - Secrets in `/opt/clipper/.env`, never in git.
 
 ## Cost (monthly)
 | Item | Cost |
 |---|---|
-| Gemini Flash-Lite (paid tier, $50 hard cap) | ~$1–5 |
+| Claude API: Haiku per clip + Sonnet daily report + build agents ($30/month Console limit) | ~$5–30 |
 | YouTube + Twitch APIs, Telegram, SQLite, n8n self-hosted | $0 |
 | Claude subscription | existing |
-| **Total** | **~$1–5** (+ electricity) |
+| **Total** | **~$5–30** (+ electricity) |
