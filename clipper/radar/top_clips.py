@@ -27,9 +27,23 @@ def parse_ts(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
 
 
-def load_creators(path=None):
+def load_creator_configs(path=None):
+    """[{"twitch": login, "youtube_channel": "@Handle" | None}]. Entries are a plain Twitch login
+    string or a mapping with `twitch` (or `login`) and optional `youtube_channel`."""
     cfg = yaml.safe_load(Path(path or HERE / "config" / "creators.yaml").read_text())
-    return [str(c).lower() for c in cfg["creators"]]
+    out = []
+    for c in cfg["creators"]:
+        if isinstance(c, dict):
+            login = c.get("twitch") or c.get("login")
+            yt = c.get("youtube_channel")
+            out.append({"twitch": str(login).lower(), "youtube_channel": str(yt) if yt else None})
+        else:
+            out.append({"twitch": str(c).lower(), "youtube_channel": None})
+    return out
+
+
+def load_creators(path=None):
+    return [c["twitch"] for c in load_creator_configs(path)]
 
 
 def score(clip, now):
@@ -96,11 +110,12 @@ def collect(tw, creators, min_candidates, now=None, days=(1, 7)):
 
 def store(db, cands):
     for c in cands:
+        c = {"broadcaster_id": None, **c, "source": c.get("source", "twitch")}
         db.execute(
             """INSERT INTO radar_candidates (clip_id, creator, broadcaster_id, title, url, video_id,
-                   vod_offset, duration_s, view_count, clip_created_at, views_per_hour)
+                   vod_offset, duration_s, view_count, clip_created_at, views_per_hour, source)
                VALUES (:clip_id,:creator,:broadcaster_id,:title,:url,:video_id,:vod_offset,
-                   :duration_s,:view_count,:created_at,:views_per_hour)
+                   :duration_s,:view_count,:created_at,:views_per_hour,:source)
                ON CONFLICT(clip_id) DO UPDATE SET view_count=excluded.view_count,
                    views_per_hour=excluded.views_per_hour, updated_at=datetime('now')""", c)
     db.commit()
@@ -116,25 +131,40 @@ def register_clips(db, cands):
             continue
         db.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, 'twitch', ?)",
                    (c["creator"], f"https://twitch.tv/{c['creator']}"))
+        start_s, end_s = pick_window(c)
         creator_id = db.execute("SELECT id FROM creators WHERE name=?", (c["creator"],)).fetchone()[0]
         db.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
                    (creator_id, c["url"], c["title"], c["view_count"]))
         source_id = db.execute("SELECT id FROM sources WHERE url=?", (c["url"],)).fetchone()[0]
         cur = db.execute(
             "INSERT INTO clips (source_id, start_s, end_s, picked_by, state, state_changed_at) "
-            "VALUES (?, 0, ?, 'ai', 'found', datetime('now'))",
-            (source_id, min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S)))
+            "VALUES (?, ?, ?, 'ai', 'found', datetime('now'))",
+            (source_id, start_s, end_s))
         db.execute("UPDATE radar_candidates SET clips_id=? WHERE clip_id=?", (cur.lastrowid, c["clip_id"]))
         ids.append(cur.lastrowid)
     db.commit()
     return ids
 
 
+def pick_window(c):
+    """(start, end) in seconds inside the file behind source_url.
+    Twitch: the source is the clip itself, so 0 -> duration. YouTube (D29): the source is the whole
+    live VOD, so start/end are VOD-absolute."""
+    dur = min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S)
+    if c.get("source") == "youtube":
+        start = c["vod_offset"]
+        return start, start + dur
+    return 0, dur
+
+
 def to_picks(cands, n):
-    """Editor format. start/end are seconds inside the downloaded Twitch clip file."""
-    return [{"start": 0, "end": min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S),
-             "source_url": c["url"], "creator": c["creator"], "clip_id": c["clip_id"]}
-            for c in cands[:n]]
+    """Editor format (D23). start/end are seconds inside the file for source_url (see pick_window)."""
+    out = []
+    for c in cands[:n]:
+        start, end = pick_window(c)
+        out.append({"start": start, "end": end, "source_url": c["url"],
+                    "creator": c["creator"], "clip_id": c["clip_id"]})
+    return out
 
 
 def connect(path=None):
@@ -148,11 +178,17 @@ def main(argv=None):
     ap.add_argument("--min-candidates", type=int, default=10,
                     help="widen to 7 days if fewer per creator")
     ap.add_argument("--config", help="creators.yaml path")
+    ap.add_argument("--youtube", action="store_true",
+                    help="also add moments from creators' own YouTube live VODs (D29)")
     a = ap.parse_args(argv)
 
     from .twitch import Twitch
     cands = collect(Twitch(), load_creators(a.config), max(a.min_candidates, a.picks or 0))
     db = connect()
+    if a.youtube:
+        from . import youtube_vods
+        cands = sorted(cands + youtube_vods.collect(load_creator_configs(a.config), db),
+                       key=lambda x: x["views_per_hour"], reverse=True)
     store(db, cands)
     for i, c in enumerate(cands, 1):
         print(f"{i:>3}. {c['views_per_hour']:>9.1f} v/h  {c['view_count']:>7} views  "
