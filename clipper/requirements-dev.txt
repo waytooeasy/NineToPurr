@@ -1,2 +1,4 @@
 pytest
 python-telegram-bot>=21
+pyyaml
+requests
