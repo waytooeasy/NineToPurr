@@ -1,8 +1,8 @@
 # Publisher
 
-**Scope:** (1) the Telegram approval gate (`approve_bot.py`, built); (2) upload approved Shorts to YouTube on a spaced schedule (not built).
+**Scope:** (1) the Telegram approval gate (`approve_bot.py`, built); (2) upload approved Shorts to YouTube on a spaced schedule (`upload.py`, built).
 
-**Status:** approval bot built. Upload not built.
+**Status:** approval bot built. Upload built (`upload.py`, tests offline; real API not yet exercised, run the D21 test upload).
 
 ## Approval bot (D10: Lucas approves every Short)
 
@@ -61,7 +61,43 @@ Then `sudo systemctl enable --now clipper-approve`. Adjust the paths to match `i
 ### Tests
 `pip install -r clipper/requirements-dev.txt && pytest clipper/publisher` (offline, Telegram mocked).
 
-## Upload (not built)
+## Upload (`upload.py`, built, untested against the real API)
 **Constraints (D21):** uploads have their own quota bucket (~100/day, ~100 units each). Unverified projects may upload public now; confirm with one test upload. If private-only, request the audit and upload by phone meanwhile.
 
-**Next:** Google Cloud project, OAuth, `upload.py` (picks up `approved` clips).
+**How it works:** the timer runs every 15 min. Each pass computes today's slots; if one is due it uploads the oldest clean `approved` clip via `videos.insert`, writes the `posts` row (video id, url, posted_at, caption) and sets `clips.state='published'` in one transaction.
+- Slots (D8): max 5/day, >= 2 h apart, window 19:00-02:00 America/Asuncion (crosses midnight; at 01:00 the window that began yesterday is current). Gotcha: a 7 h window with a 2 h gap fits only 4 slots. For 5 set `UPLOAD_WINDOW_END=03:00`.
+- Title = `clips.title`, else `hook_text` (<= 100 chars). Description = `context_line` + `#Shorts`. Tags include `#Shorts` + `topic_tags`. Category Gaming (20).
+- Idempotent: a clip that already has a `posts` row is only marked published, never re-uploaded. Account row (`youtube`, handle `YOUTUBE_CHANNEL_HANDLE`) is created on first upload.
+- Quota (403 `quotaExceeded`/`uploadLimitExceeded`): `last_error` = `quota: ...`, Telegram alert, no more uploads until the next local day. Clip stays `approved`.
+- Other errors (missing file, API failure): `last_error` + Telegram alert, clip stays `approved`, one attempt per pass, and clips with an error sort after clean ones so they never block the queue. There is no retry cap yet: a permanently broken clip is retried last on every pass (kill it in the DB or re-approve to clear).
+- Known risk: if the process dies between `videos.insert` returning and the DB commit, the next pass uploads that clip again (duplicate video). Window is milliseconds; accepted for now.
+
+Env (all optional): `CLIPPER_DB`, `YOUTUBE_CLIENT_SECRET` (default `/opt/clipper/client_secret.json`), `YOUTUBE_TOKEN_FILE` (default `/opt/clipper/youtube_token.json`), `YOUTUBE_CHANNEL_HANDLE`, `YOUTUBE_CATEGORY_ID` (20), `UPLOAD_PRIVACY` (public), `UPLOAD_TZ`, `UPLOAD_WINDOW_START`, `UPLOAD_WINDOW_END`, `UPLOAD_MAX_PER_DAY` (5), `UPLOAD_MIN_GAP_HOURS` (2), plus `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALLOWED_CHAT_ID` for alerts.
+
+### One-time OAuth setup
+1. console.cloud.google.com: create a project, **APIs & Services -> Library -> YouTube Data API v3 -> Enable**.
+2. **OAuth consent screen**: External, add your Google account as a test user.
+3. **Credentials -> Create credentials -> OAuth client ID -> Desktop app**. Download the JSON, save as `/opt/clipper/client_secret.json` (never in git).
+4. Run `python upload.py --auth` on a machine with a browser (log in with the channel's Google account). It writes the token to `YOUTUBE_TOKEN_FILE`. For the headless VM, run it on your PC with `YOUTUBE_CLIENT_SECRET`/`YOUTUBE_TOKEN_FILE` pointing at local files, then `scp` the token to `/opt/clipper/youtube_token.json` (chmod 600). It refreshes itself afterwards.
+5. Note: while the consent screen is in "Testing", Google expires refresh tokens after 7 days. Publish the app (still unverified is fine for own use) so the token lasts.
+
+### D21 test upload (do this first)
+```
+cd clipper/publisher
+python upload.py --test-upload some_short.mp4 --privacy unlisted   # then public
+```
+Open the printed link logged out. If a public upload shows as locked/private, the project needs the API audit; upload by phone meanwhile and tell HQ.
+
+### Run / inspect
+```
+python upload.py --dry-run     # today's slots and which clip goes where, no API, no writes
+python upload.py               # one pass (what the timer runs)
+```
+
+### systemd
+```
+sudo cp clipper/infra/systemd/clipper-upload.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now clipper-upload.timer
+```
+
+**Next:** run the D21 test upload; then watch the first live day (`journalctl -u clipper-upload`). Later: retry cap for broken clips, shift slots by Heat Index (D33), pull metrics into `post_metrics`.
