@@ -20,6 +20,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 | Module sessions (optional) | One folder each, same rules |
 
 ## Rules
+- **Exactly one HQ:** the chat named "PRM · 00 HQ". No other chat or agent edits `STRATEGY.md`, `DECISIONS.md` or `CLAUDE.md`, or pushes to `hq/*` branches. If you're not HQ and something needs a decision, open a `needs-hq` issue.
 - Work on a branch; open a PR. Never push to `main`.
 - Anything that changes strategy or another module's contract → open a GitHub issue labeled `needs-hq` and keep building around it.
 - Schema changes only as `clipper/db/migrations/NNN_name.sql`.
