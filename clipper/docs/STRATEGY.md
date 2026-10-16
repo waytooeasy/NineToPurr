@@ -1,75 +1,67 @@
-# PRM — Clipping Engine strategy (v3, Oct 15, 2026)
+# PRM — Clipper strategy (v4, Oct 16, 2026)
 
-PRM = Puro Rico o Muerto. This doc is the main strategy. Build details live in separate chats.
+PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [`DECISIONS.md`](DECISIONS.md). Evidence: [`research/ai-shorts-2026.md`](research/ai-shorts-2026.md).
 
-## The idea (locked)
-- Our own **YouTube Shorts** channel of big-streamer clips. No ties to the streamers: we clip, we post, the views and channel are ours.
-- Streamer's own audio, big hook captions, **copy whatever edit formats are trending**. No voiceover, no long videos.
-- **Many Shorts a day**, several creators. Start with **Kai Cenat**, add creators by data.
-- Money = **YouTube Shorts ad revenue** (YPP is available in Paraguay). US/English audience.
-- Goal: **~6.7M PYG ≈ $1,100/month net** (≈ half a salary).
-- Lucas: ~1 h/day. Clips auto-post, daily review.
+## The model
+- **One YouTube Shorts channel**, multi-streamer brand (no streamer name in it). Kai Cenat is the first source, not the whole channel.
+- No ties to streamers. We clip, add our angle, post. Views and channel are ours.
+- Money = YouTube Shorts ads (YPP; Paraguay eligible). English/US audience.
+- Goal: **≈6.7M PYG ≈ $1,100/month net** (~$1,450 gross after ~24% US withholding).
+
+## What changed (v3 → v4) and why
+| Was | Now | Why |
+|---|---|---|
+| Raw clips, streamer audio only, copy templates | **Every clip gets our angle:** a context line + storytelling captions (setup → payoff). Recaps of 2–4 moments as a format test. Streamer audio stays. | YouTube's reused-content rules reject "clips with little or no narrative" and "template-based changes". Since Oct 2, 2026, Shorts reach is cut for re-uploads that add nothing of your own. |
+| Many Shorts/day | **3–5/day**, curated | Top clip channels post 0.3–2/day. Spam policy bans high volumes of similar AI content. |
+| Multiple channels | **One channel** until it holds ≥20M Shorts views/90d | From Feb 1, 2027, Shorts pay only in months with ≥10M views/rolling 90d. One AdSense per person; one termination bars every channel. |
+| Kai only | **Multi-streamer config**, Kai first | 759 accounts clip Kai; he streams irregularly. |
+| Any length | **≤60 s hard cap** + music flag | A Short over 60 s with any copyright claim is blocked worldwide. |
+| Claude API / scheduled chats as the brain | **Gemini 3.1 Flash-Lite API** writes per-clip text. Claude builds the code. | Anthropic API unavailable on this account; Gemini costs cents. |
+| n8n agent team now | **Plain Python + systemd + SQLite + Telegram bot.** n8n/agent team unlock at a gate. | Bottleneck is views, not tooling. Automate only what has worked by hand. |
+| 7 chats | **HQ + one Build session** in the repo (module chats optional) | Hand-off pain came from the split. |
 
 ## The math
-| Item | Number |
-|---|---|
-| Shorts RPM (entertainment) | ~$0.03–0.08 per 1k views |
-| US tax withholding | 30% on US-viewer revenue (no US treaty for Paraguay; W-8BEN still required, otherwise 24% of everything) |
-| Net after withholding (~80% US audience) | ~76% of gross |
-| Gross needed for $1,100 net | ~$1,450/month |
-| Views needed | **~18–48M/month ≈ 0.6–1.6M/day** |
-| At 10 Shorts/day | **~60k–160k avg views per Short** |
-| YPP gate (before any $) | 1,000 subs + 10M Shorts views in 90 days |
-
-Benchmark: top streamer-clip channels do 60–110M views/month. The target is mid-tier.
-
-## The engine
-| Agent | Job | Runs on |
+| RPM case | Views/month for $1,100 net | Avg views per Short at 5/day |
 |---|---|---|
-| **Radar** | Each creator's most-viewed Twitch clips (last 24h) + live chat spikes, ranked | Home VM, code |
-| **Capture** | Downloads the raw moment | Home VM, yt-dlp |
-| **Editor** | Trending format preset: 9:16, facecam crop, hook text, word captions, zooms, title + tags | Home VM, ffmpeg + Whisper |
-| **QC** | Kills dupes/weak clips, daily cap, spacing | Home VM, rules |
-| **Publisher** | Spaced uploads | Home VM, YouTube API (manual phone upload until audit) |
-| **Analyst** | Views 1h/24h/72h, retention, subs, Content ID claims → scores creators, formats, hooks, post times | Home VM, YouTube Analytics API + SQLite |
-| **Trend Scout** | Studies competitor Shorts daily, updates the format library | Claude scheduled task |
-| **Orchestrator** | Daily report + changes for tomorrow | Claude scheduled task |
+| $0.05 (low) | ~29M | ~193K |
+| $0.15 (mid) | ~9.7M | ~64K |
+| $0.30 (US-heavy) | ~4.8M | ~32K |
 
-No Claude API (account banned there). Real-time work is plain code; the thinking runs as daily scheduled tasks on the current Claude plan.
+YPP today: 1k subs + 10M Shorts views/90d. **From Feb 1, 2027:** new applicants need 20M/90d + 1k subs, and every channel needs ≥10M/90d each month to be paid.
 
-## Infra ($0)
-- Home PC: i5-12400, 32 GB, 2 TB NVMe, Win 11 → **VMware Ubuntu Server 24.04 VM** (6 vCPU, 8 GB RAM, 80 GB).
-- Auto-start the VM via Task Scheduler (`vmrun ... nogui`). Bot runs as systemd services.
-- Remote access: **Tailscale** in the VM + personal phone/laptop. No DNS, no open ports (everything is outbound).
-- Data: SQLite (`schema.sql`, `math.sql`, `ledger.sql`), money tracked in USD + PYG.
-
-## Hard constraints
-- **YouTube API:** a new project uploads private-only until audited, ~6 uploads/day on the default quota. Apply for audit + quota on day 1.
-- **YPP review:** raw reuploads get rejected. The edit layer (captions, zooms, cuts) keeps the channel monetizable.
-- **Content ID:** a claimed Short's revenue goes to the claimant. The Analyst tracks claim rate per creator, and creators who claim a lot get swapped out.
-- **Taxes:** W-8BEN in AdSense on day 1. Foreign income in Paraguay: RUC/IRP, ask a contador before the first payout.
+## Pipeline
+```
+Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Gemini: score, 3 hooks, context line, title)
+→ Editor (Whisper captions, face-tracked 9:16, ≤60 s) → QC (rules) → Telegram approve/edit/kill → Publisher (YouTube API)
+→ Metrics (engaged views, viewed-vs-swiped, claims) → daily report
+```
+- Clip states: `found → captured → drafted → edited → qc_passed → approved → published → measured`.
+- Measure **engaged views** and viewed-vs-swiped-away, not raw views (Shorts count every play).
+- Lucas approves every Short at first (L0). Auto-publish only after 2 clean weeks (≥90% approved unchanged, 0 blocked claims).
 
 ## Phases and gates
 | Phase | What | Gate |
 |---|---|---|
-| **0 — Week 1** | VM + `clip.py`, Kai only, 3–5 Shorts/day, manual upload. Apply for API audit. AdSense + W-8BEN. | ≥100k total views |
-| **1 — Weeks 2–4** | Radar + Capture + Editor + QC automated, 5–8/day, 2nd creator | ≥1M views/month pace, ≥500 subs |
-| **2 — Months 2–3** | Analyst + Trend Scout + Orchestrator, 8–12/day, 3–5 creators | YPP: 1k subs + 10M views/90 days |
-| **3 — Monetized** | Scale what the data says works. 2nd channel only after the 1st makes ≥ $500/month. | ≥ $1,100/month net |
+| **0. Validate (2 weeks)** | VM up. 15 Shorts: script cuts + captions, Lucas approves the angle, upload by hand or one API test upload. 3/day. | ≥1 Short over 10K engaged views. None → change format before more code. |
+| **1. Automate the proven steps** | Radar + Writer + Editor + Telegram bot + API publisher. 3–5/day. Add 1–2 streamers. | ≥1M engaged views/month pace |
+| **2. Learning loop** | Daily metrics, weekly "what won" prompt update, 1 daily `claude -p` report (official CLI, own account, `setup-token`). Optional Feb 1 YPP push if pace allows (~111K views/day). | YPP accepted; ≥10M/90d sustained |
+| **3. Scale** | n8n / agent team, recap format, more streamers. 2nd channel only with a distinct format and the 1st ≥20M/90d. | ≥$1,100 net for 2 months |
 
-**Kill / pivot:** under 1M views in the first 60 days → change creator/format. Under 3M in 90 days → stop.
+**Kill:** <3M views in the first 90 days → stop the ad model.
 
-## Chat split
-- **Main (this one):** strategy, numbers, gates, decisions.
-- **Build chats:** Infra (VM, Tailscale, setup.sh) · Radar + Capture · Editor (formats) · Publisher (YouTube API) · Analyst + ledger · Trend Scout/Orchestrator.
+## Hard rules
+- No raw re-uploads; every clip carries our context line + story captions.
+- No detection-evasion edits (speed-up, pitch shift, mirror, heavy filters, crop tricks). Those are spam strikes.
+- ≤60 s. Flag music segments. Track claims per streamer; drop sources that claim.
+- No duplicate files. Cap 5/day.
+- Never a backup channel. Never a second Anthropic account. No `ANTHROPIC_API_KEY`, no `--bare`.
+- US tax form (W-8BEN) in AdSense on day 1; contador for Paraguay IRP.
+- Secrets in `/opt/clipper/.env`, never in git.
 
-## Built so far
-`clip.py` (cut + captions) ✅ · `schema.sql` + `math.sql` ✅ · `ledger.sql` ✅ · `setup.sh` ✅
-
-## Sources
-- YPP availability (Paraguay listed): support.google.com/youtube/answer/7101720
-- YPP thresholds: support.google.com/youtube/answer/72851
-- Shorts RPM: joyspace.ai/youtube-shorts-rpm-2026-calculator · 1of10.com/blog/youtube-pay-per-view
-- US withholding on YouTube earnings: wiki.private.law/en/platform-withholding
-- YouTube API quota: outlierkit.com/resources/youtube-api-quota
-- Top clip channels: creatordb.app/creator-news/the-rise-of-the-clip-economy
+## Cost (monthly)
+| Item | Cost |
+|---|---|
+| Gemini Flash-Lite (paid tier, $50 hard cap) | ~$1–5 |
+| YouTube + Twitch APIs, Telegram, SQLite, n8n self-hosted | $0 |
+| Claude subscription | existing |
+| **Total** | **~$1–5** (+ electricity) |
