@@ -37,6 +37,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
         run: python clipper/analyst/trend_scout.py --library clipper/formats/library.md --report report.md
       - name: Publish report issue + library branch
         if: steps.has.outputs.ok == '1'
@@ -45,6 +47,7 @@ jobs:
         run: |
           d=$(date -u +%F)
           gh issue create --title "Trends $d" --body-file report.md --label trends || gh issue create --title "Trends $d" --body-file report.md
+          [ -f clipper/formats/library.md ] || { echo "no library.md this run"; exit 0; }
           git config user.name "trend-scout"; git config user.email "actions@users.noreply.github.com"
           cp clipper/formats/library.md /tmp/library.md
           git fetch -q origin trends && git checkout -q -B trends origin/trends || git checkout -q --orphan trends
