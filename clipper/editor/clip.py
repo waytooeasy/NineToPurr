@@ -46,6 +46,11 @@ WINDOW_S, STRIDE_S = 120.0, 90.0   # transcript windows sent to the Writer
 DEFAULT_DB = "/opt/clipper/db/clip.db"
 
 
+def work_root():
+    """Per-clip work dirs (words.json, transcript, .ass) live under $CLIPPER_WORK; relative `work` if unset."""
+    return Path(os.environ.get("CLIPPER_WORK", "work"))
+
+
 def db_open():
     """Open $CLIPPER_DB; None when the file does not exist (stand-alone use without the DB)."""
     path = os.environ.get("CLIPPER_DB", DEFAULT_DB)
@@ -281,7 +286,7 @@ def log(row, path="clips_log.csv"):
 def render_picks(src, picks, a, out, con=None, slug=None):
     """Download/transcribe `src`, then draft (Radar picks with --auto) and render each pick."""
     slug = slug or re.sub(r"[^A-Za-z0-9]+", "_", str(src))[-40:].strip("_") or "src"
-    work = Path("work") / slug
+    work = work_root() / str(slug)
     work.mkdir(parents=True, exist_ok=True)
     video = download(src, work)
     words = transcribe(video, work, a.model)

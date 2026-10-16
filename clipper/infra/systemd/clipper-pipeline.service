@@ -1,0 +1,17 @@
+# One pipeline pass: radar -> capture -> writer/editor -> qc -> rerender (clipper/run_pipeline.py).
+# Overlapping runs exit at once (flock on /opt/clipper/pipeline.lock).
+[Unit]
+Description=Clipper pipeline pass
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/clipper/repo/clipper
+EnvironmentFile=/opt/clipper/.env
+Environment=CLIPPER_DB=/opt/clipper/db/clip.db
+Environment=CLIPPER_WORK=/opt/clipper/work
+Environment=CLIPPER_CLIPS=/opt/clipper/clips
+Environment=CLIPPER_LOCK=/opt/clipper/pipeline.lock
+ExecStart=/opt/clipper/venv/bin/python run_pipeline.py
+TimeoutStartSec=30min
