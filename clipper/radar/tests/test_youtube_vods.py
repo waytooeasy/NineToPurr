@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from radar import capture, top_clips, youtube_vods
 from radar.tests.test_radar import migrate_db
 
@@ -110,17 +112,68 @@ def test_picks_are_vod_absolute_and_register_clips():
     assert (s, e) == (picks[0]["start"], picks[0]["end"])
 
 
-def test_capture_youtube_downloads_vod_once(tmp_path):
+def test_segments_past_duration_rejected():
+    info = json.loads((FIX / "video_heat.json").read_text())
+    dur = info["duration"]
+    late_heat = dict(info, heatmap=[{"start_time": dur + 100, "end_time": dur + 130, "value": 1.0}])
+    assert youtube_vods.moments(late_heat) == []
+    late_chap = dict(info, heatmap=[], chapters=[{"start_time": dur + 50, "end_time": dur + 90, "title": "x"}])
+    assert youtube_vods.moments(late_chap) == []
+    assert youtube_vods.candidates_for_vod(late_heat, "k", NOW) == []
+
+
+def test_youtube_id():
+    assert capture.youtube_id("https://www.youtube.com/watch?v=abc123") == "abc123"
+    assert capture.youtube_id("https://youtu.be/abc123") == "abc123"
+    assert capture.youtube_id("https://www.twitch.tv/kaicenat/clip/Foo") is None
+    for bad in ("https://www.youtube.com/watch", "https://www.youtube.com/watch?list=x", "https://youtu.be/"):
+        with pytest.raises(ValueError):
+            capture.youtube_id(bad)
+
+
+def _yt_picks():
     db = sqlite3.connect(":memory:")
     migrate_db(db)
     cands = [c for c in youtube_vods.collect(CFG, db, now=NOW, runner=FakeYtdlp()) if c["video_id"] == "VODheat001"]
     top_clips.store(db, cands)
+    return db, top_clips.to_picks(cands, 3)
+
+
+def test_capture_youtube_downloads_only_window(tmp_path):
+    db, picks = _yt_picks()
     calls = []
 
     def runner(cmd, check):
         calls.append(cmd)
         Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x")
 
-    paths = capture.capture(top_clips.to_picks(cands, 3), work=tmp_path, db=db, runner=runner)
-    assert len(calls) == 1 and len(paths) == 3
-    assert set(paths.values()) == {tmp_path / "yt_VODheat001.mp4"}
+    paths = capture.capture(picks, work=tmp_path, db=db, runner=runner)
+    assert len(calls) == len(paths) == 3
+    for cmd, p in zip(calls, picks):
+        s, e = capture.section(p)
+        assert s == max(0, p["start"] - 3) and e >= p["end"] + 3
+        assert cmd[cmd.index("--download-sections") + 1] == f"*{s}-{e}"
+        assert "--max-filesize" in cmd
+        assert paths[p["clip_id"]] == tmp_path / f"yt_VODheat001_{s}_{e}.mp4"
+    assert sorted(f.name for f in tmp_path.iterdir()) == sorted(f.name for f in paths.values())  # no temp files
+
+
+def test_capture_cleans_up_on_failure_and_size_cap(tmp_path):
+    _, picks = _yt_picks()
+
+    def failing(cmd, check):
+        out = Path(cmd[cmd.index("-o") + 1])
+        out.write_bytes(b"x")
+        Path(str(out) + ".part").write_bytes(b"x")
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        capture.capture(picks[:1], work=tmp_path, runner=failing)
+    assert list(tmp_path.iterdir()) == []
+
+    def big(cmd, check):
+        Path(cmd[cmd.index("-o") + 1]).write_bytes(b"x" * 2048)
+
+    with pytest.raises(RuntimeError, match="cap"):
+        capture.download_section(picks[0], tmp_path / "o.mp4", big, max_mb=0.001)
+    assert list(tmp_path.iterdir()) == []

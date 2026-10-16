@@ -19,7 +19,8 @@
 - Dedupe: same `video_id` + overlapping `[vod_offset, vod_offset+duration]`; no VOD offset → same creator + title similarity ≥ 0.8 + `created_at` within 5 min. Best score kept.
 - `picks.json`: `[{"start", "end", "source_url", "creator", "clip_id"}]` (D23). `start`/`end` are seconds **inside the file for `source_url`**, max 60 s apart:
   - Twitch: the source is the clip, so `0 → duration`.
-  - YouTube: the source is the whole VOD, so `start`/`end` are **VOD-absolute** (`vod_offset → vod_offset+duration`). Same shape, Editor needs no change. `capture.py` downloads the VOD (≤720p) once as `yt_<videoid>.mp4`, shared by all its picks; `radar_candidates.file_path` points at it.
+  - YouTube: the source is the whole VOD, so `start`/`end` are **VOD-absolute** (`vod_offset → vod_offset+duration`). `clips.start_s/end_s` and `picks.json` from `youtube_vods` stay VOD-absolute. `capture.py` downloads only each pick's window (`--download-sections "*start-end"`, ±3 s padding, ≤720p, 150 MB cap) as `yt_<videoid>_<s>_<e>.mp4` via a temp file that is removed on failure; `radar_candidates.file_path` points at it. The file starts at the padded start, so `python -m radar.capture` rewrites `picks.json` `start`/`end` file-relative for the Editor. A YouTube URL with no video id raises `ValueError`.
+  - **Needs HQ:** `editor/rerender.py` cuts `source_file` using the absolute `clips.start_s/end_s`, which is wrong for YouTube window files (offset = `start - padded start`). Contract change, not made here.
 - YouTube rows: `clip_id = yt:<video_id>:<start>`, `url` = VOD URL, `video_id`/`vod_offset`/`duration_s` as for Twitch, so dedupe (same video + overlapping window) is shared. Score = VOD views/hour × replay heat (a proxy; YouTube has no per-moment views). Re-runs reuse a stored row when a shifted heatmap peak overlaps it.
 - Moment window: a heatmap/chapter segment >60 s is centred and cut to 60 s; <10 s or outside the video is dropped.
 
