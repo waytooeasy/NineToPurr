@@ -160,7 +160,7 @@ def mock_media(monkeypatch, tmp_path):
         return [{"s": 1.0, "e": 1.5, "w": "hello"}]
     monkeypatch.setattr(clip, "transcribe", fake_transcribe)
     monkeypatch.setattr(clip, "render", fake_render)
-    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None: PLAN)
+    monkeypatch.setattr(writer, "write_clip", lambda win, creator, meta=None, clip_id=None: PLAN)
 
 
 def ytdlp(cmd, check):

@@ -141,3 +141,33 @@ def test_batch_guards(fake_sdk, monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     with pytest.raises(L.LLMError):
         L.llm_batch([{"id": "1", "prompt": "x"}], SCHEMA)
+
+
+def test_missing_table_warns(fake_sdk, monkeypatch, tmp_path, caplog):
+    bare = tmp_path / "bare.db"
+    sqlite3.connect(bare).close()  # migration 006 not run
+    monkeypatch.setenv("CLIPPER_DB", str(bare))
+    with caplog.at_level("WARNING", logger="llm"):
+        assert L.llm("p", SCHEMA) == {"a": 0.5}
+    assert "llm_usage not logged" in caplog.text
+
+
+def test_clip_id_stored_in_llm_usage(fake_sdk, monkeypatch, tmp_path):
+    db = make_db(tmp_path)
+    monkeypatch.setenv("CLIPPER_DB", str(db))
+    L.llm("p", SCHEMA, system="s", clip_id=7)
+    assert rows(db)[0][3] == 7
+
+
+def test_log_usage_connects_with_timeout(fake_sdk, monkeypatch, tmp_path):
+    db = make_db(tmp_path)
+    monkeypatch.setenv("CLIPPER_DB", str(db))
+    seen = {}
+    real = sqlite3.connect
+
+    def spy(*a, **kw):
+        seen.update(kw)
+        return real(*a, **kw)
+    monkeypatch.setattr(L.sqlite3, "connect", spy)
+    L.llm("p", SCHEMA)
+    assert seen.get("timeout") == 30

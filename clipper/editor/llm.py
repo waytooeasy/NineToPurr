@@ -6,6 +6,7 @@ The reply must be JSON that satisfies `schema`; one retry on invalid output.
 SDKs/HTTP are imported lazily so tests run with no key and no network.
 """
 import json
+import logging
 import os
 import sqlite3
 import time
@@ -13,6 +14,7 @@ import time
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"
 DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_DB = "/opt/clipper/db/clip.db"
+log = logging.getLogger(__name__)
 _sleep = time.sleep  # tests patch this
 
 
@@ -102,7 +104,7 @@ def log_usage(provider, model, usage, kind="call", clip_id=None, batch_id=None):
     if not os.path.exists(path):
         return
     try:
-        con = sqlite3.connect(path)
+        con = sqlite3.connect(path, timeout=30)  # the bot/pipeline write too
         try:
             con.execute(
                 "INSERT INTO llm_usage (provider, model, kind, clip_id, batch_id, input_tokens, "
@@ -113,8 +115,8 @@ def log_usage(provider, model, usage, kind="call", clip_id=None, batch_id=None):
             con.commit()
         finally:
             con.close()
-    except sqlite3.Error:
-        pass
+    except sqlite3.Error as e:  # e.g. migration 006 not run: warn, never break a clip
+        log.warning("llm_usage not logged (%s); run db/migrate.py first", e)
 
 
 def _call_anthropic(prompt, system=None, clip_id=None):
