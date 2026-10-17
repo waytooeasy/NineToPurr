@@ -25,6 +25,15 @@ Decides *which streamers* get today's Shorts slots; Radar then ranks moments onl
 - `top_clips.py` hook: `collect(..., allowed=[...])` / `filter_allowed`, `apply_allocation(cands, slots, ids)`; CLI `--allocation allocation.json` ranks only allocated streamers and keeps at most `slots` moments per streamer. Without the flag nothing changes.
 - Saturation input: `CLIPPER_SATURATION` = JSON `{"Kai Cenat": 7}` (competitor Shorts in 24 h). Missing -> 0.
 
+## Pipeline wiring (issue #47, `run_pipeline.py` radar step)
+Every 20-min pass (D22): `radar_step` = **Heat slots → moments → picks**.
+- `heat_allocation` re-measures the Heat Index at most every 30 min (`HEAT_REFRESH_MIN`); in between it re-allocates from the latest `streamer_heat` snapshot. Exploration slot is seeded per day, so it stays stable. Slots already used today (clips started, not killed) are subtracted per streamer.
+- Per allocated creator: Twitch top clips (`top_clips.collect(allowed=...)`) **and** YouTube VOD most-replayed windows (`youtube_vods.collect`, creators with `youtube_channel`), merged and ranked by score; `apply_allocation` keeps the best `slots` per streamer, then the 5/day cap (`qc.DAILY_CAP`) trims the total. Already-registered moments are skipped before slots are applied.
+- Heat unavailable (error) → logged, falls back to ranking all creators; the cap still holds. A yt-dlp failure keeps the Twitch picks.
+- `_picks` reads `clips.start_s/end_s` (set by `pick_window`, D23): Twitch `0 → duration`, YouTube VOD-absolute. `capture_step` gets those as is; `editor_step` gets YouTube picks shifted into the downloaded window file (`start - capture.section(pick)[0]`), same as `python -m radar.capture` does for `picks.json`. Previously every pick was `0 → duration`, wrong for VOD moments.
+- Tests: `radar/tests/test_pipeline_radar.py` (fake Twitch, fake yt-dlp, fake Heat fetchers).
+- Needs `creators.yaml` logins to match the watchlist (`ids` map in the allocation); a creator not in the watchlist gets no slot while Heat is on.
+
 ## Rules in code
 - Score = views / hours since `created_at` (age floored at 15 min).
 - Dedupe: same `video_id` + overlapping `[vod_offset, vod_offset+duration]`; no VOD offset → same creator + title similarity ≥ 0.8 + `created_at` within 5 min. Best score kept.
@@ -68,4 +77,6 @@ The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 - Heat constants (live bonus 1.0, momentum floor 0.1) are my choice; D33 gives only the shape.
 - Watchlist Twitch logins are unverified guesses; `creators.yaml` (what `top_clips` actually pulls) is not yet derived from the watchlist.
 
-**Next:** wire the allocation into the Radar timer and the saturation hand-off; chat spikes (live chat message-rate peaks → extra candidates).
+**Needs HQ (issue #47):** `editor/rerender.py` still cuts YouTube window files with the absolute `clips.start_s/end_s` (see the earlier note); `run_pipeline` now feeds the Editor file-relative times but the DB keeps absolute ones. Contract change, not made here.
+
+**Next:** saturation hand-off (the pipeline now runs the Heat allocation itself); chat spikes (live chat message-rate peaks → extra candidates).
