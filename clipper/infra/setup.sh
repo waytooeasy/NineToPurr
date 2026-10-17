@@ -1,11 +1,32 @@
 #!/usr/bin/env bash
 # setup.sh — bootstrap the clipper on Ubuntu 24.04 (home VMware VM or any VPS)
 # Usage (from anywhere):  bash clipper/infra/setup.sh
+# Expects the repo at /opt/clipper/repo (git clone https://github.com/waytooeasy/prm.git /opt/clipper/repo).
 # Idempotent: safe to run again after pulling new code.
+# --units-only: just install + enable the systemd units (step 8).
 set -euo pipefail
 
 CLIP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo/clipper
-DATA=/opt/clipper                                         # runtime data (not in git)
+DATA="${CLIPPER_DATA:-/opt/clipper}"                      # runtime data (not in git)
+UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
+SUDO="${SUDO-sudo}"                                       # SUDO="" in tests
+SYSTEMCTL="${SYSTEMCTL:-systemctl}"
+
+install_units() {
+  echo "== 8. systemd units (copy, daemon-reload, enable)"
+  $SUDO mkdir -p "$UNIT_DIR"
+  $SUDO cp "$CLIP"/infra/systemd/clipper-* "$UNIT_DIR"/
+  $SUDO $SYSTEMCTL daemon-reload
+  $SUDO $SYSTEMCTL enable clipper-pipeline.timer clipper-upload.timer clipper-approve-bot.service
+  $SUDO $SYSTEMCTL start clipper-pipeline.timer clipper-upload.timer clipper-approve-bot.service
+}
+
+if [[ "$CLIP" != "$DATA/repo/clipper" ]]; then
+  echo "ERROR: repo must live at $DATA/repo (found $CLIP/..)." >&2
+  echo "  sudo mkdir -p $DATA && sudo chown \"\$USER\": $DATA && git clone https://github.com/waytooeasy/prm.git $DATA/repo" >&2
+  exit 1
+fi
+if [[ "${1:-}" == "--units-only" ]]; then install_units; exit 0; fi
 WHISPER_MODEL="${WHISPER_MODEL:-small}"                   # base on <4 GB RAM boxes
 
 echo "== 1. System packages"
@@ -54,6 +75,8 @@ from faster_whisper import WhisperModel
 WhisperModel("$WHISPER_MODEL", device="cpu", compute_type="int8")
 print("whisper $WHISPER_MODEL ready")
 PY
+
+install_units
 
 echo
 echo "DONE."; free -h; df -h /

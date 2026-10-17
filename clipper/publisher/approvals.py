@@ -2,6 +2,7 @@
 import json
 import sqlite3
 
+DEFAULT_DB = "/opt/clipper/db/clip.db"  # shared default for upload.py and approve_bot.py
 QC_PASSED = "qc_passed"
 
 

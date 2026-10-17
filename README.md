@@ -28,6 +28,8 @@ clipper/
 
 ## Quick start (on the VM)
 ```bash
-git clone https://github.com/waytooeasy/prm.git ~/prm
-bash ~/prm/clipper/infra/setup.sh
+sudo mkdir -p /opt/clipper && sudo chown "$USER": /opt/clipper
+git clone https://github.com/waytooeasy/prm.git /opt/clipper/repo
+bash /opt/clipper/repo/clipper/infra/setup.sh
+cp /opt/clipper/repo/clipper/infra/.env.example /opt/clipper/.env   # then fill in, chmod 600
 ```
