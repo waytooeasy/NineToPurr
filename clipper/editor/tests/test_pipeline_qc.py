@@ -23,6 +23,10 @@ PLAN = {"score": 0.8, "in": 0.0, "out": 30.0,
         "title": "Kai Cenat loses the bet", "music_risk": True}
 
 
+# No Heat Index / yt-dlp in the legacy single-source tests.
+OFFLINE = dict(allocate=lambda con, now: None, youtube=lambda cfgs, con, now: [])
+
+
 class FakeTwitch:
     def broadcaster_id(self, login):
         return "641972806"
@@ -170,7 +174,7 @@ def ytdlp(cmd, check):
 def test_pass_walks_found_to_qc_passed(env, tmp_path, monkeypatch):
     mock_media(monkeypatch, tmp_path)
     report = run_pipeline.run_pass(env, steps={
-        "radar": lambda: run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"]),
+        "radar": lambda: run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE),
         "capture": lambda: run_pipeline.capture_step(env, runner=ytdlp),
         "editor": lambda: run_pipeline.editor_step(env, out=str(tmp_path / "clips")),
         "qc": lambda: qc.run(env, probe=lambda p: 30.0),
@@ -186,7 +190,7 @@ def test_pass_walks_found_to_qc_passed(env, tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(writer, "write_clip", lambda *a, **k: calls.append(1) or PLAN)
     run_pipeline.run_pass(env, steps={
-        "radar": lambda: run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"]),
+        "radar": lambda: run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE),
         "capture": lambda: run_pipeline.capture_step(env, runner=ytdlp),
         "editor": lambda: run_pipeline.editor_step(env, out=str(tmp_path / "clips")),
         "qc": lambda: qc.run(env, probe=lambda p: 30.0),
@@ -197,7 +201,7 @@ def test_pass_walks_found_to_qc_passed(env, tmp_path, monkeypatch):
 def test_edit_hook_loop_back_to_qc_passed(env, tmp_path, monkeypatch):
     """qc_passed -> (Lucas edits hook) needs_rerender -> pass -> qc_passed, resent."""
     mock_media(monkeypatch, tmp_path)
-    run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"])
+    run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE)
     run_pipeline.capture_step(env, runner=ytdlp)
     run_pipeline.editor_step(env, out=str(tmp_path / "clips"))
     qc.run(env, probe=lambda p: 30.0)
@@ -211,7 +215,7 @@ def test_edit_hook_loop_back_to_qc_passed(env, tmp_path, monkeypatch):
 
 
 def test_capture_failure_marks_only_that_clip(env, tmp_path):
-    run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"])
+    run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE)
 
     def boom(cmd, check):
         raise RuntimeError("yt-dlp exploded")
@@ -223,7 +227,7 @@ def test_capture_failure_marks_only_that_clip(env, tmp_path):
 def test_radar_respects_daily_cap(env):
     for i in range(5):
         add_clip(env, i, state="captured")
-    assert run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"]) == []
+    assert run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE) == []
 
 
 def test_stage_error_does_not_stop_pass(env):

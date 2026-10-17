@@ -11,23 +11,26 @@ Env: CLIPPER_DB, CLIPPER_WORK, CLIPPER_CLIPS, CLIPPER_LOCK, WHISPER_MODEL, TWITC
 import fcntl
 import json
 import os
+import random
 import sqlite3
 import sys
 import tempfile
 import traceback
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "editor")]
 
-from radar import capture, top_clips  # noqa: E402
+from radar import capture, heat, top_clips, youtube_vods  # noqa: E402
 import qc  # noqa: E402  (editor/ is on sys.path, same as clip.py and rerender.py)
 import rerender  # noqa: E402
 
 DB = "/opt/clipper/db/clip.db"
 LOCK = "/opt/clipper/pipeline.lock"
 DAILY_CAP = qc.DAILY_CAP
+HEAT_REFRESH_MIN = 30  # measure the Heat Index at most this often (D33); in between reuse the stored snapshot
 # A clip whose step failed is retried after 2 h, not every pass (each Writer retry costs API money).
 RETRY_OK = "(c.last_error IS NULL OR c.state_changed_at < datetime('now','-2 hours'))"
 
@@ -60,30 +63,105 @@ def set_error(con, clip_id, msg):
     con.commit()
 
 
-def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP):
-    """Pull Twitch clips, store them, register as many new ones as today's cap has room for."""
+def heat_allocation(con, now=None, tw=None, cfg=None, views=None, live=None):
+    """Today's Heat Index allocation (D33): {"slots": {streamer: n}, "ids": {login/id: streamer}}.
+    Measures (Twitch + yt-dlp, `heat.run`) at most every HEAT_REFRESH_MIN minutes; in between it
+    re-allocates from the latest stored `streamer_heat` snapshot. Exploration is seeded per day."""
+    now = now or datetime.now(timezone.utc)
+    cfg = cfg or heat.load_watchlist()
+    rng = random.Random(now.strftime("%Y-%m-%d"))
+    cutoff = (now - timedelta(minutes=HEAT_REFRESH_MIN)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stored = con.execute("SELECT streamer, opportunity FROM streamer_heat"
+                         " WHERE ts=(SELECT MAX(ts) FROM streamer_heat) AND ts>=?", (cutoff,)).fetchall()
+    if stored:
+        slots = heat.allocate({r[0]: r[1] for r in stored}, cfg["cap"], heat.last_posted(con, cfg["streamers"]),
+                              now, rng, cfg["max_per"], cfg["explore_days"], cfg["explore_top_n"])
+    else:
+        if views is None:
+            from radar.twitch import Twitch
+            views, live = heat.default_fetchers(tw or Twitch())
+        _, slots = heat.run(con, cfg, views, live, heat.load_saturation(), now, rng)
+    return heat.allocation_doc(cfg, slots)
+
+
+def youtube_moments(cfgs, con, now):
+    """Most-replayed moments from the creators' own live VODs (D29)."""
+    return youtube_vods.collect(cfgs, con, now) if cfgs else []
+
+
+def _slots_left(con, alloc):
+    """Allocated slots minus clips already started today for the same streamer (not killed)."""
+    ids = {k.lower(): v for k, v in alloc["ids"].items()}
+    used = {}
+    for (name,) in con.execute(
+            "SELECT cr.name FROM clips c JOIN sources s ON s.id=c.source_id JOIN creators cr ON cr.id=s.creator_id"
+            " WHERE date(c.created_at)=date('now') AND c.state!='killed'"):
+        key = ids.get(name.lower(), name)
+        used[key] = used.get(key, 0) + 1
+    return {n: max(0, k - used.get(n, 0)) for n, k in alloc["slots"].items()}
+
+
+def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_allocation,
+               youtube=youtube_moments, now=None):
+    """Register today's picks: Heat slots (D33) across creators, each creator's moments from Twitch top
+    clips + YouTube VOD most-replayed windows (D29), ranked by score, never more than the daily cap.
+
+    `creators`: logins or {"twitch", "youtube_channel"} dicts (default creators.yaml).
+    `allocate(con, now)` -> allocation doc or None; if it fails the pass falls back to ranking all
+    creators (the cap still holds). Injectable so tests never touch the network."""
+    now = now or datetime.now(timezone.utc)
     started = con.execute("SELECT COUNT(*) FROM clips WHERE date(created_at)=date('now') AND state!='killed'"
                           ).fetchone()[0]
     want = max(0, cap - started)  # at the cap we still pull + store, but start nothing new
+    cfgs = [c if isinstance(c, dict) else {"twitch": c, "youtube_channel": None}
+            for c in (creators or top_clips.load_creator_configs())]
+    alloc = slots = allowed = None
+    try:
+        alloc = allocate(con, now)
+    except Exception:  # noqa: BLE001 - no heat data must not stop Radar
+        traceback.print_exc()
+    if alloc:
+        slots = _slots_left(con, alloc)
+        allowed = [n for n, k in slots.items() if k > 0]
+        allowed += [login for login, name in alloc["ids"].items() if slots.get(name, 0) > 0]
     if twitch is None:
         from radar.twitch import Twitch
         twitch = Twitch()
-    cands = top_clips.collect(twitch, creators or top_clips.load_creators(), max(10, want))
+    cands = top_clips.collect(twitch, [c["twitch"] for c in cfgs], max(10, want), now=now, allowed=allowed)
+    yt_cfgs = [c for c in cfgs if c.get("youtube_channel") and top_clips.filter_allowed([c["twitch"]], allowed)]
+    try:
+        cands += youtube(yt_cfgs, con, now)
+    except Exception:  # noqa: BLE001 - a yt-dlp failure keeps the Twitch picks
+        traceback.print_exc()
+    cands.sort(key=lambda c: c["views_per_hour"], reverse=True)
     top_clips.store(con, cands)
     fresh = [c for c in cands
              if con.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()[0] is None]
+    if alloc:
+        fresh = top_clips.apply_allocation(fresh, slots, alloc["ids"])
     return top_clips.register_clips(con, fresh[:want])
 
 
-def _picks(con, state):
+def _picks(con, state, file_relative=False):
+    """Picks in `state` per D23. start/end come from clips.start_s/end_s: Twitch 0 -> duration, YouTube
+    VOD-absolute. `file_relative=True` (Editor, after capture) shifts YouTube picks into the downloaded
+    window file, which starts at capture.section(pick)[0]."""
     rows = con.execute(
-        "SELECT c.id, r.clip_id, r.creator, r.url, r.duration_s FROM clips c"
+        "SELECT c.id, c.start_s, c.end_s, r.clip_id, r.creator, r.url, r.duration_s, r.source FROM clips c"
         " JOIN radar_candidates r ON r.clips_id=c.id"
         f" WHERE c.state=? AND {RETRY_OK}"
         " ORDER BY c.id", (state,)).fetchall()
-    return [{"start": 0, "end": min(r["duration_s"] or top_clips.MAX_PICK_S, top_clips.MAX_PICK_S),
-             "source_url": r["url"], "creator": r["creator"], "clip_id": r["clip_id"], "_row": r["id"]}
-            for r in rows]
+    picks = []
+    for r in rows:
+        start = r["start_s"] if r["start_s"] is not None else 0
+        end = r["end_s"] if r["end_s"] is not None else start + min(r["duration_s"] or top_clips.MAX_PICK_S,
+                                                                    top_clips.MAX_PICK_S)
+        if file_relative and r["source"] == "youtube":
+            off = capture.section({"start": start, "end": end})[0]
+            start, end = start - off, end - off
+        picks.append({"start": start, "end": end, "source_url": r["url"], "creator": r["creator"],
+                      "clip_id": r["clip_id"], "_row": r["id"]})
+    return picks
 
 
 def capture_step(con, runner=None):
@@ -102,7 +180,7 @@ def capture_step(con, runner=None):
 def editor_step(con, model="small", out=None):
     """captured -> drafted -> edited (Writer + Whisper + ffmpeg, all in editor/clip.py)."""
     import clip
-    picks = [{k: v for k, v in p.items() if k != "_row"} for p in _picks(con, "captured")]
+    picks = [{k: v for k, v in p.items() if k != "_row"} for p in _picks(con, "captured", file_relative=True)]
     if not picks:
         return 0
     with tempfile.TemporaryDirectory() as d:
