@@ -92,7 +92,7 @@ def test_discover_skipped_without_key(tmp_path):
 def test_seed_config_shape():
     cfg = yaml.safe_load((Path(trend_scout.__file__).parent / "config" / "competitors.yaml").read_text())
     handles = [c["handle"] for c in cfg["channels"]]
-    assert len(handles) == 7 and all(h.startswith("@") for h in handles)
+    assert len(handles) >= 5 and len(set(handles)) == len(handles) and all(h.startswith("@") for h in handles)
     assert [d["streamer"] for d in cfg["discover"]] == ["IShowSpeed", "Kai Cenat", "CaseOh"]
 
 

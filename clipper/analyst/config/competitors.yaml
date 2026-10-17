@@ -8,8 +8,6 @@ channels:
   - handle: "@NexxoRecaps"
   - handle: "@deagzzzshorts"
   - handle: "@StreamBellz"
-  - handle: "@DaPlug"
-  - handle: "@StreamVortex"
   - handle: "@GoofyRecaps"
   - handle: "@Snickerly"
 
@@ -17,11 +15,11 @@ channels:
 # `"<streamer> clips" shorts`, then the top `count` results by subscribers.
 discover:
   - streamer: IShowSpeed
-    count: 1
+    count: 3
   - streamer: Kai Cenat
-    count: 1
+    count: 3
   - streamer: CaseOh
-    count: 1
+    count: 2
 
 # Name -> aliases matched in titles/hashtags (case-insensitive). Streamers from
 # radar/config/creators.yaml and the Twitch watchlist are matched by their login too.
