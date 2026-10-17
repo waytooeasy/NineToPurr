@@ -1,0 +1,82 @@
+name: Claude build agent
+
+# Lucas starts an agent by commenting "@claude ..." on an issue or PR.
+# Only his account can trigger it. The agent always ends with a PR; it never merges.
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: |
+      github.actor == 'waytooeasy' && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: System tools for tests
+        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg sqlite3
+
+      - name: Run Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 25
+            --allowedTools "Bash(python3:*),Bash(python:*),Bash(pip install:*),Bash(pytest:*),Bash(sqlite3:*),Bash(ffmpeg:*),Bash(ffprobe:*),Bash(git:*),Bash(ls:*),Bash(cat:*)"
+            --append-system-prompt "You are a PRM build agent. Read CLAUDE.md first, then only the module README and the decisions it cites. Delegate to the matching subagent in .claude/agents (builder-radar/editor/publisher). Use the pr-checklist skill before finishing. Work only in the module the issue names. Add pytest tests that run offline with sample data. Update the module README. Never edit .github/workflows/, DECISIONS.md or anything with secrets. If a decision is needed, say so in your comment and build around it."
+
+      # Open the PR ourselves (the action only posts a "Create PR" link).
+      # Uses PRM_BOT_TOKEN so the PR triggers CI (GITHUB_TOKEN events don't). Lucas merges.
+      - name: Open PR for the agent's branch
+        if: always() && github.event_name == 'issue_comment' && !github.event.issue.pull_request
+        env:
+          GH_TOKEN: ${{ secrets.PRM_BOT_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.claude.outputs.branch_name }}
+          ISSUE: ${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -uo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "PRM_BOT_TOKEN not set; skipping"; exit 0; }
+          ahead=0
+          if [ -n "$BRANCH" ]; then
+            ahead=$(gh api "repos/$REPO/compare/main...$BRANCH" --jq .ahead_by 2>/dev/null || echo 0)
+          fi
+          if [ "$ahead" -gt 0 ]; then
+            existing=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number --jq length)
+            if [ "$existing" = "0" ]; then
+              gh pr create -R "$REPO" --base main --head "$BRANCH" --title "$TITLE" \
+                --body "Closes #$ISSUE. Built by the Claude build agent. Review and merge; the next queued issue starts after."
+            fi
+          else
+            gh issue edit "$ISSUE" -R "$REPO" --remove-label in-progress --add-label hold || true
+            gh issue comment "$ISSUE" -R "$REPO" --body "Agent run ended with no commits. Labeled hold for Lucas." || true
+          fi

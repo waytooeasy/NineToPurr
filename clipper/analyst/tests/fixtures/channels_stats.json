@@ -1,0 +1,5 @@
+{"items": [
+  {"id": "UCsmall", "snippet": {"title": "Small Clips"}, "statistics": {"subscriberCount": "1000"}},
+  {"id": "UCbig", "snippet": {"title": "Big Clips"}, "statistics": {"subscriberCount": "900000"}},
+  {"id": "UCmid", "snippet": {"title": "Mid Clips"}, "statistics": {"subscriberCount": "50000"}}
+]}

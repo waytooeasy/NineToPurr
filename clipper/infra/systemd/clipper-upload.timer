@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a due YouTube upload slot every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

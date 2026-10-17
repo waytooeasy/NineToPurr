@@ -1,0 +1,33 @@
+# Streamer-clip Shorts channels Trend Scout studies (D29: format research only, metadata only,
+# never downloaded or re-uploaded). Give a `handle: "@Name"`; the UC... channel_id is resolved at
+# runtime (YouTube API forHandle if YOUTUBE_API_KEY is set, else yt-dlp) and cached in
+# channel_cache.json. A channel_id may still be set by hand. Handles that don't resolve are listed
+# under "Fix me" at the top of the report: correct the spelling here (HQ).
+# streamers = who the channel mostly clips (fallback when a title names nobody).
+channels:
+  - handle: "@NexxoRecaps"
+  - handle: "@deagzzzshorts"
+  - handle: "@StreamBellz"
+  - handle: "@DaPlug"
+  - handle: "@StreamVortex"
+  - handle: "@GoofyRecaps"
+  - handle: "@Snickerly"
+
+# Slots filled by search (needs YOUTUBE_API_KEY): search.list type=channel for
+# `"<streamer> clips" shorts`, then the top `count` results by subscribers.
+discover:
+  - streamer: IShowSpeed
+    count: 1
+  - streamer: Kai Cenat
+    count: 1
+  - streamer: CaseOh
+    count: 1
+
+# Name -> aliases matched in titles/hashtags (case-insensitive). Streamers from
+# radar/config/creators.yaml and the Twitch watchlist are matched by their login too.
+aliases:
+  Kai Cenat: [kai cenat, kaicenat, kai]
+  IShowSpeed: [ishowspeed, speed]
+  Druski: [druski]
+  Adin Ross: [adin ross, adinross, adin]
+  CaseOh: [caseoh]

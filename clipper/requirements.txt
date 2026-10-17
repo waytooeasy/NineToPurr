@@ -1,0 +1,9 @@
+pyyaml
+yt-dlp
+faster-whisper
+requests
+python-telegram-bot>=21
+anthropic
+google-api-python-client
+google-auth-oauthlib
+tzdata
