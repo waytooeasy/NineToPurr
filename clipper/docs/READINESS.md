@@ -9,7 +9,7 @@ Is the clipper ready to run on the VM? Status after issue #48. ✅ = built and t
 |---|---|---|
 | `db` (schema, migrations, `migrate.py`) | ✅ | Fresh DB and re-run (no-op) tested. |
 | `radar` (Heat Index, Twitch clips, YouTube VOD moments, capture) | ✅ ⚠️ | Offline-tested. Real Twitch and yt-dlp not exercised. Watchlist Twitch logins are best guesses. |
-| `editor` (Writer, Whisper, render, QC, re-render) | ✅ ⚠️ | Real Haiku call and real Whisper not exercised. Re-render of a YouTube clip cuts the wrong window (see risks, needs HQ). |
+| `editor` (Writer, Whisper, render, QC, re-render) | ✅ ⚠️ | Real Haiku call and real Whisper not exercised. Re-render of YouTube clips fixed (shifts into the window file). |
 | `publisher` approval bot | ✅ ⚠️ | Logic tested with a fake Telegram; no real bot yet. |
 | `publisher` upload | ✅ ⚠️ | Fake uploader only. Real YouTube API never called; D21 test upload still to do. |
 | `run_pipeline.py` + systemd units | ✅ | Tested with injected stages and the flock. Units not yet started on the VM. |
@@ -85,6 +85,6 @@ Do these in order. Stop at the first failure.
 ## Top 5 risks
 1. **The real YouTube upload has never run.** Visibility (public vs locked), quota and token refresh are untested. If the OAuth app stays in "Testing", the token expires after 7 days and uploads silently stop (alert goes to Telegram, clips stay `approved`). Mitigation: steps 1 and 8.
 2. **Live services behave differently from the fixtures.** Twitch clip fields, yt-dlp output (YouTube may bot-block a home IP; yt-dlp is upgraded daily by cron) and Whisper on the VM CPU were only mocked. Expect a first-day round of small fixes. Mitigation: step 10, read the logs.
-3. **YouTube re-render is wrong.** `editor/rerender.py` cuts the downloaded window file with absolute `clips.start_s/end_s`, so *Edit hook* on a YouTube-VOD clip renders the wrong moment. Twitch clips are fine. Contract change, needs HQ (already flagged in `radar/README.md`). Until decided: use ✅ or ❌ on YouTube clips, not ✏️.
+3. ~~YouTube re-render is wrong.~~ Fixed 2026-10-18: `rerender.py` shifts VOD-absolute times into the window file (`test_rerender_window.py`). ✏️ works on every clip.
 4. **Reused-content and quality rules (D7).** Nothing automated checks that a Short really has our angle, and QC duplicate detection is an exact file hash only (no perceptual hash). Lucas approving every Short (D10) is the only real guard. Writer quality and cost per clip are untested on live transcripts (`llm_usage` will show cost).
 5. **The home VM is a single point of failure.** If Windows reboots or the VM does not auto-start, nothing runs; a crash between `videos.insert` and the DB commit would upload a clip twice (accepted, documented); a permanently broken `approved` clip is retried last on every pass (no retry cap yet). No metrics puller means the Phase 0 gate (15 Shorts in 2 weeks, ≥1 over 10K engaged views) is checked by hand in YouTube Studio for now.

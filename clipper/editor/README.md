@@ -15,7 +15,7 @@
 | `writer.py` | `write_clip(transcript_window, creator, meta) -> dict`: `score` (0–1), `in`/`out` (≤60 s), 3 `hooks` (≤7 words), `context_line` (≤12 words), `title` (≤70 chars, names the streamer), `music_risk`. Retries once if limits are broken, then raises. |
 | `prompts/writer.md` | Writer prompt + score rubric. Everything above the `=== INPUT ===` line is the cached system prompt; per-clip data goes below it only. (hook .30, coherence .25, emotion .20, value .15, payoff .10). Edit here, no code change. |
 | `qc.py` | QC v1 (D27): `edited → qc_passed` if the file is ≤60 s (ffprobe), its sha256 is not already in the library (`clips.file_hash`), and fewer than 5 clips passed today (UTC). Otherwise sets `last_error` and leaves the state. `music_risk` passes and stays on the row for the Telegram flag. |
-| `rerender.py` | `needs_rerender → qc_passed`: re-cuts the captured source with the new `hook_text` (same start/end + context line), replaces the Short in place, refreshes `file_hash`, clears `approval_sent_at`. |
+| `rerender.py` | `needs_rerender → qc_passed`: re-cuts the captured source with the new `hook_text` (same start/end + context line; YouTube VOD windows shifted by `capture.section` offset, same as `run_pipeline._picks(file_relative=True)`), replaces the Short in place, refreshes `file_hash`, clears `approval_sent_at`. |
 | `clip.py` | Download → Whisper → (`--auto`: Writer on 120 s transcript windows, best N non-overlapping) → render → CSV log. |
 
 ## Status
