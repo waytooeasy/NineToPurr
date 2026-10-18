@@ -30,5 +30,9 @@ Check: `systemctl list-timers clipper-pipeline.timer`, `journalctl -u clipper-pi
 Run one pass by hand: `sudo systemctl start clipper-pipeline.service`. Pause: `sudo systemctl stop clipper-pipeline.timer`.
 After a deploy re-run `setup.sh` (applies new migrations, e.g. `005_qc`) and `daemon-reload` if a unit file changed.
 
+## Readiness and end-to-end test
+- `../docs/READINESS.md`: ✅/❌ per module, exact first-run VM steps (including `upload.py --auth` on the Windows host and copying the token), top 5 risks.
+- `../tests/test_e2e_offline.py` (runs in CI, needs ffmpeg): fresh DB via `db/migrate.py` → one `run_pipeline` pass with a Twitch + YouTube source (Twitch, yt-dlp, Whisper, LLM mocked; tiny synthetic video) → `qc_passed` → approve through the bot handlers → `approved` → `upload.run_once` with a fake uploader → `published`. Run: `pytest clipper/tests`.
+
 ## Next
 Daily Analyst timer.
