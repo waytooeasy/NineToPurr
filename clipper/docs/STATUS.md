@@ -3,7 +3,7 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-19 19:00 UTC_
+_Last updated: 2026-10-19 19:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
