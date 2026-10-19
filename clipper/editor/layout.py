@@ -19,6 +19,8 @@ CAM_H_MIN, CAM_H_MAX = 600, 960   # a found facecam box keeps its own shape with
 EDGE_RATIO = 4.0            # an overlay border is a column/row this many times sharper than median
 FACECAM_MAX_H = 0.20        # a face smaller than this (share of frame height) ...
 FACECAM_EDGE = 0.34         # ... with its centre in the outer third -> corner facecam
+FACECAM_MIN_H = 0.045       # a corner face smaller than this is a mini cam over an event/IRL broadcast
+                            # (Adin's 33 px cam, 2026-10-19): blown up it is mush, so full-bleed the shot
 SAMPLES = 8
 CLUSTER = 0.08              # detections within 8 % of the frame width are the same face
 MODEL = "/opt/clipper/models/face_detection_yunet_2023mar.onnx"
@@ -45,6 +47,8 @@ def choose_layout(faces, W, H, cam_box=None):
     corner = (cx < W * FACECAM_EDGE or cx > W * (1 - FACECAM_EDGE)) and fh < H * FACECAM_MAX_H
     if not corner:
         return {"mode": "crop", "cx": cx, "W": W, "H": H}
+    if fh < H * FACECAM_MIN_H:
+        return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     if cam_box:
         return stack_from_box(cam_box, cx, cy, W, H)
     # no borders found: a few face-heights around the face, panel aspect 1080:768

@@ -75,3 +75,16 @@ def ass_color(hex_rgb):
 
 def apply_case(text, case):
     return {"upper": text.upper(), "title": text.title(), "lower": text.lower()}.get(case, text)
+
+
+_INVISIBLE = {0x200D, 0x20E3} | set(range(0xFE00, 0xFE10)) | set(range(0xE0020, 0xE0080))
+
+
+def onscreen(text):
+    """Text that is burned into the video: emoji and other pictographs removed (the caption font has
+    no emoji glyphs, they render as boxes; Lucas 2026-10-19: "no emojis in the video texts"). Titles
+    keep their emoji; only on-screen text goes through here."""
+    import unicodedata
+    out = "".join(ch for ch in str(text or "")
+                  if ord(ch) not in _INVISIBLE and unicodedata.category(ch) not in ("So", "Sk", "Cs", "Co"))
+    return re.sub(r"\s+", " ", out).strip()

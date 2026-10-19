@@ -228,10 +228,17 @@ STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "at", "for
         "you", "he", "she", "we", "they", "me", "my", "your", "this", "that", "was", "be", "so", "oh",
         "yo", "bro", "like", "just", "what", "are", "do", "with", "im", "its", "dont", "not"}
 POP = r"{\fscx82\fscy82\t(0,90,\fscx100\fscy100)}"
+WATERMARK = "@Peakz.Recaps"         # every top clip channel stamps its handle low-centre (NexxoRecaps, 2026-10-19)
+WATERMARK_Y = 1630                  # ~85 % down, where theirs sits
 
 
 def fonts_dir():
     return os.environ.get("CLIPPER_FONTS", FONTS_DIR)
+
+
+def watermark():
+    """Channel handle burned low-centre; CLIPPER_WATERMARK overrides, empty turns it off."""
+    return os.environ.get("CLIPPER_WATERMARK", WATERMARK).strip()
 
 
 def _key_index(tokens):
@@ -248,6 +255,7 @@ def caption_text(tokens, st=None):
     """Market caption line: case + keyword highlight colour from today's style (editor/style.py), pop-in."""
     import style as S
     st = st or S.DEFAULT
+    tokens = [t for t in (S.onscreen(t) for t in tokens) if t]   # no emoji on screen
     k = _key_index(tokens)
     hi, fill = S.ass_color(st["highlight"]), S.ass_color(st["fill"])
     parts = [("{\\c" + hi + "}" + esc(S.apply_case(t, st["case"])) + "{\\c" + fill + "}") if i == k
@@ -259,7 +267,8 @@ def build_ass(words, pick, path, chunk=None, st=None):
     """Market-style captions in today's style (editor/style.py: case, colours, words per line,
     position; default = the 2026-10-19 research: 2 words, ALL CAPS, white + black outline, keyword in
     yellow). Pop-in, heavy font, seam position for stack layouts. Hook only for the first 2.5 s.
-    No context-line banner: none of the top channels show one."""
+    No context-line banner: none of the top channels show one. No emoji on screen (style.onscreen);
+    the channel handle sits low-centre like the top channels' watermark."""
     import style as S
     from layout import caption_y
     st = dict(st or S.load())
@@ -279,15 +288,20 @@ WrapStyle: 0
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Cap,{FONT},100,{S.ass_color(st["fill"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
 Style: Hook,{FONT},84,{S.ass_color(st["highlight"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
+Style: Mark,{FONT},42,&H66FFFFFF,&H00FFFFFF,&H99000000,&HFF000000,1,0,0,0,100,100,1,0,1,2,0,5,80,80,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = []
     dur = end - start
-    if pick.get("hook"):
+    hook = S.onscreen(pick.get("hook"))   # no emoji on screen (they render as boxes)
+    if hook:
         ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 2.5))},Hook,,0,0,0,,"
-                  f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(pick['hook'], st['case']))}")
+                  f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(hook, st['case']))}")
+    if watermark():
+        ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(dur)},Mark,,0,0,0,,"
+                  f"{{\\pos(540,{WATERMARK_Y})}}{esc(S.onscreen(watermark()))}")
     pos = f"{{\\pos(540,{y})}}"
     if pick.get("es_words"):
         # translated captions: spread evenly over the clip

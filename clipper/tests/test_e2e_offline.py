@@ -163,8 +163,10 @@ def test_fresh_db_to_published(env, tmp_path, monkeypatch, synthetic_video):
     assert msg == f"uploaded clip {first}: https://youtube.com/shorts/vid_e2e_1", msg
     assert alerts == [] and len(uploaded) == 1
     path, body = uploaded[0]
-    assert path == rows[0]["file_path"] and body["snippet"]["title"] == rows[0]["title"]
-    assert "#Shorts" in body["snippet"]["description"] and body["status"]["privacyStatus"] == "public"
+    assert path == rows[0]["file_path"] and body["snippet"]["title"].startswith(rows[0]["title"])
+    assert body["snippet"]["title"].endswith("#kaicenat")          # market hashtag: streamer tag in the title
+    assert "#shorts" in body["snippet"]["description"].lower() and body["status"]["privacyStatus"] == "public"
+    assert "#kaicenat" in body["snippet"]["description"]
 
     r = env.execute("SELECT state, last_error FROM clips WHERE id=?", (first,)).fetchone()
     assert r["state"] == "published" and r["last_error"] is None

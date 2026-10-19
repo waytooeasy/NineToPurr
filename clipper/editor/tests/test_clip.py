@@ -66,6 +66,24 @@ def test_ass_market_style(tmp_path):
     assert "Montserrat Black" in txt and "\\pos(540,1080)" in caps[0]
 
 
+def test_no_emoji_on_screen_but_watermark(tmp_path, monkeypatch):
+    # Lucas 2026-10-19: emoji in the video text render as boxes ("He really said never seen this 😭").
+    monkeypatch.delenv("CLIPPER_WATERMARK", raising=False)
+    ass = tmp_path / "a.ass"
+    pick = {"start": 0, "end": 10, "hook": "He really said never seen this 😭"}
+    words = [{"s": 1, "e": 1.5, "w": "no"}, {"s": 1.5, "e": 2, "w": "way🔥"}, {"s": 2, "e": 2.4, "w": "😭"}]
+    clip.build_ass(words, pick, ass)
+    txt = ass.read_text()
+    assert "HE REALLY SAID NEVER SEEN THIS" in txt
+    assert not any(ord(ch) > 0x2000 for ch in txt)                                 # no emoji anywhere
+    mark = [l for l in txt.splitlines() if ",Mark," in l]
+    assert len(mark) == 1 and "@Peakz.Recaps" in mark[0] and "0:00:10.00" in mark[0]   # whole clip
+    monkeypatch.setenv("CLIPPER_WATERMARK", "")
+    clip.build_ass(words, {"start": 0, "end": 10, "hook": "😭"}, ass)
+    txt = ass.read_text()
+    assert ",Mark," not in txt and ",Hook," not in txt                             # emoji-only hook dropped
+
+
 def test_caption_keyword_skips_filler():
     assert clip._key_index(["bro", "what"]) is None
     assert clip._key_index(["just", "ZOOM!"]) == 1

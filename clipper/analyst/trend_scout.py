@@ -2,7 +2,8 @@
 
     python clipper/analyst/trend_scout.py --library clipper/formats/library.md --report report.md
 
-Writes next to --library: creators_ranking.json (daily, Radar reads it) and creator_weights.json.
+Writes next to --library: creators_ranking.json (daily, Radar reads it), creator_weights.json and
+hashtags.json (hashtags the top Shorts use, for the publisher; analyst/hashtag_scout.py).
 Never downloads or stores competitor videos. Every source degrades gracefully: no YOUTUBE_API_KEY
 -> RSS only; no Twitch keys -> Shorts-only ranking; no ANTHROPIC_API_KEY -> stats-only report and
 library.md untouched.
@@ -25,6 +26,7 @@ sys.path.insert(0, str(HERE.parent))  # radar.twitch
 import scout_data as data  # noqa: E402
 import scout_resolve as resolve  # noqa: E402
 import scout_stats as stats  # noqa: E402
+import hashtag_scout  # noqa: E402
 import style_scout  # noqa: E402
 
 MODEL = "claude-sonnet-5-5"
@@ -213,6 +215,12 @@ def scout(competitors, library, report, now=None, session=None, twitch=None, llm
                 notes.append("style: too few captioned thumbnails, kept the previous style.json")
         except Exception as e:  # noqa: BLE001 - the report still goes out
             notes.append(f"style scout failed: {type(e).__name__}")
+    if videos:
+        try:  # hashtags the top Shorts use today -> hashtags.json for the publisher
+            hashtag_scout.write(out_dir / "hashtags.json", hashtag_scout.summarize(
+                videos, hashtag_scout.streamer_names(cfg.get("aliases"), logins), now))
+        except Exception as e:  # noqa: BLE001 - the report still goes out
+            notes.append(f"hashtag scout failed: {type(e).__name__}")
     (out_dir / "creators_ranking.json").write_text(json.dumps(ranking, indent=2) + "\n")
     (out_dir / "creator_weights.json").write_text(json.dumps(weights, indent=2) + "\n")
     if new_lib:
