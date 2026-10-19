@@ -26,6 +26,7 @@ HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / "editor")]
 
 from radar import capture, heat, top_clips, youtube_vods  # noqa: E402
+from radar import kick as kicksrc  # noqa: E402
 import qc  # noqa: E402  (editor/ is on sys.path, same as clip.py and rerender.py)
 import rerender  # noqa: E402
 
@@ -108,6 +109,18 @@ def youtube_moments(cfgs, con, now):
     return youtube_vods.collect(cfgs, con, now) if cfgs else []
 
 
+def watchlist_kick_slugs(watchlist=None):
+    """Every enabled Kick channel in the watchlist (D45), lowercase."""
+    wl = watchlist if watchlist is not None else heat.load_watchlist()
+    return sorted({e["id"].lower() for entries in wl["streamers"].values() for e in entries
+                   if e["platform"] == "kick"})
+
+
+def kick_moments(slugs, now, min_candidates):
+    """Top Kick clips of the given channels (D45)."""
+    return kicksrc.collect(kicksrc.Kick(), slugs, min_candidates, now=now) if slugs else []
+
+
 def _slots_left(con, alloc):
     """Allocated slots minus clips already started today for the same streamer (not killed)."""
     ids = {k.lower(): v for k, v in alloc["ids"].items()}
@@ -121,12 +134,15 @@ def _slots_left(con, alloc):
 
 
 def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_allocation,
-               youtube=youtube_moments, now=None):
+               youtube=youtube_moments, now=None, kick=kick_moments, kick_from=None):
     """Register today's picks: Heat slots (D33) across creators, each creator's moments from Twitch top
-    clips + YouTube VOD most-replayed windows (D29), ranked by score, never more than the daily cap.
+    clips + YouTube VOD most-replayed windows (D29) + Kick top clips (D45), ranked by score, never more
+    than the daily cap.
 
     `creators`: logins or {"twitch", "youtube_channel"} dicts (default `radar_creators()`:
     creators.yaml + every watchlist Twitch login).
+    `kick_from`: Kick channel slugs (default: the watchlist's Kick channels when `creators` is the
+    default, none when a creator list is passed in).
     `allocate(con, now)` -> allocation doc or None; if it fails the pass falls back to ranking all
     creators (the cap still holds). Injectable so tests never touch the network."""
     now = now or datetime.now(timezone.utc)
@@ -153,7 +169,14 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
         cands += youtube(yt_cfgs, con, now)
     except Exception:  # noqa: BLE001 - a yt-dlp failure keeps the Twitch picks
         traceback.print_exc()
-    cands.sort(key=lambda c: c["views_per_hour"], reverse=True)
+    slugs = kick_from if kick_from is not None else (watchlist_kick_slugs() if creators is None else [])
+    slugs = top_clips.filter_allowed(slugs, allowed)
+    if slugs:
+        try:
+            cands += kick(slugs, now, max(10, want))
+        except Exception:  # noqa: BLE001 - a Kick failure keeps the other picks
+            traceback.print_exc()
+    cands = kicksrc.dedupe(cands, alloc["ids"] if alloc else None)  # one moment on Twitch + Kick -> one pick
     top_clips.store(con, cands)
     fresh = [c for c in cands
              if con.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()[0] is None]

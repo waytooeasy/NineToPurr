@@ -1,7 +1,7 @@
 # Streamer watchlist for the Heat Index (D33). Config-only: add/remove a line to change it.
 # platform: twitch | youtube | kick. id = Twitch login, YouTube channel handle (@x) or UC id, Kick slug.
-# Several entries may share a `name` (their numbers are summed). `disabled: true` = kept, not polled
-# (Kick has no source yet, D32). Twitch logins are best guesses: an unknown login is logged and skipped.
+# Several entries may share a `name` (their numbers are summed). `disabled: true` = kept, not polled.
+# Kick = channel slug from kick.com/<slug> (D45). An unknown login/slug is logged and skipped.
 # daily_cap = Shorts slots per day (D33: 5 for two weeks, then HQ raises it).
 daily_cap: 5
 max_per_streamer: 2
@@ -34,6 +34,7 @@ streamers:
   - {name: HasanAbi, platform: twitch, id: hasanabi}
   - {name: Ludwig, platform: twitch, id: ludwig}
   - {name: xQc, platform: twitch, id: xqc}
+  - {name: xQc, platform: kick, id: xqc}
   - {name: Sykkuno, platform: twitch, id: sykkuno}
   - {name: Valkyrae, platform: twitch, id: valkyrae}
   - {name: Tfue, platform: twitch, id: tfue}
@@ -41,4 +42,9 @@ streamers:
   - {name: Summit1g, platform: twitch, id: summit1g}
   - {name: Ranboo, platform: twitch, id: ranboo}
   - {name: Mizkif, platform: twitch, id: mizkif}
-  - {name: Adin Ross, platform: kick, id: adinross, disabled: true}
+  # Kick-first streamers (D45, 2026-10-19). Left out on purpose: politics and adult-adjacent channels
+  # (ad-unfriendly), even when their clips are big.
+  - {name: Adin Ross, platform: kick, id: adinross}
+  - {name: N3on, platform: kick, id: n3on}
+  - {name: Clavicular, platform: kick, id: clavicular}
+  - {name: Ice Poseidon, platform: kick, id: iceposeidon}
