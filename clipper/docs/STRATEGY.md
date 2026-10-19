@@ -1,9 +1,10 @@
-# PRM — Clipper strategy (v4.1, Oct 16, 2026)
+# PRM — Clipper strategy (v4.2, Oct 19, 2026)
 
-PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [`DECISIONS.md`](DECISIONS.md). Evidence: [`research/ai-shorts-2026.md`](research/ai-shorts-2026.md).
+PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [`DECISIONS.md`](DECISIONS.md). What runs right now: [`STATUS.md`](STATUS.md). Evidence: [`research/ai-shorts-2026.md`](research/ai-shorts-2026.md).
 
 ## The model
-- **One YouTube Shorts channel**, multi-streamer brand (no streamer name in it). Kai Cenat is the first source, not the whole channel.
+- **One YouTube Shorts channel**, multi-streamer brand (no streamer name in it). The Heat Index picks streamers daily from a ~30-name watchlist (D33).
+- **Follow the market (D36):** length, look, colours, titles and timing copy what works for the top clip channels today.
 - No ties to streamers. We clip, add our angle, post. Views and channel are ours.
 - Money = YouTube Shorts ads (YPP; Paraguay eligible). English/US audience.
 - Goal: **≈6.7M PYG ≈ $1,100/month net** (~$1,450 gross after ~24% US withholding).
@@ -11,7 +12,7 @@ PRM = Puro Rico o Muerto. Owner: **PRM · 00 HQ**. Every decision is logged in [
 ## What changed (v3 → v4) and why
 | Was | Now | Why |
 |---|---|---|
-| Raw clips, streamer audio only, copy templates | **Every clip gets our angle:** a context line + storytelling captions (setup → payoff). Recaps of 2–4 moments as a format test. Streamer audio stays. | YouTube's reused-content rules reject "clips with little or no narrative" and "template-based changes". Since Oct 2, 2026, Shorts reach is cut for re-uploads that add nothing of your own. |
+| Raw clips, streamer audio only, copy templates | **Every clip gets our angle:** hook + storytelling captions in the market's current style + our title (the context line feeds title/description, not the screen; D39). Recaps of 2–4 moments as a format test. Streamer audio stays. | YouTube's reused-content rules reject "clips with little or no narrative" and "template-based changes". Since Oct 2, 2026, Shorts reach is cut for re-uploads that add nothing of your own. |
 | Many Shorts/day | **3–5/day**, curated | Top clip channels post 0.3–2/day. Spam policy bans high volumes of similar AI content. |
 | Multiple channels | **One channel** until it holds ≥20M Shorts views/90d | From Feb 1, 2027, Shorts pay only in months with ≥10M views/rolling 90d. One AdSense per person; one termination bars every channel. |
 | Kai only | **Multi-streamer config**, Kai first | 759 accounts clip Kai; he streams irregularly. |
@@ -31,8 +32,9 @@ YPP today: 1k subs + 10M Shorts views/90d. **From Feb 1, 2027:** new applicants 
 
 ## Pipeline
 ```
-Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Claude Haiku: score, 3 hooks, context line, title)
-→ Editor (Whisper captions, face-tracked 9:16, ≤60 s) → QC (rules) → Telegram approve/edit/kill → Publisher (YouTube API)
+Trend Scout (daily: format library + caption style) ─┐
+Radar (Heat Index → Twitch clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Claude Haiku: score, hooks, context line, title, per the library)
+→ Editor (Whisper captions in today's style, face-centred / facecam-stack 9:16, market length ≤60 s) → QC → Telegram ✅ Post / ❌ Kill → Publisher (YouTube API, at once)
 → Metrics (engaged views, viewed-vs-swiped, claims) → daily report
 ```
 - Clip states: `found → captured → drafted → edited → qc_passed → approved → published → measured`.
@@ -50,7 +52,7 @@ Radar (Twitch Get Clips, views/hour, dedupe) → Capture (yt-dlp) → Writer (Cl
 **Kill:** <3M views in the first 90 days → stop the ad model.
 
 ## Hard rules
-- No raw re-uploads; every clip carries our context line + story captions.
+- No raw re-uploads; every clip carries our hook + story captions + title (D39).
 - No detection-evasion edits (speed-up, pitch shift, mirror, heavy filters, crop tricks). Those are spam strikes.
 - ≤60 s. Flag music segments. Track claims per streamer; drop sources that claim.
 - No duplicate files. Cap 5/day.

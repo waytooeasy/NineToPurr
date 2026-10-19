@@ -99,12 +99,12 @@ The chat must be linked to moon in the Claude desktop app, with the `project` fo
 - `setup.sh` died silently at step 6 on a fresh box (no crontab + `pipefail`). Fixed; steps 6–7 were then run by hand.
 - Runner: `svc.sh` must run from `/opt/clipper/actions-runner`. A runner started with `./run.sh` and paused with Ctrl+Z blocks the service; `kill %1` first.
 
-## State (2026-10-19, evening)
-- ✅ VM, Tailscale, `setup.sh` steps 1–7, Whisper `small`, yt-dlp cron, runner `prm-vm` + `vm-shell`.
-- ✅ `.env` keys all verified live: Anthropic, YouTube API key, YouTube OAuth upload token (`/opt/clipper/youtube_token.json`, consent screen published with the GitHub Pages home/privacy pages), Twitch, Telegram (`@PRM_Clips_BOT`, chat id set).
-- ✅ First real pipeline passes run by hand (`/opt/clipper/work/firstpass.sh`): 5 Twitch clips → captured → rendered → `qc_passed`. Fixes in PR #63.
-- ❌ YouTube blocks yt-dlp from this IP ("confirm you're not a bot"): YouTube VOD source empty, issue #64 (needs-hq).
-- ❌ Step 8 (systemd units/timers + approval bot) not enabled: `bash /opt/clipper/repo/clipper/infra/setup.sh --units-only` (needs sudo) after #63 is merged and the VM repo is back on `main`.
+## State
+Moved to [`../docs/STATUS.md`](../docs/STATUS.md) (live status for every session). Box-specific facts stay here.
+- Services: `clipper-pipeline.timer`, `clipper-upload.timer`, `clipper-approve-bot.service`, runner `actions.runner.waytooeasy-PRM.prm-vm.service`.
+- `prm` may run without a password: `sudo systemctl restart clipper-approve-bot.service | clipper-pipeline.timer | clipper-upload.timer`, `sudo systemctl daemon-reload` (`/etc/sudoers.d/clipper`).
+- Extra runtime files: `/opt/clipper/fonts` (Montserrat), `/opt/clipper/models` (YuNet face model), `/opt/clipper/formats/{library.md,style.json}` (from the `trends` branch).
+- Deploy after a merge: `cd /opt/clipper/repo && git pull && CLIPPER_DB=/opt/clipper/db/clip.db /opt/clipper/venv/bin/python clipper/db/migrate.py`; restart the bot if `publisher/` changed; re-run `setup.sh` if `requirements.txt` or units changed.
 
 ## Open items
 - Root LV uses 38.5 of 76.9 GB. Grow it when clips need room: `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv`.

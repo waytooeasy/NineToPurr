@@ -2,11 +2,11 @@
 
 PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 
-**Read first, every session:** `clipper/docs/STRATEGY.md` and `clipper/docs/DECISIONS.md`.
+**Read first, every session:** `clipper/docs/STATUS.md` (what runs now), then `clipper/docs/STRATEGY.md` and `clipper/docs/DECISIONS.md`.
 
 ## Clipper (active)
-- One YouTube Shorts channel, multi-streamer brand (Kai Cenat first). No ties to streamers. Paid by YouTube Shorts ads.
-- Every clip gets our angle: context line + storytelling captions. ≤60 s. 3–5/day. Streamer audio, no raw re-uploads.
+- One YouTube Shorts channel, multi-streamer brand; the Heat Index picks streamers daily. No ties to streamers. Paid by YouTube Shorts ads.
+- **Follow the market (D36):** copy what works for the top clip channels today; don't invent rules. Every clip: hook + story captions in today's style + our title. Market length ≤60 s. Max 5/day, posted as soon as Lucas taps ✅ Post. Streamer audio, no raw re-uploads.
 - Stack: Python + systemd timers + SQLite + Telegram approval bot. Per-clip LLM = **Claude Haiku 5.5** (Anthropic API); daily Analyst = Sonnet 5.5. Runtime n8n/agent team only after the gate in STRATEGY.md.
 - **Anthropic API = Lucas's own account only. Never a second account.** `ANTHROPIC_API_KEY` lives in GitHub secrets and `/opt/clipper/.env`, never in git or logs.
 - Build agents run via the Claude GitHub Action: Lucas comments `@claude` on an issue → agent builds → opens a PR. Agents never merge, never edit `.github/workflows/`, never touch secrets.
@@ -34,3 +34,4 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 - Sources = streamers' own footage (Twitch clips, Twitch/YouTube live VODs). Competitor Shorts = format research only; never download or re-upload them. See `.claude/skills/shorts-format`.
 - Subagents in `.claude/agents/` (builder-radar/editor/publisher, reviewer, security). Read only what the task needs to save tokens.
 - Lucas wants short, direct answers and the whole system in mind; ask when unsure instead of assuming.
+- **Keep `clipper/docs/STATUS.md` current:** if your PR changes what runs, what's next or who something waits on, update it in the same PR.
