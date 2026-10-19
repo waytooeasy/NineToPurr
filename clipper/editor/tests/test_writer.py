@@ -59,3 +59,27 @@ def test_prompt_file_exists_and_formats():
     assert txt.format(creator="c", meta="{}", transcript="t")
     for w in ("hook", "coherence", "emotion", "value", "payoff", ".30"):
         assert w in txt
+
+
+LIB = "# Format library\n## Hook templates\n1. `No way {person} came on stream ❤️‍🩹 #{S}`\n"
+
+
+def test_market_library_goes_into_the_cached_system_part(tmp_path, monkeypatch):
+    f = tmp_path / "library.md"
+    f.write_text(LIB, encoding="utf-8")
+    monkeypatch.setenv("CLIPPER_FORMATS", str(f))
+    system, user = W.load_prompt()
+    assert "TODAY'S MARKET" in system and "No way {person} came on stream" in system
+    assert "No way" not in user  # per-clip part stays small
+
+
+def test_no_library_means_no_market_section(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_FORMATS", str(tmp_path / "missing.md"))
+    system, _ = W.load_prompt()
+    assert "=== TODAY'S MARKET" not in system and "hook .30" in system
+
+
+def test_market_section_is_capped(tmp_path):
+    f = tmp_path / "big.md"
+    f.write_text("x" * (W.MARKET_MAX_CHARS * 2), encoding="utf-8")
+    assert len(W.market_section(f)) < W.MARKET_MAX_CHARS + 200

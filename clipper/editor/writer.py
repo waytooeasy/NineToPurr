@@ -5,6 +5,7 @@ context_line (<=12 words), title (<=70 chars, names the streamer), music_risk.
 Prompt lives in prompts/writer.md so the Analyst can tune it.
 """
 import json
+import os
 from pathlib import Path
 
 from llm import llm
@@ -12,6 +13,8 @@ from llm import llm
 PROMPT_FILE = Path(__file__).parent / "prompts" / "writer.md"
 MAX_CLIP_S = 60.0
 INPUT_MARKER = "=== INPUT ==="
+FORMATS_FILE = "/opt/clipper/formats/library.md"  # Trend Scout's library, refreshed by run_pipeline
+MARKET_MAX_CHARS = 6000
 RUBRIC = {"hook": .30, "coherence": .25, "emotion": .20, "value": .15, "payoff": .10}
 
 SCHEMA = {
@@ -58,14 +61,30 @@ def format_window(words_or_lines):
     return words_or_lines if isinstance(words_or_lines, str) else "\n".join(words_or_lines)
 
 
-def load_prompt():
+def market_section(path=None):
+    """Today's format library from the Trend Scout (titles, hook templates, what to avoid), or "".
+    Goes into the cached system part: it changes at most daily, so the cache still pays off."""
+    p = Path(path or os.environ.get("CLIPPER_FORMATS", FORMATS_FILE))
+    try:
+        text = p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    if not text:
+        return ""
+    return ("=== TODAY'S MARKET (Trend Scout format library: copy what is working) ===\n"
+            + text[:MARKET_MAX_CHARS])
+
+
+def load_prompt(formats=None):
     """Split prompts/writer.md at the INPUT_MARKER line: (static system part, per-clip user
-    template). The static part (role, rubric, rules) is what gets prompt-cached (D31)."""
+    template). The static part (role, rubric, rules + today's market) is what gets prompt-cached (D31)."""
     text = PROMPT_FILE.read_text(encoding="utf-8")
     system, sep, user = text.partition(INPUT_MARKER)
     if not sep:
         raise ValueError(f"{PROMPT_FILE.name} is missing the {INPUT_MARKER} line")
-    return system.strip(), user.strip()
+    market = market_section(formats)
+    system = system.strip() + ("\n\n" + market if market else "")
+    return system, user.strip()
 
 
 def write_clip(transcript, creator, meta=None, clip_id=None):

@@ -13,7 +13,9 @@ import json
 import os
 import random
 import sqlite3
+import subprocess
 import sys
+import time
 import tempfile
 import traceback
 from contextlib import contextmanager
@@ -209,10 +211,41 @@ def editor_step(con, model="small", out=None):
     return len(picks)
 
 
+FORMATS_REF = "origin/trends:clipper/formats/library.md"
+FORMATS_MAX_AGE_S = 6 * 3600
+
+
+def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMATS_MAX_AGE_S, now=None):
+    """Copy the Trend Scout's latest format library (trends branch) to $CLIPPER_FORMATS for the
+    Writer, at most every 6 h. Best effort: on any git error the old copy stays. -> 'fresh' |
+    'updated' | 'error: ...'."""
+    p = Path(path or os.environ.get("CLIPPER_FORMATS", "/opt/clipper/formats/library.md"))
+    repo = str(repo or HERE.parent)
+    now = now or time.time()
+    if p.exists() and now - p.stat().st_mtime < max_age_s:
+        return "fresh"
+    try:
+        runner(["git", "-C", repo, "fetch", "-q", "origin", "trends:refs/remotes/origin/trends"],
+               capture_output=True, text=True, check=True, timeout=120)
+        out = runner(["git", "-C", repo, "show", FORMATS_REF],
+                     capture_output=True, text=True, check=True, timeout=60).stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        return f"error: {type(e).__name__}"
+    if not out.strip():
+        return "error: empty library"
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(out, encoding="utf-8")
+    except OSError as e:
+        return f"error: {type(e).__name__}"
+    return "updated"
+
+
 def run_pass(con, steps=None):
     """Run each stage; return {stage: result or 'error: ...'}. `steps` lets tests inject mocks."""
     model = os.environ.get("WHISPER_MODEL", "small")
     steps = steps or {
+        "formats": refresh_formats,
         "radar": lambda: radar_step(con),
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),

@@ -189,3 +189,33 @@ def test_default_radar_step_serves_heat_slots_outside_creators_yaml(con, monkeyp
                                   "ids": {"other": "Other"}}, youtube=fake_youtube, now=NOW)
     rows = registered(con)
     assert len(ids) == 1 and rows[0]["creator"] == "other"
+
+
+class FakeGit:
+    def __init__(self, show="# Format library\n", fail=False):
+        self.cmds, self.show, self.fail = [], show, fail
+
+    def __call__(self, cmd, **kw):
+        import subprocess
+        self.cmds.append(cmd)
+        if self.fail:
+            raise subprocess.CalledProcessError(128, cmd)
+        return type("R", (), {"stdout": self.show if cmd[3] == "show" else ""})()
+
+
+def test_refresh_formats_copies_trends_library(tmp_path):
+    p = tmp_path / "formats" / "library.md"
+    git = FakeGit("# Format library (updated today)\n")
+    assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=git) == "updated"
+    assert p.read_text() == "# Format library (updated today)\n"
+    assert git.cmds[0][3:5] == ["fetch", "-q"] and git.cmds[1][-1] == run_pipeline.FORMATS_REF
+
+
+def test_refresh_formats_skips_when_fresh_and_keeps_old_copy_on_error(tmp_path):
+    p = tmp_path / "library.md"
+    p.write_text("old")
+    git = FakeGit()
+    assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=git) == "fresh" and git.cmds == []
+    later = p.stat().st_mtime + run_pipeline.FORMATS_MAX_AGE_S + 1
+    assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=FakeGit(fail=True), now=later).startswith("error")
+    assert p.read_text() == "old"

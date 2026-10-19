@@ -5,6 +5,7 @@
 **HQ decisions (D7, D8, D15, D18):**
 - Every clip gets a context line + setup→payoff captions. No raw re-uploads.
 - Hard cap 60 s; flag music segments.
+- **Market style:** the Writer's cached system prompt includes the Trend Scout format library (`$CLIPPER_FORMATS`, default `/opt/clipper/formats/library.md`; `run_pipeline.refresh_formats()` copies it from the `trends` branch every ≤6 h). Titles and hooks follow what is working that day.
 - **Market window:** a Radar pick keeps the length viewers chose (popular Twitch clip / most-replayed YouTube part). The Writer may only trim dead air, max 2 s per end (`market_window()`, `MAX_TRIM_S`). No fixed minimum length.
 - No speed-up, pitch shift, mirroring or heavy filters.
 - Writer = provider-neutral `llm()` defaulting to Claude Haiku 5.5 (`ANTHROPIC_API_KEY` in `/opt/clipper/.env`); Gemini as fallback.
