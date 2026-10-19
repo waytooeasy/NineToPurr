@@ -201,3 +201,27 @@ def test_bot_token_never_reaches_the_logs(monkeypatch):
     monkeypatch.setattr(approve_bot, "build_app", lambda *a: NS(run_polling=lambda: None))
     approve_bot.main()
     assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING
+
+
+def test_daily_recap_once_per_day(con, add_clip):
+    from datetime import datetime, timezone
+    cid = add_clip()
+    con.execute("INSERT OR IGNORE INTO accounts (id, platform, handle) VALUES (1, 'youtube', 'peakz')")
+    con.execute("INSERT INTO posts (clip_id, account_id, platform_post_id, url, posted_at)"
+                " VALUES (?, 1, 'AAA', 'https://youtube.com/shorts/AAA', '2026-10-19 19:20:57')", (cid,))
+    con.commit()
+    ctx = make_ctx(con)
+    early = datetime(2026, 10, 20, 1, 0, tzinfo=timezone.utc)
+    assert asyncio.run(approve_bot.push_digest(ctx.application, early)) is False   # before 02:00 UTC
+    t = datetime(2026, 10, 20, 2, 5, tzinfo=timezone.utc)
+    assert asyncio.run(approve_bot.push_digest(ctx.application, t)) is True
+    assert asyncio.run(approve_bot.push_digest(ctx.application, t.replace(hour=9))) is False  # same day
+    text = ctx.application.bot.send_message.await_args.kwargs["text"]
+    assert text.startswith("Daily recap\n📈 1 Shorts") and "https://youtube.com/shorts/AAA" in text
+
+
+def test_stats_command(con, add_clip):
+    supd, smsg = text_update("/stats")
+    asyncio.run(approve_bot.on_stats(supd, make_ctx(con)))
+    smsg.reply_text.assert_awaited()
+    assert smsg.reply_text.await_args.args[0] == "No Shorts posted yet."

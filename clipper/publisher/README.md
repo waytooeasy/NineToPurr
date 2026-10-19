@@ -17,6 +17,7 @@ When a clip reaches `qc_passed`, the bot sends the mp4 (or text only if the file
 
 Since 2026-10-19 (Lucas): just Post or Kill. Old messages with ✅ Hook 1/2/3 still work; the edit-hook flow (`e:` button + reply) stays in code but has no button.
 
+- `/stats`: views, views/hour and likes per Short (latest `post_metrics`). A **daily recap** with the same table arrives once a day after 02:00 UTC (23:00 Asunción).
 - `/status`: today's counts per state, how many wait for you and the oldest age, last error.
 - Only `TELEGRAM_ALLOWED_CHAT_ID` gets answers; everyone else is ignored silently.
 - Decisions only apply to clips still in `qc_passed`, so a stale or double tap does nothing.
