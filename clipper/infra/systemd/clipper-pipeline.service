@@ -9,6 +9,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/opt/clipper/repo/clipper
 EnvironmentFile=/opt/clipper/.env
+Environment=PATH=/opt/clipper/venv/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CLIPPER_DB=/opt/clipper/db/clip.db
 Environment=CLIPPER_WORK=/opt/clipper/work
 Environment=CLIPPER_CLIPS=/opt/clipper/clips

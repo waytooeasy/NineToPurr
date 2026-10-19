@@ -159,3 +159,33 @@ def test_heat_allocation_measures_then_reuses_snapshot(con):
     assert len(calls) == n and sum(again["slots"].values()) <= cfg["cap"]  # no re-measure inside 30 min
     run_pipeline.heat_allocation(con, NOW + timedelta(minutes=45), cfg=cfg, views=views, live=lambda e: False)
     assert len(calls) == 2 * n  # stale snapshot -> measure again
+
+
+def test_radar_creators_covers_every_watchlist_twitch_login():
+    wl = {"streamers": {
+        "Kai Cenat": [{"platform": "twitch", "id": "kaicenat"}, {"platform": "youtube", "id": "@KaiCenatLive"}],
+        "IShowSpeed": [{"platform": "twitch", "id": "IShowSpeed"}, {"platform": "youtube", "id": "@IShowSpeed"}],
+        "Sykkuno": [{"platform": "twitch", "id": "sykkuno"}],
+    }}
+    got = run_pipeline.radar_creators(wl, [{"twitch": "kaicenat", "youtube_channel": "@KaiCenatLive"}])
+    assert got == [{"twitch": "kaicenat", "youtube_channel": "@KaiCenatLive"},   # creators.yaml first, no dupe
+                   {"twitch": "ishowspeed", "youtube_channel": "@IShowSpeed"},
+                   {"twitch": "sykkuno", "youtube_channel": None}]
+
+
+def test_radar_creators_real_config_serves_every_heat_streamer():
+    wl = heat.load_watchlist()
+    logins = {c["twitch"] for c in run_pipeline.radar_creators()}
+    for name, entries in wl["streamers"].items():
+        tw = [e["id"].lower() for e in entries if e["platform"] == "twitch"]
+        assert not tw or set(tw) & logins, name
+
+
+def test_default_radar_step_serves_heat_slots_outside_creators_yaml(con, monkeypatch):
+    # The first VM pass (2026-10-19) gave slots to Sykkuno/Valkyrae/xQc while creators.yaml only listed
+    # kaicenat -> 0 picks. With the default creator list a slot for a watchlist streamer is served.
+    monkeypatch.setattr(run_pipeline, "radar_creators", lambda: [KAI, {"twitch": "other", "youtube_channel": None}])
+    ids = run_pipeline.radar_step(con, FakeTwitch(), None, allocate=lambda c, n: {"slots": {"Other": 1},
+                                  "ids": {"other": "Other"}}, youtube=fake_youtube, now=NOW)
+    rows = registered(con)
+    assert len(ids) == 1 and rows[0]["creator"] == "other"

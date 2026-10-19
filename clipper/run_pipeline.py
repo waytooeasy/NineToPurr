@@ -84,6 +84,23 @@ def heat_allocation(con, now=None, tw=None, cfg=None, views=None, live=None):
     return heat.allocation_doc(cfg, slots)
 
 
+def radar_creators(watchlist=None, creators=None):
+    """Creators Radar pulls from: creators.yaml entries plus every enabled Twitch login in the
+    watchlist (D33), so each streamer the Heat Index gives a slot can actually be served. A watchlist
+    streamer's YouTube channel rides along with its Twitch login. creators.yaml wins on duplicates."""
+    out = list(creators if creators is not None else top_clips.load_creator_configs())
+    seen = {c["twitch"] for c in out}
+    wl = watchlist if watchlist is not None else heat.load_watchlist()
+    for entries in wl["streamers"].values():
+        yt = next((e["id"] for e in entries if e["platform"] == "youtube"), None)
+        for e in entries:
+            login = e["id"].lower()
+            if e["platform"] == "twitch" and login not in seen:
+                seen.add(login)
+                out.append({"twitch": login, "youtube_channel": yt})
+    return out
+
+
 def youtube_moments(cfgs, con, now):
     """Most-replayed moments from the creators' own live VODs (D29)."""
     return youtube_vods.collect(cfgs, con, now) if cfgs else []
@@ -106,7 +123,8 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
     """Register today's picks: Heat slots (D33) across creators, each creator's moments from Twitch top
     clips + YouTube VOD most-replayed windows (D29), ranked by score, never more than the daily cap.
 
-    `creators`: logins or {"twitch", "youtube_channel"} dicts (default creators.yaml).
+    `creators`: logins or {"twitch", "youtube_channel"} dicts (default `radar_creators()`:
+    creators.yaml + every watchlist Twitch login).
     `allocate(con, now)` -> allocation doc or None; if it fails the pass falls back to ranking all
     creators (the cap still holds). Injectable so tests never touch the network."""
     now = now or datetime.now(timezone.utc)
@@ -114,7 +132,7 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
                           ).fetchone()[0]
     want = max(0, cap - started)  # at the cap we still pull + store, but start nothing new
     cfgs = [c if isinstance(c, dict) else {"twitch": c, "youtube_channel": None}
-            for c in (creators or top_clips.load_creator_configs())]
+            for c in (creators or radar_creators())]
     alloc = slots = allowed = None
     try:
         alloc = allocate(con, now)

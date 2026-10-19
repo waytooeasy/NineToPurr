@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/clipper/repo/clipper/publisher
 EnvironmentFile=/opt/clipper/.env
+Environment=PATH=/opt/clipper/venv/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CLIPPER_DB=/opt/clipper/db/clip.db
 ExecStart=/opt/clipper/venv/bin/python approve_bot.py
 Restart=always

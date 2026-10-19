@@ -133,8 +133,7 @@ def youtube_views(channel, now, runner=None):
     from . import youtube_vods as yv
     kw = {"runner": runner} if runner else {}
     D = W = 0
-    for url in yv.list_stream_urls(channel, **kw):
-        info = yv.video_info(url, **kw)
+    for info in yv.own_vod_infos(channel, **kw):
         t = yv._vod_time(info)
         if not yv.is_own_live_vod(info, channel) or t is None or t < now - timedelta(days=7):
             continue

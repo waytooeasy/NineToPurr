@@ -3,4 +3,4 @@
 # livestream VODs (D29): only that channel's /streams, never Shorts or other channels.
 creators:
   - twitch: kaicenat
-    youtube_channel: "@KaiCenat"
+    youtube_channel: "@KaiCenatLive"

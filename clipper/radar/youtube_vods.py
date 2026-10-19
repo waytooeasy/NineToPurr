@@ -64,6 +64,22 @@ def video_info(url, runner=subprocess.run):
     return json.loads(run_ytdlp(["--dump-json", "--skip-download", "--no-playlist", url], runner))
 
 
+def own_vod_infos(channel, runner=subprocess.run, limit=LIST_N):
+    """video_info for each /streams entry, skipping entries yt-dlp can't read (members-only, premieres,
+    YouTube's "confirm you're not a bot"). Raises only if the list had entries and every one failed,
+    so the caller logs it instead of silently treating the channel as 0 views."""
+    urls = list_stream_urls(channel, runner, limit)
+    infos, failed = [], 0
+    for url in urls:
+        try:
+            infos.append(video_info(url, runner))
+        except (subprocess.CalledProcessError, ValueError):
+            failed += 1
+    if urls and failed == len(urls):
+        raise RuntimeError(f"yt-dlp could not read any of {len(urls)} VODs on {channel}")
+    return infos
+
+
 def _same_channel(info, channel):
     ch = channel.strip().rstrip("/").split("/")[-1].lower()
     ids = {str(info.get(k) or "").lower() for k in
@@ -160,8 +176,7 @@ def collect(creator_cfgs, db=None, now=None, runner=subprocess.run, days=7):
         if not channel:
             continue
         found = []
-        for url in list_stream_urls(channel, runner):
-            info = video_info(url, runner)
+        for info in own_vod_infos(channel, runner):
             if not is_own_live_vod(info, channel):
                 continue
             when = _vod_time(info)

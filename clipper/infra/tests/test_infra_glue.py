@@ -103,3 +103,10 @@ def test_ytdlp_cron_idempotent_and_keeps_other_jobs(tmp_path):
     lines = tab.read_text().splitlines()
     assert sum("yt-dlp" in l for l in lines) == 1
     assert "0 1 * * * echo other" in lines
+
+
+def test_units_put_the_venv_on_path():
+    # Code runs "yt-dlp" by name; under systemd it is only found via the venv's bin/ (first VM pass).
+    for unit in ("clipper-pipeline.service", "clipper-upload.service", "clipper-approve-bot.service"):
+        text = (CLIPPER / "infra/systemd" / unit).read_text()
+        assert "Environment=PATH=/opt/clipper/venv/bin:" in text, unit
