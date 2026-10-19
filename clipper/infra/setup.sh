@@ -81,6 +81,17 @@ CLIPPER_DB=$DATA/db/clip.db $DATA/venv/bin/python "$CLIP/db/migrate.py"
 
 install_ytdlp_cron
 
+echo "== 6b. Caption font (Montserrat, SIL OFL) + YuNet face model (OpenCV zoo) for the market-style layout"
+mkdir -p "$DATA/fonts"
+for f in Montserrat-Black Montserrat-ExtraBold; do
+  [[ -s "$DATA/fonts/$f.ttf" ]] || curl -fsSL -o "$DATA/fonts/$f.ttf" \
+    "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/$f.ttf" || echo "WARN: $f download failed (libass falls back)"
+done
+mkdir -p "$DATA/models"
+[[ -s "$DATA/models/face_detection_yunet_2023mar.onnx" ]] || curl -fsSL -o "$DATA/models/face_detection_yunet_2023mar.onnx" \
+  "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" \
+  || echo "WARN: face model download failed (layout falls back to centre crop)"
+
 echo "== 7. Pre-download Whisper '$WHISPER_MODEL'"
 $DATA/venv/bin/python - <<PY
 from faster_whisper import WhisperModel

@@ -52,12 +52,23 @@ def test_log_adds_columns_and_migrates_old_header(tmp_path):
     assert rows[1]["context_line"] == "c" and rows[0]["context_line"] == ""
 
 
-def test_ass_has_hook_and_context(tmp_path):
+def test_ass_market_style(tmp_path):
     ass = tmp_path / "a.ass"
     pick = {"start": 0, "end": 10, "hook": "He lost", "context_line": "Kai lost a bet to chat"}
-    clip.build_ass([{"s": 1, "e": 2, "w": "hello"}], pick, ass)
+    words = [{"s": 1, "e": 1.4, "w": "and"}, {"s": 1.4, "e": 2, "w": "zoom"}, {"s": 2, "e": 2.5, "w": "in"}]
+    clip.build_ass(words, pick, ass)
     txt = ass.read_text()
-    assert "Hook,,0,0,0,,HE LOST" in txt and "Ctx,,0,0,0,,Kai lost a bet to chat" in txt
+    assert "HE LOST" in txt and "0:00:02.50,Hook" in txt.replace("0:00:00.00,", "")  # hook only 2.5 s
+    assert "Kai lost a bet to chat" not in txt and "Ctx" not in txt               # no banner
+    caps = [l for l in txt.splitlines() if ",Cap," in l]
+    assert len(caps) == 2                                                          # 2 words per line
+    assert "AND {\\c&H0000E5FF&}ZOOM{\\c&H00FFFFFF&}" in caps[0]                # keyword in yellow
+    assert "Montserrat Black" in txt and "\\pos(540,1080)" in caps[0]
+
+
+def test_caption_keyword_skips_filler():
+    assert clip._key_index(["bro", "what"]) is None
+    assert clip._key_index(["just", "ZOOM!"]) == 1
 
 
 @pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg")
@@ -75,17 +86,21 @@ def test_synthetic_render_capped_and_context_visible(tmp_path):
         clip.render(src, pick, ass, mp4)
         return ass, mp4
 
-    ass, with_ctx = make("with", {**base, "context_line": "Kai lost a bet to chat"})
-    _, no_ctx = make("without", base)
+    ass, with_ctx = make("with", base)
+    _, no_ctx = make("without", {**base, "hook": ""})
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
                                 "csv=p=0", str(with_ctx)], capture_output=True, text=True, check=True).stdout)
     assert 59 <= dur <= 60.5
-    assert "Kai lost a bet to chat" in ass.read_text()
+    assert "HE LOST" in ass.read_text()
+    w, h = (int(v) for v in subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+            "stream=width,height", "-of", "csv=p=0", str(with_ctx)], capture_output=True, text=True,
+            check=True).stdout.strip().split(","))
+    assert (w, h) == (1080, 1920)
 
     def frame(mp4):
-        return subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", "2", "-i", str(mp4), "-frames:v", "1",
+        return subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", "1", "-i", str(mp4), "-frames:v", "1",
                                "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, check=True).stdout
-    assert frame(with_ctx) != frame(no_ctx)  # context line is actually drawn
+    assert frame(with_ctx) != frame(no_ctx)  # hook is actually drawn
 
 
 def test_draft_pick_passes_clip_id_to_writer(tmp_path, monkeypatch):
