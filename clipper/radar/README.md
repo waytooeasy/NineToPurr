@@ -40,7 +40,7 @@ Every 20-min pass (D22): `radar_step` = **Heat slots → moments → picks**.
 - `picks.json`: `[{"start", "end", "source_url", "creator", "clip_id"}]` (D23). `start`/`end` are seconds **inside the file for `source_url`**, max 60 s apart:
   - Twitch: the source is the clip, so `0 → duration`.
   - YouTube: the source is the whole VOD, so `start`/`end` are **VOD-absolute** (`vod_offset → vod_offset+duration`). `clips.start_s/end_s` and `picks.json` from `youtube_vods` stay VOD-absolute. `capture.py` downloads only each pick's window (`--download-sections "*start-end"`, ±3 s padding, ≤720p, 150 MB cap) as `yt_<videoid>_<s>_<e>.mp4` via a temp file that is removed on failure; `radar_candidates.file_path` points at it. The file starts at the padded start, so `python -m radar.capture` rewrites `picks.json` `start`/`end` file-relative for the Editor. A YouTube URL with no video id raises `ValueError`.
-  - **Needs HQ:** `editor/rerender.py` cuts `source_file` using the absolute `clips.start_s/end_s`, which is wrong for YouTube window files (offset = `start - padded start`). Contract change, not made here.
+  - Re-render of YouTube window files: fixed (HQ decision 2026-10-18). The DB keeps VOD-absolute times; `editor/rerender.py` shifts them by the `capture.section` offset.
 - YouTube rows: `clip_id = yt:<video_id>:<start>`, `url` = VOD URL, `video_id`/`vod_offset`/`duration_s` as for Twitch, so dedupe (same video + overlapping window) is shared. Score = VOD views/hour × replay heat (a proxy; YouTube has no per-moment views). Re-runs reuse a stored row when a shifted heatmap peak overlaps it.
 - Moment window: a heatmap/chapter segment >60 s is centred and cut to 60 s; <10 s or outside the video is dropped.
 
@@ -77,6 +77,6 @@ The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 - Heat constants (live bonus 1.0, momentum floor 0.1) are my choice; D33 gives only the shape.
 - Watchlist Twitch logins are unverified guesses; `creators.yaml` (what `top_clips` actually pulls) is not yet derived from the watchlist.
 
-**Needs HQ (issue #47):** `editor/rerender.py` still cuts YouTube window files with the absolute `clips.start_s/end_s` (see the earlier note); `run_pipeline` now feeds the Editor file-relative times but the DB keeps absolute ones. Contract change, not made here.
+**Resolved (HQ 2026-10-18):** the DB keeps VOD-absolute `start_s/end_s`; the Editor and re-render both shift into the window file.
 
 **Next:** saturation hand-off (the pipeline now runs the Heat allocation itself); chat spikes (live chat message-rate peaks → extra candidates).
