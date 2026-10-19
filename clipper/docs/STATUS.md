@@ -29,6 +29,7 @@ _Last updated: 2026-10-19 19:00 UTC_
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 
 ## Waiting on Lucas
+- **Create the YouTube channel "Peakz Recaps" (@Peakz) on the.prm.project@gmail.com**, phone-verify it, upload the profile picture + banner (design canvas "Peakz Recaps brand"). The first upload failed with `youtubeSignupRequired` until the channel exists.
 - AdSense signup + W-8BEN.
 - Anthropic Console spend limit.
 - Decision on YouTube footage (#64).
