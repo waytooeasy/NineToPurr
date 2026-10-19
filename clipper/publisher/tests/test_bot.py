@@ -192,3 +192,12 @@ def test_auto_post_off_by_default(con, add_clip, monkeypatch):
     cid = add_clip()
     asyncio.run(approve_bot.push_pending(make_ctx(con).application))
     assert st(con, cid) == "qc_passed"
+
+
+def test_bot_token_never_reaches_the_logs(monkeypatch):
+    import logging
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:secret")
+    monkeypatch.setenv("TELEGRAM_ALLOWED_CHAT_ID", "1")
+    monkeypatch.setattr(approve_bot, "build_app", lambda *a: NS(run_polling=lambda: None))
+    approve_bot.main()
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

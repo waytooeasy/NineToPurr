@@ -170,6 +170,8 @@ def build_app(token: str, chat_id: int, db_path: str) -> Application:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    # httpx logs every request URL at INFO, and Telegram URLs carry the bot token: keep it out of journald
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_ALLOWED_CHAT_ID")
     if not token or not chat:
         sys.exit("TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_CHAT_ID are required")
