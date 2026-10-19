@@ -3,13 +3,14 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-19 19:00 UTC_
+_Last updated: 2026-10-19 19:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
 | Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → radar → capture → Writer → render → QC → re-render |
-| Telegram bot `@PRM_Clips_BOT` | ✅ live: sends each `qc_passed` clip with **✅ Post / ❌ Kill**; re-renders first if it was made in an older style |
+| Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
+| Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 5/day (`.env`: UTC window 00:00–23:59) |
 | Trend Scout (GitHub Actions, 10:30 UTC daily) | ✅ report issue + `trends` branch: `library.md` (titles/hooks) + `style.json` (caption style) |
 | Keys in `/opt/clipper/.env` | ✅ Anthropic, YouTube API key + upload token (OAuth app published), Twitch, Telegram |
@@ -24,7 +25,7 @@ _Last updated: 2026-10-19 19:00 UTC_
 ## Clips so far
 | Date | Made | Approved | Published | Notes |
 |---|---|---|---|---|
-| 2026-10-19 | 5 | 4 (xQc, Valkyrae, emiru, Lacy) | uploading from 19:05 UTC, 30 min apart | Sykkuno's clip still waiting (his own burned-in captions double ours → kill) |
+| 2026-10-19 | 5 | 4 (xQc, Valkyrae, emiru, Lacy) | 1 so far: **first Short live 19:20 UTC** ([Valkyrae](https://youtube.com/shorts/BqOQ8cAeRMo)); the other 3 every 30 min | Sykkuno's clip still waiting (his own burned-in captions double ours → kill) |
 
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 

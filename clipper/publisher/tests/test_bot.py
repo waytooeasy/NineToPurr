@@ -147,3 +147,57 @@ def test_clip_in_an_old_style_goes_back_for_rerender_not_to_lucas(con, add_clip,
     con.execute("UPDATE clips SET state='qc_passed', style_version=? WHERE id=?", (style.version(), cid))
     con.commit()                                        # re-rendered in today's style
     assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1
+
+
+def test_auto_post_approves_and_sends_stop_button(con, add_clip, monkeypatch):
+    monkeypatch.setenv("AUTO_POST", "1")
+    cid = add_clip()
+    ctx = make_ctx(con)
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1
+    assert st(con, cid) == "approved"
+    kw = ctx.application.bot.send_message.await_args.kwargs
+    assert kw["text"].startswith("🚀 Auto-posting")
+    assert [b.callback_data for r in kw["reply_markup"].inline_keyboard for b in r] == [f"s:{cid}"]
+
+
+def test_stop_before_upload_kills_it(con, add_clip, monkeypatch):
+    monkeypatch.setenv("AUTO_POST", "1")
+    cid = add_clip()
+    asyncio.run(approve_bot.push_pending(make_ctx(con).application))
+    upd, q = button_update(f"s:{cid}")
+    asyncio.run(approve_bot.on_button(upd, make_ctx(con)))
+    assert st(con, cid) == "killed"
+    con.execute("UPDATE clips SET state='published' WHERE id=?", (cid,))
+    upd2, q2 = button_update(f"s:{cid}")              # too late: already uploaded
+    asyncio.run(approve_bot.on_button(upd2, make_ctx(con)))
+    q2.message.reply_text.assert_awaited_with(f"Clip #{cid} is already uploaded or decided.")
+
+
+def test_music_risk_still_waits_for_a_tap(con, add_clip, monkeypatch):
+    monkeypatch.setenv("AUTO_POST", "1")
+    cid = add_clip()
+    con.execute("UPDATE clips SET music_risk=1 WHERE id=?", (cid,))
+    con.commit()
+    ctx = make_ctx(con)
+    asyncio.run(approve_bot.push_pending(ctx.application))
+    assert st(con, cid) == "qc_passed"
+    kw = ctx.application.bot.send_message.await_args.kwargs
+    assert [b.callback_data for r in kw["reply_markup"].inline_keyboard for b in r] == [f"p:{cid}", f"k:{cid}"]
+    monkeypatch.setenv("AUTO_POST_MUSIC", "1")
+    assert approvals.needs_tap(con.execute("SELECT * FROM clips WHERE id=?", (cid,)).fetchone()) is False
+
+
+def test_auto_post_off_by_default(con, add_clip, monkeypatch):
+    monkeypatch.delenv("AUTO_POST", raising=False)
+    cid = add_clip()
+    asyncio.run(approve_bot.push_pending(make_ctx(con).application))
+    assert st(con, cid) == "qc_passed"
+
+
+def test_bot_token_never_reaches_the_logs(monkeypatch):
+    import logging
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:secret")
+    monkeypatch.setenv("TELEGRAM_ALLOWED_CHAT_ID", "1")
+    monkeypatch.setattr(approve_bot, "build_app", lambda *a: NS(run_polling=lambda: None))
+    approve_bot.main()
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

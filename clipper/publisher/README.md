@@ -13,6 +13,8 @@ When a clip reaches `qc_passed`, the bot sends the mp4 (or text only if the file
 | ✅ Post | `approved` exactly as rendered (the Writer's best hook) |
 | ❌ Kill | `killed` |
 
+**Auto-post (`AUTO_POST=1`, D44):** the bot approves each clip itself and sends an FYI "🚀 Auto-posting at the next upload slot" with **🛑 Stop** (`approvals.stop`: approved → killed, only before upload). Clips with `music_risk` still get ✅ Post / ❌ Kill unless `AUTO_POST_MUSIC=1`.
+
 Since 2026-10-19 (Lucas): just Post or Kill. Old messages with ✅ Hook 1/2/3 still work; the edit-hook flow (`e:` button + reply) stays in code but has no button.
 
 - `/status`: today's counts per state, how many wait for you and the oldest age, last error.

@@ -29,6 +29,10 @@ def keyboard(clip_id: int, n_hooks: int = 0) -> InlineKeyboardMarkup:
     ]])
 
 
+def stop_keyboard(clip_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Stop", callback_data=f"s:{clip_id}")]])
+
+
 def caption(row) -> str:
     text = f"Clip #{row['id']}: {row['title'] or '-'}\n{row['context_line'] or ''}".rstrip()
     if row["music_risk"]:
@@ -36,15 +40,18 @@ def caption(row) -> str:
     return text[:1000]  # Telegram caption limit is 1024
 
 
-async def send_clip(bot, chat_id: int, row) -> None:
-    kb = keyboard(row["id"], len(approvals.hooks_of(row)))
+async def send_clip(bot, chat_id: int, row, auto: bool = False) -> None:
+    """auto: the clip is already approved; the message is an FYI with a 🛑 Stop button that works
+    until the uploader takes it (next upload slot)."""
+    kb = stop_keyboard(row["id"]) if auto else keyboard(row["id"], len(approvals.hooks_of(row)))
     path = row["file_path"]
+    text = ("🚀 Auto-posting at the next upload slot.\n" if auto else "") + caption(row)
     if path and os.path.isfile(path) and os.path.getsize(path) <= MAX_UPLOAD_BYTES:
         with open(path, "rb") as f:
-            await bot.send_video(chat_id=chat_id, video=f, caption=caption(row), reply_markup=kb)
+            await bot.send_video(chat_id=chat_id, video=f, caption=text[:1000], reply_markup=kb)
     else:
         note = "\n(video file missing or too big for Telegram)"
-        await bot.send_message(chat_id=chat_id, text=caption(row) + note, reply_markup=kb)
+        await bot.send_message(chat_id=chat_id, text=text + note, reply_markup=kb)
 
 
 async def push_pending(app: Application) -> int:
@@ -58,7 +65,10 @@ async def push_pending(app: Application) -> int:
             approvals.restyle(con, row["id"])
             continue
         try:
-            await send_clip(app.bot, chat_id, row)
+            auto = approvals.auto_post_enabled() and not approvals.needs_tap(row)
+            if auto and not approvals.post(con, row["id"]):
+                continue  # decided meanwhile (double run)
+            await send_clip(app.bot, chat_id, row, auto=auto)
             approvals.mark_sent(con, row["id"])
             sent += 1
         except Exception as e:  # keep the loop alive; retry next poll
@@ -97,6 +107,13 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError:
         return
 
+    if action == "s":
+        ok = approvals.stop(con, clip_id)
+        result = f"🛑 Stopped clip #{clip_id}" if ok else f"Clip #{clip_id} is already uploaded or decided."
+        await q.message.reply_text(result)
+        if ok:
+            await q.edit_message_reply_markup(reply_markup=None)
+        return
     if action == "p":
         ok = approvals.post(con, clip_id)
         result = f"✅ Posting clip #{clip_id}"
@@ -153,6 +170,8 @@ def build_app(token: str, chat_id: int, db_path: str) -> Application:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    # httpx logs every request URL at INFO, and Telegram URLs carry the bot token: keep it out of journald
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_ALLOWED_CHAT_ID")
     if not token or not chat:
         sys.exit("TELEGRAM_BOT_TOKEN and TELEGRAM_ALLOWED_CHAT_ID are required")

@@ -1,5 +1,6 @@
 """DB logic for the approval gate. Pure sqlite3, no Telegram, easy to test."""
 import json
+import os
 import sqlite3
 
 DEFAULT_DB = "/opt/clipper/db/clip.db"  # shared default for upload.py and approve_bot.py
@@ -86,6 +87,33 @@ def restyle(con, clip_id: int) -> bool:
             "UPDATE clips SET state = 'needs_rerender', state_changed_at = datetime('now')"
             " WHERE id = ? AND state = ? AND approval_sent_at IS NULL", (clip_id, QC_PASSED))
     return cur.rowcount == 1
+
+
+def auto_post_enabled(env=None) -> bool:
+    """AUTO_POST=1 in /opt/clipper/.env: clips post without a tap (Lucas, 2026-10-19)."""
+    e = os.environ if env is None else env
+    return str(e.get("AUTO_POST", "")).strip().lower() in ("1", "true", "yes", "on")
+
+
+def needs_tap(row, env=None) -> bool:
+    """Even with AUTO_POST, a music-risk clip waits for Lucas (AUTO_POST_MUSIC=1 posts those too):
+    a music claim can block or demonetise a Short."""
+    e = os.environ if env is None else env
+    music_ok = str(e.get("AUTO_POST_MUSIC", "")).strip().lower() in ("1", "true", "yes", "on")
+    return bool(row["music_risk"]) and not music_ok
+
+
+def stop(con, clip_id: int) -> bool:
+    """🛑 Stop an auto-posted clip before the uploader takes it: approved -> killed."""
+    with con:
+        cur = con.execute(
+            "UPDATE clips SET state = 'killed', state_changed_at = datetime('now')"
+            " WHERE id = ? AND state = 'approved'", (clip_id,))
+        if cur.rowcount != 1:
+            return False
+        con.execute("INSERT INTO approvals (clip_id, decision, hook_index, chosen_hook) VALUES (?,?,?,?)",
+                    (clip_id, "killed", None, None))
+    return True
 
 
 def kill(con, clip_id: int) -> bool:
