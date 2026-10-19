@@ -99,3 +99,19 @@ def test_draft_pick_passes_clip_id_to_writer(tmp_path, monkeypatch):
     monkeypatch.setattr(writer, "write_clip", fake)
     clip.draft_pick(tmp_path, {"start": 0.0, "end": 10.0}, "Kai Cenat", {}, clip_id=42)
     assert seen["clip_id"] == 42
+
+
+def test_market_window_keeps_the_length_viewers_chose():
+    # VM pass 2026-10-19: Writer said 0.0-3.4 inside a 16.7 s clip and 0.5-6.7 inside 37.1 s.
+    assert clip.market_window({"start": 0.0, "end": 16.7}, 0.0, 3.4) == (0.0, 14.7)
+    assert clip.market_window({"start": 0.0, "end": 37.1}, 0.5, 6.7) == (0.5, 35.1)
+
+
+def test_market_window_allows_small_dead_air_trims_and_clamps_outside():
+    assert clip.market_window({"start": 10.0, "end": 40.0}, 11.5, 39.0) == (11.5, 39.0)   # within 2 s
+    assert clip.market_window({"start": 10.0, "end": 40.0}, 5.0, 50.0) == (10.0, 40.0)   # never outside
+    assert clip.market_window({"start": 10.0, "end": 40.0}, 20.0, 30.0) == (12.0, 38.0)  # max 2 s each end
+
+
+def test_market_window_short_pick_never_inverts():
+    assert clip.market_window({"start": 0.0, "end": 3.0}, 2.5, 0.5) == (0.0, 3.0)
