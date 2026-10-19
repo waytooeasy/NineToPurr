@@ -24,7 +24,7 @@ _Last updated: 2026-10-19 19:00 UTC_
 ## Clips so far
 | Date | Made | Approved | Published | Notes |
 |---|---|---|---|---|
-| 2026-10-19 | 5 | 4 (xQc, Valkyrae, emiru, Lacy) | uploading from 19:05 UTC, 30 min apart | Sykkuno's clip still waiting (his own burned-in captions double ours → kill) |
+| 2026-10-19 | 5 | 4 (xQc, Valkyrae, emiru, Lacy) | 0: blocked until the channel exists (`youtubeSignupRequired`) | Sykkuno's clip still waiting (his own burned-in captions double ours → kill) |
 
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 
