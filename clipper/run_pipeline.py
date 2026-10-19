@@ -251,11 +251,19 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
         return "updated"
 
 
+def metrics_step(con):
+    """Public stats of our own Shorts -> post_metrics (analyst/metrics.py), each at most hourly."""
+    sys.path.insert(0, str(HERE / "analyst"))
+    import metrics
+    return metrics.run(con, os.environ.get("YOUTUBE_API_KEY"))
+
+
 def run_pass(con, steps=None):
     """Run each stage; return {stage: result or 'error: ...'}. `steps` lets tests inject mocks."""
     model = os.environ.get("WHISPER_MODEL", "small")
     steps = steps or {
         "formats": refresh_formats,
+        "metrics": lambda: metrics_step(con),
         "radar": lambda: radar_step(con),
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),

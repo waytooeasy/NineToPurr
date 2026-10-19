@@ -14,7 +14,9 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 import approvals
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "editor"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "analyst"))
 import style  # noqa: E402  (editor/style.py: today's market caption style)
+import metrics  # noqa: E402  (analyst/metrics.py: views per Short)
 
 log = logging.getLogger("approve_bot")
 POLL_SECONDS = 30
@@ -81,6 +83,7 @@ async def _push_loop(app: Application) -> None:
     while True:
         try:
             await push_pending(app)
+            await push_digest(app)
         except Exception:
             log.exception("push loop error")
         await asyncio.sleep(POLL_SECONDS)
@@ -153,6 +156,35 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"✏️ Re-render requested for clip #{clip_id}." if ok else f"Clip #{clip_id} already decided.")
 
 
+async def on_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _allowed(update, context):
+        return
+    await update.message.reply_text(metrics.report(context.application.bot_data["con"]),
+                                    disable_web_page_preview=True)
+
+
+DIGEST_HOUR_UTC = 2   # 23:00 Asunción: one summary per day
+
+
+def digest_due(now, last_day):
+    """True once per UTC day, at/after DIGEST_HOUR_UTC."""
+    return now.hour >= DIGEST_HOUR_UTC and last_day != now.date()
+
+
+async def push_digest(app: Application, now=None) -> bool:
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    if not digest_due(now, app.bot_data.get("digest_day")):
+        return False
+    app.bot_data["digest_day"] = now.date()
+    text = metrics.report(app.bot_data["con"])
+    if text.startswith("No Shorts"):
+        return False
+    await app.bot.send_message(chat_id=app.bot_data["chat_id"], text="Daily recap\n" + text,
+                               disable_web_page_preview=True)
+    return True
+
+
 async def on_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _allowed(update, context):
         return
@@ -163,6 +195,7 @@ def build_app(token: str, chat_id: int, db_path: str) -> Application:
     app = Application.builder().token(token).post_init(_post_init).build()
     app.bot_data.update(con=approvals.connect(db_path), chat_id=chat_id, pending_edit=None)
     app.add_handler(CommandHandler("status", on_status))
+    app.add_handler(CommandHandler("stats", on_stats))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     return app

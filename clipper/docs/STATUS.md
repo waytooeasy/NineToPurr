@@ -12,6 +12,7 @@ _Last updated: 2026-10-19 19:30 UTC_
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 5/day (`.env`: UTC window 00:00–23:59) |
+| Metrics (`metrics` stage of every pass) | ✅ views/likes/comments per Short hourly → `post_metrics`; Telegram `/stats` + daily recap 23:00 Asunción |
 | Trend Scout (GitHub Actions, 10:30 UTC daily) | ✅ report issue + `trends` branch: `library.md` (titles/hooks) + `style.json` (caption style) |
 | Keys in `/opt/clipper/.env` | ✅ Anthropic, YouTube API key + upload token (OAuth app published), Twitch, Telegram |
 | Access for Claude | ✅ SSH from moon's local shell, `/vm` on issue #58, scoped sudo for restarting `clipper-*` services |
@@ -35,8 +36,9 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - Decision on YouTube footage (#64).
 
 ## Next for Claude
-- Watch the first real uploads (first ever YouTube API upload) and the first metrics.
-- Metrics puller + daily Analyst after launch (D35).
+- Read the first 48 h of views; raise the 5/day cap when views per Short hold up.
+- Feed views per streamer / format back into the Heat Index and the Writer (learning loop).
+- Engaged views / swipe-away: needs a token with `yt-analytics.readonly` (one re-auth by Lucas).
 
 ## On hold (until the first Shorts perform, D35)
 #69 Kick source · #70 YouTube streamers (Speed) source · #45 · #28.
