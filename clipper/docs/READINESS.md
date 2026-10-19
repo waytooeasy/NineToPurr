@@ -1,5 +1,7 @@
 # Readiness
 
+> **2026-10-19: live on the VM.** Current state lives in [`STATUS.md`](STATUS.md); this file is the pre-launch checklist, kept for reference.
+
 Is the clipper ready to run on the VM? Status after issue #48. ✅ = built and tested offline, ❌ = missing, ⚠️ = built, but never run against the real service.
 
 **Proof it hangs together:** `clipper/tests/test_e2e_offline.py` (runs in CI). Fresh DB via `db/migrate.py` → one pipeline pass with a Twitch and a YouTube source (Twitch API, yt-dlp, Whisper and the LLM mocked; real ffmpeg on a tiny synthetic video) → `qc_passed` → bot approval → `approved` → `upload.run_once` with a fake uploader → `published`. It found no glue bugs.

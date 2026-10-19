@@ -5,10 +5,11 @@
 
 | Folder | Project | Status |
 |---|---|---|
-| [`clipper/`](clipper/) | YouTube Shorts channel of big-streamer clips, run by agents | Phase 0 |
+| [`clipper/`](clipper/) | YouTube Shorts channel of big-streamer clips, run by agents | Phase 0, live ([status](clipper/docs/STATUS.md)) |
 
 ## Clipper at a glance
-- One Shorts channel, multi-streamer (Kai Cenat first). Every clip gets our angle: context line + story captions. ≤60 s, 3–5/day.
+- One Shorts channel, multi-streamer (Heat Index picks daily). Follows the market's format daily; every clip gets our hook + story captions + title. ≤60 s, max 5/day.
+- **Live since 2026-10-19.** What runs now: [`clipper/docs/STATUS.md`](clipper/docs/STATUS.md).
 - Paid by YouTube Shorts ads. Goal ≈ 6.7M PYG/month net.
 - Python + systemd + SQLite + Telegram approvals; Claude Haiku writes per-clip text; Claude agents build the code from GitHub issues.
 - Runs on a home Ubuntu VM (Hyper-V on Lucas's PC), reached over Tailscale. Access + state: `clipper/infra/VM.md`.
