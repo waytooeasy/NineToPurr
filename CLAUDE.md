@@ -10,7 +10,8 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 - Stack: Python + systemd timers + SQLite + Telegram approval bot. Per-clip LLM = **Claude Haiku 5.5** (Anthropic API); daily Analyst = Sonnet 5.5. Runtime n8n/agent team only after the gate in STRATEGY.md.
 - **Anthropic API = Lucas's own account only. Never a second account.** `ANTHROPIC_API_KEY` lives in GitHub secrets and `/opt/clipper/.env`, never in git or logs.
 - Build agents run via the Claude GitHub Action: Lucas comments `@claude` on an issue → agent builds → opens a PR. Agents never merge, never edit `.github/workflows/`, never touch secrets.
-- Runs on a home Ubuntu 24.04 VM (VMware on Win 11, i5-12400, 32 GB), reached over Tailscale. Data in `/opt/clipper`, never in git.
+- Runs on a home Ubuntu 24.04 VM (`prm-clipper`, Hyper-V on Lucas's Win 11 PC `moon`), reached over Tailscale. Data in `/opt/clipper`, never in git.
+- **Need a shell on the VM?** Read `clipper/infra/VM.md` first: SSH from the local shell on moon, or comment `/vm` on issue #58 (self-hosted runner). Never use the INFOCENTER work laptop.
 
 ## Sessions
 | Session | Owns |

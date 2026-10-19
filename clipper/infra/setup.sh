@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# setup.sh — bootstrap the clipper on Ubuntu 24.04 (home VMware VM or any VPS)
+# setup.sh — bootstrap the clipper on Ubuntu 24.04 (home Hyper-V VM or any VPS)
 # Usage (from anywhere):  bash clipper/infra/setup.sh
 # Expects the repo at /opt/clipper/repo (git clone https://github.com/waytooeasy/prm.git /opt/clipper/repo).
 # Idempotent: safe to run again after pulling new code.
 # --units-only: just install + enable the systemd units (step 8).
+# --cron-only:  just (re)install the daily yt-dlp update cron (step 6).
 set -euo pipefail
 
 CLIP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo/clipper
@@ -11,6 +12,7 @@ DATA="${CLIPPER_DATA:-/opt/clipper}"                      # runtime data (not in
 UNIT_DIR="${UNIT_DIR:-/etc/systemd/system}"
 SUDO="${SUDO-sudo}"                                       # SUDO="" in tests
 SYSTEMCTL="${SYSTEMCTL:-systemctl}"
+CRONTAB="${CRONTAB:-crontab}"
 
 install_units() {
   echo "== 8. systemd units (copy, daemon-reload, enable)"
@@ -21,12 +23,24 @@ install_units() {
   $SUDO $SYSTEMCTL start clipper-pipeline.timer clipper-upload.timer clipper-approve-bot.service
 }
 
+install_ytdlp_cron() {
+  echo "== 6. Keep yt-dlp fresh (daily)"
+  # A fresh box has no crontab (crontab -l exits 1) and grep -v on empty input exits 1;
+  # under set -e/pipefail either one used to kill setup.sh silently here.
+  local current
+  current="$($CRONTAB -l 2>/dev/null || true)"
+  { printf '%s\n' "$current" | grep -v -e 'yt-dlp' -e '^$' || true
+    echo "17 4 * * * $DATA/venv/bin/pip install -q --upgrade yt-dlp >> $DATA/logs/ytdlp-update.log 2>&1"
+  } | $CRONTAB -
+}
+
 if [[ "$CLIP" != "$DATA/repo/clipper" ]]; then
   echo "ERROR: repo must live at $DATA/repo (found $CLIP/..)." >&2
   echo "  sudo mkdir -p $DATA && sudo chown \"\$USER\": $DATA && git clone https://github.com/waytooeasy/prm.git $DATA/repo" >&2
   exit 1
 fi
 if [[ "${1:-}" == "--units-only" ]]; then install_units; exit 0; fi
+if [[ "${1:-}" == "--cron-only" ]]; then install_ytdlp_cron; exit 0; fi
 WHISPER_MODEL="${WHISPER_MODEL:-small}"                   # base on <4 GB RAM boxes
 
 echo "== 1. System packages"
@@ -65,9 +79,7 @@ $DATA/venv/bin/pip install --upgrade -r "$CLIP/requirements.txt"
 echo "== 5. Database (schema + ledger on a new DB, then pending migrations; idempotent)"
 CLIPPER_DB=$DATA/db/clip.db $DATA/venv/bin/python "$CLIP/db/migrate.py"
 
-echo "== 6. Keep yt-dlp fresh (daily)"
-( crontab -l 2>/dev/null | grep -v 'yt-dlp' ; \
-  echo "17 4 * * * $DATA/venv/bin/pip install -q --upgrade yt-dlp >> $DATA/logs/ytdlp-update.log 2>&1" ) | crontab -
+install_ytdlp_cron
 
 echo "== 7. Pre-download Whisper '$WHISPER_MODEL'"
 $DATA/venv/bin/python - <<PY

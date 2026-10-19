@@ -1,10 +1,10 @@
 # Infra
 
-**Scope:** the box. Ubuntu 24.04 VM (VMware, Win 11 host: i5-12400, 32 GB, 2 TB). Suggested VM: 6 vCPU, 8 GB RAM, 80 GB disk. Auto-start via Task Scheduler (`vmrun -T ws start <vmx> nogui`). Remote access: Tailscale.
+**Scope:** the box. Ubuntu 24.04 Hyper-V VM `prm-clipper` on Lucas's PC `moon` (Win 11 Pro: i5-12400, 32 GB, 2 TB): 6 vCPU, 8 GB RAM, 80 GB disk, auto-starts with Windows. Remote access: Tailscale. **IPs, access paths (SSH key, `vm-shell` runner), current state: [`VM.md`](VM.md).**
 
 **Status:** `setup.sh` ready (packages, firewall, fail2ban, venv, DB via `db/migrate.py` (new DB or pending migrations, idempotent), Whisper model). systemd units for the pipeline and the approval bot ready (D27).
 
-**Run:** clone to `/opt/clipper/repo`, then `bash /opt/clipper/repo/clipper/infra/setup.sh` (refuses to run from anywhere else). It also copies the units, runs `daemon-reload` and enables `clipper-pipeline.timer`, `clipper-upload.timer`, `clipper-approve-bot.service`. Re-run after a pull; `--units-only` skips the rest. Env vars: copy `.env.example` to `/opt/clipper/.env`.
+**Run:** clone to `/opt/clipper/repo`, then `bash /opt/clipper/repo/clipper/infra/setup.sh` (refuses to run from anywhere else). `--cron-only` re-installs just the yt-dlp cron. It also copies the units, runs `daemon-reload` and enables `clipper-pipeline.timer`, `clipper-upload.timer`, `clipper-approve-bot.service`. Re-run after a pull; `--units-only` skips the rest. Env vars: copy `.env.example` to `/opt/clipper/.env`.
 
 ## systemd units (`systemd/`)
 | Unit | What |
