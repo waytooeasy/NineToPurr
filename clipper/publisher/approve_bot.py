@@ -13,6 +13,9 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 
 import approvals
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "editor"))
+import style  # noqa: E402  (editor/style.py: today's market caption style)
+
 log = logging.getLogger("approve_bot")
 POLL_SECONDS = 30
 MAX_UPLOAD_BYTES = 49 * 1024 * 1024  # Bot API upload limit is 50 MB
@@ -45,9 +48,15 @@ async def send_clip(bot, chat_id: int, row) -> None:
 
 
 async def push_pending(app: Application) -> int:
-    """Send every unsent qc_passed clip. Returns how many were sent."""
+    """Send every unsent qc_passed clip. Returns how many were sent. A clip rendered in an older
+    caption style than today's goes back for a re-render first (Lucas: always recheck the trending
+    format before sending)."""
     con, chat_id, sent = app.bot_data["con"], app.bot_data["chat_id"], 0
+    current = style.version()
     for row in approvals.pending_to_send(con):
+        if row["style_version"] != current:
+            approvals.restyle(con, row["id"])
+            continue
         try:
             await send_clip(app.bot, chat_id, row)
             approvals.mark_sent(con, row["id"])

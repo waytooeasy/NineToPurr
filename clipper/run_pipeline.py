@@ -212,6 +212,7 @@ def editor_step(con, model="small", out=None):
 
 
 FORMATS_REF = "origin/trends:clipper/formats/library.md"
+STYLE_REF = "origin/trends:clipper/formats/style.json"
 FORMATS_MAX_AGE_S = 6 * 3600
 
 
@@ -238,7 +239,16 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
         p.write_text(out, encoding="utf-8")
     except OSError as e:
         return f"error: {type(e).__name__}"
-    return "updated"
+    try:  # today's caption style (style scout); optional, the renderer has a default
+        st = runner(["git", "-C", repo, "show", STYLE_REF], capture_output=True, text=True, check=True,
+                    timeout=60).stdout
+        json.loads(st)
+        sp = Path(os.environ.get("CLIPPER_STYLE", "/opt/clipper/formats/style.json"))
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        sp.write_text(st, encoding="utf-8")
+        return "updated (+style)"
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError):
+        return "updated"
 
 
 def run_pass(con, steps=None):

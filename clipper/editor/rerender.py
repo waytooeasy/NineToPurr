@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(1, str(Path(__file__).parent.parent))  # clipper/ for radar.capture
 import clip  # noqa: E402
 import qc  # noqa: E402
+import style  # noqa: E402
 
 
 def fail(con, clip_id, msg):
@@ -78,8 +79,8 @@ def run(con, model="small", out_dir=None):
             continue
         cur = con.execute(
             "UPDATE clips SET state='qc_passed', state_changed_at=datetime('now'), file_path=?, file_hash=?,"
-            " approval_sent_at=NULL, last_error=NULL WHERE id=? AND state='needs_rerender'",
-            (str(mp4), digest, row["id"]))
+            " approval_sent_at=NULL, last_error=NULL, style_version=? WHERE id=? AND state='needs_rerender'",
+            (str(mp4), digest, style.version(), row["id"]))
         con.commit()
         if cur.rowcount:
             res["done"].append(row["id"])

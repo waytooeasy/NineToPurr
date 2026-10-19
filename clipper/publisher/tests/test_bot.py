@@ -131,3 +131,19 @@ def test_post_button_approves_as_rendered(con, add_clip):
     upd2, q2 = button_update(f"p:{cid}")   # double tap
     asyncio.run(approve_bot.on_button(upd2, make_ctx(con)))
     q2.message.reply_text.assert_awaited_with(f"Clip #{cid} already decided.")
+
+
+def test_clip_in_an_old_style_goes_back_for_rerender_not_to_lucas(con, add_clip, tmp_path, monkeypatch):
+    import json
+    import style
+    cid = add_clip()                                   # rendered in the default style
+    sf = tmp_path / "style.json"
+    sf.write_text(json.dumps({"caption": {"case": "title", "highlight": "#00FF66"}}))
+    monkeypatch.setenv("CLIPPER_STYLE", str(sf))       # market moved on
+    ctx = make_ctx(con)
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 0
+    ctx.application.bot.send_message.assert_not_awaited()
+    assert st(con, cid) == "needs_rerender"
+    con.execute("UPDATE clips SET state='qc_passed', style_version=? WHERE id=?", (style.version(), cid))
+    con.commit()                                        # re-rendered in today's style
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1

@@ -8,6 +8,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 DB = pathlib.Path(__file__).resolve().parents[2] / "db"
 
 
+@pytest.fixture(autouse=True)
+def _no_style_file(monkeypatch, tmp_path):
+    """Tests run with the default caption style (version 'default') unless they write a style file."""
+    monkeypatch.setenv("CLIPPER_STYLE", str(tmp_path / "style.json"))
+
+
 @pytest.fixture
 def con():
     c = sqlite3.connect(":memory:")
@@ -24,10 +30,10 @@ def con():
 
 @pytest.fixture
 def add_clip(con):
-    def _add(state="qc_passed", hooks='["h one","h two","h three"]', path=None):
+    def _add(state="qc_passed", hooks='["h one","h two","h three"]', path=None, style_version="default"):
         cur = con.execute(
-            "INSERT INTO clips (source_id, start_s, end_s, state, hooks_json, context_line, file_path)"
-            " VALUES (1, 0, 30, ?, ?, 'Kai loses it', ?)", (state, hooks, path))
+            "INSERT INTO clips (source_id, start_s, end_s, state, hooks_json, context_line, file_path,"
+            " style_version) VALUES (1, 0, 30, ?, ?, 'Kai loses it', ?, ?)", (state, hooks, path, style_version))
         con.commit()
         return cur.lastrowid
     return _add

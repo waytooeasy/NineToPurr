@@ -203,10 +203,11 @@ class FakeGit:
         return type("R", (), {"stdout": self.show if cmd[3] == "show" else ""})()
 
 
-def test_refresh_formats_copies_trends_library(tmp_path):
+def test_refresh_formats_copies_trends_library(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_STYLE", str(tmp_path / "style.json"))
     p = tmp_path / "formats" / "library.md"
     git = FakeGit("# Format library (updated today)\n")
-    assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=git) == "updated"
+    assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=git) == "updated"  # style.json not JSON
     assert p.read_text() == "# Format library (updated today)\n"
     assert git.cmds[0][3:5] == ["fetch", "-q"] and git.cmds[1][-1] == run_pipeline.FORMATS_REF
 
@@ -219,3 +220,18 @@ def test_refresh_formats_skips_when_fresh_and_keeps_old_copy_on_error(tmp_path):
     later = p.stat().st_mtime + run_pipeline.FORMATS_MAX_AGE_S + 1
     assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=FakeGit(fail=True), now=later).startswith("error")
     assert p.read_text() == "old"
+
+
+class FakeGitStyle(FakeGit):
+    def __call__(self, cmd, **kw):
+        r = super().__call__(cmd, **kw)
+        if cmd[3] == "show" and cmd[-1] == run_pipeline.STYLE_REF:
+            return type("R", (), {"stdout": '{"caption": {"highlight": "#00FF66"}}'})()
+        return r
+
+
+def test_refresh_formats_also_copies_todays_style(tmp_path, monkeypatch):
+    sp = tmp_path / "style.json"
+    monkeypatch.setenv("CLIPPER_STYLE", str(sp))
+    assert run_pipeline.refresh_formats(tmp_path / "library.md", repo=tmp_path, runner=FakeGitStyle()) == "updated (+style)"
+    assert "#00FF66" in sp.read_text()
