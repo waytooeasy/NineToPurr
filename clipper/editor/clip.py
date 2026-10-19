@@ -262,7 +262,8 @@ def build_ass(words, pick, path, chunk=None, st=None):
     No context-line banner: none of the top channels show one."""
     import style as S
     from layout import caption_y
-    st = st or S.load()
+    st = dict(st or S.load())
+    st["highlight"] = S.highlight_for(st, pick.get("hook") or pick.get("start"))
     chunk = chunk or st["words"]
     start, end = pick["start"], pick["end"]
     lay = pick.get("layout")

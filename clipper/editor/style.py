@@ -41,7 +41,17 @@ def normalize(raw):
         out["position"] = cap["position"]
     if out["highlight"] == out["fill"]:          # a highlight nobody can see is no highlight
         out["highlight"] = DEFAULT["highlight"] if out["fill"] != DEFAULT["highlight"] else "#FFFFFF"
+    pal = [c.upper() for c in (cap.get("highlights") or []) if isinstance(c, str) and HEX.match(c)]
+    pal = [c for i, c in enumerate(pal) if c != out["fill"] and c not in pal[:i]][:4]
+    if pal:
+        out["highlights"] = pal
     return out
+
+
+def highlight_for(st, seed):
+    """Top channels vary the emphasis colour per clip: pick one from today's palette, stable per clip."""
+    pal = st.get("highlights") or [st["highlight"]]
+    return pal[int(hashlib.sha1(str(seed).encode()).hexdigest(), 16) % len(pal)]
 
 
 def load(p=None):

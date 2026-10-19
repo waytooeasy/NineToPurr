@@ -31,7 +31,8 @@ PROMPT = (
     '{"seen": <how many images show burned-in captions>, "caption": {"case": "upper|title|lower|'
     'as_spoken", "fill": "#RRGGBB" (main text colour), "highlight": "#RRGGBB" (colour of emphasised '
     'words; same as fill if none), "outline": "#RRGGBB", "words": <1-3 words shown at once>, '
-    '"position": "upper|middle|lower"}, "layout": "fullbleed|stack|letterbox", "notes": "<=20 words"}\n'
+    '"position": "upper|middle|lower", "highlights": ["#RRGGBB", ...] (every emphasis colour you see, '
+    'most common first, max 4)}, "layout": "fullbleed|stack|letterbox", "notes": "<=20 words"}\n'
     'If no image shows captions reply {"seen": 0}.')
 
 
@@ -59,7 +60,8 @@ def anthropic_vision(images):
     content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                             "data": base64.b64encode(b).decode()}} for _, b in images]
     content.append({"type": "text", "text": PROMPT})
-    msg = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=800,
+    # thinking off: with it on, Haiku 5.5 spent all 800 tokens thinking and returned no text (VM test)
+    msg = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=800, thinking={"type": "disabled"},
                                                 messages=[{"role": "user", "content": content}])
     return "".join(b.text for b in msg.content if b.type == "text")
 

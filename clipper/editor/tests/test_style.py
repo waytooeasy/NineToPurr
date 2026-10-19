@@ -38,3 +38,11 @@ def test_build_ass_follows_the_style(tmp_path, monkeypatch):
     caps = [l for l in ass.read_text().splitlines() if ",Cap," in l]
     assert len(caps) == 2                                    # 1 word per line
     assert "\\pos(540,1300)" in caps[1] and "{\\c&H0066FF00&}Zoom" in caps[1]  # lower, green, Title case
+
+
+def test_palette_varies_per_clip_but_is_stable():
+    st = S.normalize({"caption": {"highlights": ["#33ccff", "#99ff33", "#FFFFFF", "bad", "#33CCFF"]}})
+    assert st["highlights"] == ["#33CCFF", "#99FF33"]             # valid, no fill, no dupes
+    picks = {S.highlight_for(st, f"hook {i}") for i in range(20)}
+    assert picks == {"#33CCFF", "#99FF33"}
+    assert S.highlight_for(st, "same") == S.highlight_for(st, "same")
