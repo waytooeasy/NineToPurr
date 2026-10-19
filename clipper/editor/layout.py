@@ -5,9 +5,11 @@
 No blurred letterbox bars: none of the top channels use them.
 
 `choose_layout()` is pure (tests need no OpenCV); `detect_layout()` samples frames with OpenCV's
-bundled Haar face detector. No OpenCV, no faces or any error -> centred crop.
+YuNet face detector (model downloaded by setup.sh; OpenCV 5 dropped the Haar cascades).
+No OpenCV, no model, no faces or any error -> centred crop.
 """
 import json
+import os
 import subprocess
 from statistics import median
 
@@ -16,6 +18,8 @@ CAM_H = 768                 # stack: facecam panel height (40 %), gameplay gets 
 FACECAM_MAX_H = 0.20        # a face smaller than this (share of frame height) ...
 FACECAM_EDGE = 0.34         # ... with its centre in the outer third -> corner facecam
 SAMPLES = 8
+CLUSTER = 0.08              # detections within 8 % of the frame width are the same face
+MODEL = "/opt/clipper/models/face_detection_yunet_2023mar.onnx"
 
 
 def probe_size(video):
@@ -28,6 +32,7 @@ def probe_size(video):
 
 def choose_layout(faces, W, H):
     """faces: [(x, y, w, h)] in source pixels from sampled frames (any number per frame)."""
+    faces = dominant(faces, W)
     if not faces:
         return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     cx = median(x + w / 2 for x, y, w, h in faces)
@@ -45,6 +50,19 @@ def choose_layout(faces, W, H):
     y = min(max(cy - ch / 2, 0), H - ch)
     return {"mode": "stack", "cam": [round(x), round(y), round(cw), round(ch)], "W": W, "H": H,
             "face_w": round(fw)}
+
+
+def dominant(faces, W):
+    """The face seen most often: detections whose centres sit within CLUSTER*W of each other count
+    as one face. Drops one-off hits (a face on a TV, a game character, a passer-by)."""
+    if not faces:
+        return []
+    centres = [(x + w / 2, y + h / 2) for x, y, w, h in faces]
+
+    def near(a, b):
+        return abs(a[0] - b[0]) <= CLUSTER * W and abs(a[1] - b[1]) <= CLUSTER * W
+    best = max(range(len(faces)), key=lambda i: sum(near(centres[i], c) for c in centres))
+    return [f for f, c in zip(faces, centres) if near(centres[best], c)]
 
 
 def _even(v):
@@ -76,11 +94,15 @@ def caption_y(layout):
     return CAM_H if (layout or {}).get("mode") == "stack" else 1080
 
 
-def sample_faces(video, start, end, samples=SAMPLES):
+def sample_faces(video, start, end, samples=SAMPLES, model=None):
+    """All face boxes (x, y, w, h, source pixels) found in `samples` frames between start and end."""
+    os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
     import cv2  # lazy: optional dependency
-    det = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    model = model or os.environ.get("CLIPPER_FACE_MODEL", MODEL)
+    if not os.path.exists(model):
+        return []
     cap = cv2.VideoCapture(str(video))
-    faces = []
+    faces, det = [], None
     try:
         span = max(end - start, 0.1)
         for i in range(samples):
@@ -88,11 +110,13 @@ def sample_faces(video, start, end, samples=SAMPLES):
             ok, frame = cap.read()
             if not ok:
                 continue
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            found = det.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6,
-                                         minSize=(max(24, gray.shape[0] // 30),) * 2)
-            if len(found):
-                faces.append(tuple(int(v) for v in max(found, key=lambda f: f[2] * f[3])))
+            sc = 640 / frame.shape[1]
+            small = cv2.resize(frame, None, fx=sc, fy=sc)
+            if det is None:
+                det = cv2.FaceDetectorYN.create(model, "", (small.shape[1], small.shape[0]), 0.6)
+            _, found = det.detect(small)
+            for f in (found if found is not None else []):
+                faces.append(tuple(int(v / sc) for v in f[:4]))
     finally:
         cap.release()
     return faces

@@ -35,3 +35,19 @@ def test_unknown_size_uses_ffmpeg_expressions():
 
 def test_caption_sits_on_the_seam_for_stack():
     assert L.caption_y({"mode": "stack"}) == L.CAM_H and L.caption_y(None) == 1080
+
+
+def test_one_off_faces_are_ignored():
+    cam = [(216, 87, 74, 104)] * 6                  # xQc facecam, every frame
+    noise = [(605, 493, 23, 28)]                    # a face on a screen, once
+    lay = L.choose_layout(cam + noise, 1920, 1080)
+    assert lay["mode"] == "stack"
+
+
+def test_dominant_picks_the_face_seen_most():
+    faces = [(177, 459, 80, 104)] * 6 + [(903, 561, 99, 153)] * 2
+    assert L.dominant(faces, 2560) == [(177, 459, 80, 104)] * 6
+
+
+def test_missing_model_means_no_faces(tmp_path):
+    assert L.sample_faces(tmp_path / "x.mp4", 0, 10, model=str(tmp_path / "none.onnx")) == []
