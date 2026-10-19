@@ -15,6 +15,40 @@ Source of truth for the box. Update this file when anything here changes. No sec
 
 **Not PRM hardware:** `laptop-9au4kuc4` is Lucas's INFOCENTER work laptop. Never use it for PRM.
 
+## Host moon: how it was set up (HQ chat, 2026-10-19)
+Scripts live in `clipper/infra/windows/`. Run them in PowerShell as Administrator: `Set-ExecutionPolicy -Scope Process Bypass -Force`.
+
+**1. `Enable-PRMRemote.ps1`** (run with `-OpenToAll`; re-check anytime with `-CheckOnly`)
+- **Turned on:**
+  - RDP, with Network Level Authentication (NLA) required
+  - OpenSSH Server, with PowerShell as the default shell
+  - WinRM / PowerShell remoting on :5985
+  - SMB file sharing and network discovery
+  - ping (ICMP)
+  - Remote Assistance and Remote Registry
+  - Tailscale, unattended mode, so it connects before anyone logs in
+- **Firewall scope:** the rules are open to **any** address, not Tailscale/LAN only. The PC is safe only because it sits behind the home router's NAT. **Never add a port forward** on the router to moon. To tighten it, re-run without `-OpenToAll` (Tailscale `100.64.0.0/10` + LocalSubnet).
+- **Power:** no sleep or hibernate on AC power, fast startup off, Wake-on-LAN on in the NIC driver. Wake-on-LAN also needs the BIOS setting; not yet confirmed.
+- **Check results:** all PASS except RustDesk (winget couldn't find the package; not needed, since RDP works) and VMware (not used).
+- **Reboot survival:** confirmed. TermService, sshd and Tailscale are all Automatic. BitLocker has no PIN, so moon reboots unattended and comes back over Tailscale.
+
+**2. `New-PRMVM.ps1`**
+- 1st run: enables Hyper-V, then reboot.
+- 2nd run:
+  - downloads the latest Ubuntu 24.04 live-server ISO into `C:\PRM\vm`
+  - creates the external switch `PRM-External`; this drops the network for about 5 s and can cut an RDP session
+  - creates the Gen2 VM `prm-clipper` with Secure Boot (UEFI CA), 6 vCPU, 8 GB RAM, an 80 GB disk and no checkpoints, set to auto-start 30 s after Windows boots
+
+**Why Hyper-V and not VMware (D2 updated by HQ):** Hyper-V is built into Windows 11 Pro, costs $0, auto-starts VMs and is scriptable. VMware was never installed. A `192.168.56.1` adapter (probably VirtualBox) also exists on moon; ignore it.
+
+**Claude access to moon:** link the chat in the **Claude desktop app on moon** ("Link to this computer"). From the cloud container, Tailscale is blocked by the egress proxy (tested 2026-10-19: controlplane, derp and pkgs all rejected).
+
+## Security notes on `vm-shell` (HQ review, 2026-10-19)
+- `github.actor == 'waytooeasy'` also matches the `PRM_BOT_TOKEN` PAT. Anything holding that token can run commands on the VM. Keep the PAT scoped to this repo only, rotate it if it ever leaks, and never echo it in logs.
+- The runner is `self-hosted`. Any workflow file pushed to any branch could target it, and `pull_request` workflows run the branch's own copy. Build agents must never edit `.github/workflows/`; that is a rule in CLAUDE.md. In practice the Claude GitHub App can't push workflow files without the `workflows` permission, so don't grant it.
+- `prm` can read `/opt/clipper/.env` (Anthropic, Twitch, Telegram and YouTube secrets). Never `cat` it through vm-shell, because the output becomes an issue comment. Use `grep -c '=' .env` or `cut -d= -f1 .env` to check which keys are present.
+- Recommended hardening (HQ to apply, workflow edit): add `github.event.comment.author_association == 'OWNER'` to the `if:`, and give the runner a custom label `prm-vm` used only by `vm-shell.yml`.
+
 ## Paths on the VM
 | Path | What |
 |---|---|
