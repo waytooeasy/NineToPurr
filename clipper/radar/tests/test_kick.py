@@ -117,10 +117,22 @@ def test_overlapping_kick_clips_count_once():
     assert {"opgkepor", "AMANDA AND ?", "Michael Beasley 👀", "gg"} <= got
 
 
-def test_collect_widens_day_to_week_and_respects_allowed():
+def test_collect_reads_day_and_week_and_respects_allowed():
     fk = FakeKick()
-    kick.collect(fk, ["adinross", "n3on"], 50, now=NOW, allowed=["adinross"])
-    assert fk.calls == [("adinross", "day", 1), ("adinross", "week", 1)]
+    got = kick.collect(fk, ["adinross", "n3on"], 1, now=NOW, allowed=["adinross"])
+    assert fk.calls == [("adinross", "day", 1), ("adinross", "week", 1)]   # both, even with enough today
+    assert len({c["clip_id"] for c in got}) == len(got)                    # day + week overlap counted once
+
+
+def test_week_hit_beats_a_day_full_of_tiny_clips():
+    class DayNoise(FakeKick):
+        def get_clips(self, slug, window="week", max_pages=1):
+            if window == "day":
+                return [dict(WEEK["clips"][0], id=f"tiny{i}", view_count=4, duration=20,
+                             created_at="2026-10-17T11:00:00Z") for i in range(20)]
+            return [WEEK["clips"][1]]                                          # 14k views, 2.5 days old
+    got = kick.collect(DayNoise(), ["adinross"], 10, now=NOW)
+    assert got[0]["clip_id"] == WEEK["clips"][1]["id"]
 
 
 def test_a_block_stops_kick_for_the_pass_and_a_bad_slug_is_skipped():
@@ -128,7 +140,7 @@ def test_a_block_stops_kick_for_the_pass_and_a_bad_slug_is_skipped():
     fk = FakeKick(fail={"gone": ValueError("404"), "n3on": kick.KickBlocked("403")})
     got = kick.collect(fk, ["gone", "adinross", "n3on", "clavicular"], 1, now=NOW, log=logs.append)
     assert {c["creator"] for c in got} == {"adinross"}
-    assert [s for s, _, _ in fk.calls] == ["gone", "adinross", "n3on"]   # nothing after the block
+    assert [s for s, _, _ in fk.calls] == ["gone", "adinross", "adinross", "n3on"]   # nothing after the block
     assert len(logs) == 2
 
 
