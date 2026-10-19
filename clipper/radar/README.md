@@ -7,7 +7,7 @@
 **Status:** v1 built; YouTube live-VOD source added (issue #19, D29). `pytest clipper/radar` passes offline (saved responses in `tests/fixtures/`).
 
 ## Files
-- `config/creators.yaml` — per creator: a plain Twitch login, or `{twitch: kaicenat, youtube_channel: "@KaiCenat"}` to also pull that channel's livestream VODs.
+- `config/creators.yaml` — per creator: a plain Twitch login, or `{twitch: kaicenat, youtube_channel: "@KaiCenatLive"}` to also pull that channel's livestream VODs.
 - `youtube_vods.py` — yt-dlp metadata only (no API key): `<channel>/streams` → per-video JSON → moments from the `heatmap` ("most replayed", segments with value ≥ 0.5, top 3 per VOD), else `chapters` (weak score), else nothing → `radar_candidates` rows with `source='youtube'` (migration `007_radar_source.sql`). Skips `/shorts/` URLs, videos not from the configured channel, and non-live uploads / still-live streams. VODs from the last 7 days.
 - `twitch.py` — app token (client credentials, cached in `/opt/clipper/twitch_token.json`), login → broadcaster id, paginated Get Clips.
 - `top_clips.py` — last 24 h per creator (7 days if < N candidates after dedupe) → score → dedupe → `radar_candidates` → ranked list → `--picks N` writes `picks.json`.
@@ -16,7 +16,7 @@
 
 ## Heat Index (issue #33, D33)
 Decides *which streamers* get today's Shorts slots; Radar then ranks moments only inside them.
-- `config/watchlist.yaml` — ~30 English streamers, each entry `{name, platform, id}` (`twitch` | `youtube` | `kick`; Kick is `disabled: true`, no source yet). Also `daily_cap` (5), `max_per_streamer` (2), `explore_days` (3), `explore_top_n` (15). Add/remove a line, no code. Twitch logins are best guesses.
+- `config/watchlist.yaml` — ~30 English streamers, each entry `{name, platform, id}` (`twitch` | `youtube` | `kick`; Kick is `disabled: true`, no source yet). Also `daily_cap` (5), `max_per_streamer` (2), `explore_days` (3), `explore_top_n` (15). Add/remove a line, no code. All Twitch logins verified against Helix on 2026-10-19 (`erobb221t` → `erobb221`); Kai's YouTube is `@KaiCenatLive` (`@KaiCenat` has no streams tab).
 - `heat.py` — per streamer (entries with the same name are summed): **D** = views on clips created in the last 24 h (Twitch Get Clips; YouTube: views of own live VODs from the last 24 h), **W** = same over 7 d, **B** = W/7, **momentum** = (D+1)/(B+1), `live_now` (Twitch Get Streams / YouTube `/live`), **saturation** = competitor Shorts about the streamer in 24 h (Trend Scout), else 0.
   - `heat = ln(1+D) * (1 + 0.5*log2(momentum)) + 0.3*ln(1+B) + 1.0*live_now` (natural log; momentum factor floored at 0.1 so a collapsing streamer is never negative)
   - `opportunity = heat / (1 + 0.1*saturation)`
@@ -32,7 +32,8 @@ Every 20-min pass (D22): `radar_step` = **Heat slots → moments → picks**.
 - Heat unavailable (error) → logged, falls back to ranking all creators; the cap still holds. A yt-dlp failure keeps the Twitch picks.
 - `_picks` reads `clips.start_s/end_s` (set by `pick_window`, D23): Twitch `0 → duration`, YouTube VOD-absolute. `capture_step` gets those as is; `editor_step` gets YouTube picks shifted into the downloaded window file (`start - capture.section(pick)[0]`), same as `python -m radar.capture` does for `picks.json`. Previously every pick was `0 → duration`, wrong for VOD moments.
 - Tests: `radar/tests/test_pipeline_radar.py` (fake Twitch, fake yt-dlp, fake Heat fetchers).
-- Needs `creators.yaml` logins to match the watchlist (`ids` map in the allocation); a creator not in the watchlist gets no slot while Heat is on.
+- Radar pulls from `radar_creators()` = `creators.yaml` + every enabled watchlist Twitch login (with that streamer's YouTube channel), so every Heat slot can be served. Before this, the first VM pass allocated Sykkuno/Valkyrae/xQc while only `kaicenat` was pulled → 0 picks.
+- A VOD yt-dlp can't read (members-only, premiere, YouTube's "confirm you're not a bot") is skipped; if every VOD on a channel fails it raises and is logged.
 
 ## Rules in code
 - Score = views / hours since `created_at` (age floored at 15 min).
@@ -75,7 +76,7 @@ The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 - Trend Scout does not persist per-streamer Shorts counts (`leaderboard_24h` is only in its in-memory summary). `heat.py` reads `CLIPPER_SATURATION` JSON; the analyst should write `{streamer: shorts_24h}` next to `creators_ranking.json`, or HQ confirms another hand-off. Until then saturation = 0.
 - No systemd unit for `radar.heat` yet (`.github/` and infra timer every 30 min not added; `top_clips` should read the latest `allocation.json`).
 - Heat constants (live bonus 1.0, momentum floor 0.1) are my choice; D33 gives only the shape.
-- Watchlist Twitch logins are unverified guesses; `creators.yaml` (what `top_clips` actually pulls) is not yet derived from the watchlist.
+- **YouTube blocks yt-dlp from the VM** ("Sign in to confirm you're not a bot", 2026-10-19): the YouTube VOD source and YouTube heat return nothing until HQ decides how (needs-hq). Twitch clips work.
 
 **Resolved (HQ 2026-10-18):** the DB keeps VOD-absolute `start_s/end_s`; the Editor and re-render both shift into the window file.
 

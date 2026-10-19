@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +35,7 @@ class FakeYtdlp:
 
 def test_config_backward_compatible(tmp_path):
     assert top_clips.load_creators() == ["kaicenat"]
-    assert top_clips.load_creator_configs()[0]["youtube_channel"] == "@KaiCenat"
+    assert top_clips.load_creator_configs()[0]["youtube_channel"] == "@KaiCenatLive"
     p = tmp_path / "c.yaml"
     p.write_text("creators:\n  - Kaicenat\n  - {twitch: duke}\n")
     assert top_clips.load_creators(p) == ["kaicenat", "duke"]
@@ -177,3 +178,30 @@ def test_capture_cleans_up_on_failure_and_size_cap(tmp_path):
     with pytest.raises(RuntimeError, match="cap"):
         capture.download_section(picks[0], tmp_path / "o.mp4", big, max_mb=0.001)
     assert list(tmp_path.iterdir()) == []
+
+
+class FlakyYtdlp(FakeYtdlp):
+    """Like FakeYtdlp, but the listed video ids fail like YouTube's bot check does."""
+
+    def __init__(self, fail):
+        super().__init__()
+        self.fail = set(fail)
+
+    def __call__(self, cmd, capture_output=True, text=True, check=True):
+        vid = cmd[-1].split("v=")[-1]
+        if not cmd[-1].endswith("/streams") and (vid in self.fail or "*" in self.fail):
+            self.cmds.append(cmd)
+            raise subprocess.CalledProcessError(1, cmd, stderr="Sign in to confirm you're not a bot")
+        return super().__call__(cmd, capture_output, text, check)
+
+
+def test_one_unreadable_vod_is_skipped_not_fatal():
+    ok = youtube_vods.own_vod_infos("@KaiCenat", FakeYtdlp())
+    bad_id = ok[0]["id"]
+    infos = youtube_vods.own_vod_infos("@KaiCenat", FlakyYtdlp([bad_id]))
+    assert len(infos) == len(ok) - 1 and bad_id not in {i["id"] for i in infos}
+
+
+def test_every_vod_unreadable_raises_so_it_gets_logged():
+    with pytest.raises(RuntimeError, match="any of 4 VODs"):
+        youtube_vods.own_vod_infos("@KaiCenat", FlakyYtdlp(["*"]))

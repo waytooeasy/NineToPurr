@@ -171,3 +171,20 @@ def test_log_usage_connects_with_timeout(fake_sdk, monkeypatch, tmp_path):
     monkeypatch.setattr(L.sqlite3, "connect", spy)
     L.llm("p", SCHEMA)
     assert seen.get("timeout") == 30
+
+
+def test_text_skips_leading_thinking_block():
+    # First VM pass (2026-10-19): Haiku 5.5 returned [thinking, text]; content[0].text crashed all 5 clips.
+    m = types.SimpleNamespace(stop_reason="end_turn", content=[
+        types.SimpleNamespace(type="thinking", thinking="plan the hook..."),
+        types.SimpleNamespace(type="text", text='{"a": 0.5}')])
+    assert L._text(m) == '{"a": 0.5}'
+
+
+def test_text_truncated_or_empty_is_an_llm_error():
+    with pytest.raises(L.LLMError, match="max_tokens"):
+        L._text(types.SimpleNamespace(stop_reason="max_tokens",
+                                      content=[types.SimpleNamespace(type="text", text='{"a": 0.')]))
+    with pytest.raises(L.LLMError, match="no text"):
+        L._text(types.SimpleNamespace(stop_reason="end_turn",
+                                      content=[types.SimpleNamespace(type="thinking", thinking="x")]))

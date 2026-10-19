@@ -12,7 +12,7 @@ streamers:
   - {name: IShowSpeed, platform: twitch, id: ishowspeed}
   - {name: IShowSpeed, platform: youtube, id: "@IShowSpeed"}
   - {name: Kai Cenat, platform: twitch, id: kaicenat}
-  - {name: Kai Cenat, platform: youtube, id: "@KaiCenat"}
+  - {name: Kai Cenat, platform: youtube, id: "@KaiCenatLive"}
   - {name: CaseOh, platform: twitch, id: caseoh_}
   - {name: Agent00, platform: twitch, id: agent00}
   - {name: Jynxzi, platform: twitch, id: jynxzi}
@@ -27,7 +27,7 @@ streamers:
   - {name: ExtraEmily, platform: twitch, id: extraemily}
   - {name: Emiru, platform: twitch, id: emiru}
   - {name: Esfand, platform: twitch, id: esfand}
-  - {name: Erobb, platform: twitch, id: erobb221t}
+  - {name: Erobb, platform: twitch, id: erobb221}
   - {name: Shroud, platform: twitch, id: shroud}
   - {name: Tarik, platform: twitch, id: tarik}
   - {name: Pokimane, platform: twitch, id: pokimane}

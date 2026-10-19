@@ -9,6 +9,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/opt/clipper/repo/clipper/publisher
 EnvironmentFile=/opt/clipper/.env
+Environment=PATH=/opt/clipper/venv/bin:/usr/local/bin:/usr/bin:/bin
 Environment=CLIPPER_DB=/opt/clipper/db/clip.db
 Environment=YOUTUBE_CLIENT_SECRET=/opt/clipper/client_secret.json
 Environment=YOUTUBE_TOKEN_FILE=/opt/clipper/youtube_token.json
