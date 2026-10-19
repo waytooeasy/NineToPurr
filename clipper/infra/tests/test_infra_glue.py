@@ -63,7 +63,8 @@ def test_env_example_lists_every_env_var_the_code_reads():
 def test_env_example_has_no_values():
     for line in (CLIPPER / "infra/.env.example").read_text().splitlines():
         if re.match(r"^[A-Z]", line):
-            assert re.match(r"^[A-Z0-9_]+=\s*(#.*)?$", line), line
+            # Empty, and no inline comment: systemd EnvironmentFile would keep "# ..." as the value.
+            assert re.match(r"^[A-Z0-9_]+=$", line), line
 
 
 def _run_cron(tmp_path, existing):
