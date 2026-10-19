@@ -260,7 +260,7 @@ def build_ass(words, pick, path, chunk=2):
     start, end = pick["start"], pick["end"]
     lay = pick.get("layout")
     y = caption_y(lay)
-    hook_y = 900 if (lay or {}).get("mode") == "stack" else 380
+    hook_y = 1180 if (lay or {}).get("mode") == "stack" else 380  # stack: in the gameplay, clear of the seam captions
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080

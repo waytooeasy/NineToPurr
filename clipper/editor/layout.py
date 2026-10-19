@@ -43,7 +43,7 @@ def choose_layout(faces, W, H):
     if not corner:
         return {"mode": "crop", "cx": cx, "W": W, "H": H}
     # facecam box: a few face-heights around the face, panel aspect 1080:768
-    ch = min(H, fh * 3.4)
+    ch = min(H, fh * 3.0)
     cw = min(W, ch * OUT_W / CAM_H)
     ch = cw * CAM_H / OUT_W
     x = min(max(cx - cw / 2, 0), W - cw)
