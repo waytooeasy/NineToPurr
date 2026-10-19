@@ -39,7 +39,7 @@ Radar (Heat Index → Twitch clips, views/hour, dedupe) → Capture (yt-dlp) →
 ```
 - Clip states: `found → captured → drafted → edited → qc_passed → approved → published → measured`.
 - Measure **engaged views** and viewed-vs-swiped-away, not raw views (Shorts count every play).
-- Lucas approves every Short at first (L0). Auto-publish only after 2 clean weeks (≥90% approved unchanged, 0 blocked claims).
+- Auto-publish from day 1 (D44, Lucas): QC + today's style decide; Lucas gets an FYI with 🛑 Stop. Music-risk clips still need his tap.
 
 ## Phases and gates
 | Phase | What | Gate |
