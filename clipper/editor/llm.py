@@ -119,14 +119,29 @@ def log_usage(provider, model, usage, kind="call", clip_id=None, batch_id=None):
         log.warning("llm_usage not logged (%s); run db/migrate.py first", e)
 
 
+MAX_TOKENS = 4000  # room for adaptive thinking before the JSON (Haiku 5.5 thinks on the Writer prompt)
+
+
+def _text(msg):
+    """Joined text blocks of a Messages response. Newer models can put a `thinking` block first,
+    so content[0] is not always the answer (first VM pass, 2026-10-19). Truncation is an error,
+    not half a JSON object."""
+    if getattr(msg, "stop_reason", None) == "max_tokens":
+        raise LLMError(f"response hit max_tokens ({MAX_TOKENS})")
+    text = "".join(b.text for b in msg.content if getattr(b, "type", "text") == "text")
+    if not text.strip():
+        raise LLMError("response has no text block")
+    return text
+
+
 def _call_anthropic(prompt, system=None, clip_id=None):
     import anthropic  # lazy: not needed in CI
     kw = {"system": _system_blocks(system)} if system else {}
     model = _anthropic_model()
     msg = anthropic.Anthropic().messages.create(
-        model=model, max_tokens=1500, messages=[{"role": "user", "content": prompt}], **kw)
+        model=model, max_tokens=MAX_TOKENS, messages=[{"role": "user", "content": prompt}], **kw)
     log_usage("anthropic", model, _usage_dict(msg.usage), clip_id=clip_id)
-    return msg.content[0].text
+    return _text(msg)
 
 
 def _call_gemini(prompt, system=None, clip_id=None):
@@ -209,7 +224,7 @@ def llm_batch(items, schema, system=None, poll_s=30, timeout_s=24 * 3600):
     sys_text = (system + suffix) if system else None
     requests_ = []
     for it in items:
-        params = {"model": model, "max_tokens": 1500,
+        params = {"model": model, "max_tokens": MAX_TOKENS,
                   "messages": [{"role": "user", "content": it["prompt"] + ("" if sys_text else suffix)}]}
         if sys_text:
             params["system"] = _system_blocks(sys_text)
@@ -230,7 +245,7 @@ def llm_batch(items, schema, system=None, poll_s=30, timeout_s=24 * 3600):
         log_usage("anthropic", model, _usage_dict(res.message.usage), kind="batch",
                   clip_id=int(entry.custom_id) if entry.custom_id.isdigit() else None, batch_id=batch.id)
         try:
-            out[entry.custom_id] = validate(_parse_json(res.message.content[0].text), schema)
-        except ValueError:
+            out[entry.custom_id] = validate(_parse_json(_text(res.message)), schema)
+        except (ValueError, LLMError):
             pass
     return out
