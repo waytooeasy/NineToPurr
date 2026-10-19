@@ -14,7 +14,9 @@ import subprocess
 from statistics import median
 
 OUT_W, OUT_H = 1080, 1920
-CAM_H = 768                 # stack: facecam panel height (40 %), gameplay gets the rest
+CAM_H = 768                 # stack: default facecam panel height (40 %), gameplay gets the rest
+CAM_H_MIN, CAM_H_MAX = 600, 960   # a found facecam box keeps its own shape within these
+EDGE_RATIO = 4.0            # an overlay border is a column/row this many times sharper than median
 FACECAM_MAX_H = 0.20        # a face smaller than this (share of frame height) ...
 FACECAM_EDGE = 0.34         # ... with its centre in the outer third -> corner facecam
 SAMPLES = 8
@@ -30,8 +32,9 @@ def probe_size(video):
     return int(s["width"]), int(s["height"])
 
 
-def choose_layout(faces, W, H):
-    """faces: [(x, y, w, h)] in source pixels from sampled frames (any number per frame)."""
+def choose_layout(faces, W, H, cam_box=None):
+    """faces: [(x, y, w, h)] in source pixels from sampled frames (any number per frame).
+    cam_box: the facecam overlay's (x0, y0, x1, y1) if its borders were found (find_cam_box)."""
     faces = dominant(faces, W)
     if not faces:
         return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
@@ -42,14 +45,63 @@ def choose_layout(faces, W, H):
     corner = (cx < W * FACECAM_EDGE or cx > W * (1 - FACECAM_EDGE)) and fh < H * FACECAM_MAX_H
     if not corner:
         return {"mode": "crop", "cx": cx, "W": W, "H": H}
-    # facecam box: a few face-heights around the face, panel aspect 1080:768
+    if cam_box:
+        return stack_from_box(cam_box, cx, cy, W, H)
+    # no borders found: a few face-heights around the face, panel aspect 1080:768
     ch = min(H, fh * 3.0)
     cw = min(W, ch * OUT_W / CAM_H)
     ch = cw * CAM_H / OUT_W
     x = min(max(cx - cw / 2, 0), W - cw)
     y = min(max(cy - ch / 2, 0), H - ch)
-    return {"mode": "stack", "cam": [round(x), round(y), round(cw), round(ch)], "W": W, "H": H,
-            "face_w": round(fw)}
+    return {"mode": "stack", "cam": [round(x), round(y), round(cw), round(ch)], "cam_h": CAM_H,
+            "W": W, "H": H}
+
+
+def stack_from_box(box, cx, cy, W, H):
+    """Crop exactly the facecam overlay. The top panel keeps the overlay's shape (600-960 px tall);
+    if it is even wider/taller than that, trim the long side around the face."""
+    x0, y0, x1, y1 = box
+    bw, bh = x1 - x0, y1 - y0
+    cam_h = _even(min(CAM_H_MAX, max(CAM_H_MIN, OUT_W * bh / bw)))
+    a = OUT_W / cam_h                       # panel aspect w/h
+    if bw / bh > a:                          # too wide: narrower window around the face
+        cw, ch = bh * a, bh
+        x, y = min(max(cx - cw / 2, x0), x1 - cw), y0
+    else:                                    # too tall: shorter window around the face
+        cw, ch = bw, bw / a
+        x, y = x0, min(max(cy - ch / 2, y0), y1 - ch)
+    return {"mode": "stack", "cam": [round(x), round(y), round(cw), round(ch)], "cam_h": cam_h,
+            "W": W, "H": H}
+
+
+def _edge(profile, lo, hi, ratio=EDGE_RATIO):
+    """Index of the sharpest line in profile[lo:hi] if it stands out `ratio` x above the median."""
+    lo, hi = max(0, int(lo)), min(len(profile), int(hi))
+    if hi - lo < 2:
+        return None
+    seg = profile[lo:hi]
+    i = max(range(len(seg)), key=seg.__getitem__)
+    med = sorted(profile)[len(profile) // 2] or 1e-6
+    return lo + i if seg[i] >= ratio * med else None
+
+
+def cam_box_from_profiles(col, row, face, W, H):
+    """Facecam overlay borders from edge profiles: col[x] = vertical-edge strength per column (rows
+    around the face), row[y] = horizontal-edge strength per row (columns around the face). A side
+    with no clear border falls back to the frame edge (overlay flush with it) or a face-sized margin."""
+    fx, fy, fw, fh = face
+    r = _edge(col, fx + fw + 5, fx + 6 * fw)
+    left = _edge(col, fx - 4 * fw, fx - 5)
+    b = _edge(row, fy + fh + 5, fy + 5 * fh)
+    t = _edge(row, fy - 4 * fh, fy - 5)
+    # no border found but the search reached the frame edge -> overlay is flush with it
+    x0 = left if left is not None else (0 if fx - 4 * fw <= 0 else fx - 1.5 * fw)
+    x1 = r if r is not None else (W if fx + 6 * fw >= W else fx + 2.5 * fw)
+    y0 = t if t is not None else (0 if fy - 4 * fh <= 0 else fy - 1.5 * fh)
+    y1 = b if b is not None else (H if fy + 5 * fh >= H else fy + 2.5 * fh)
+    if r is None and left is None and b is None and t is None:
+        return None
+    return (int(x0), int(y0), int(x1), int(y1))
 
 
 def dominant(faces, W):
@@ -74,11 +126,12 @@ def filtergraph(layout):
     W, H = layout["W"], layout["H"]
     if layout["mode"] == "stack":
         x, y, cw, ch = layout["cam"]
-        gh = OUT_H - CAM_H
+        cam_h = layout.get("cam_h", CAM_H)
+        gh = OUT_H - cam_h
         gw = min(W, H * OUT_W / gh)           # gameplay: centre cut, panel aspect 1080:1152
         gx = (W - gw) / 2
         return (f"[0:v]split[c][g];"
-                f"[c]crop={_even(cw)}:{_even(ch)}:{_even(x)}:{_even(y)},scale={OUT_W}:{CAM_H},setsar=1[top];"
+                f"[c]crop={_even(cw)}:{_even(ch)}:{_even(x)}:{_even(y)},scale={OUT_W}:{cam_h},setsar=1[top];"
                 f"[g]crop={_even(gw)}:{_even(min(H, gw * gh / OUT_W))}:{_even(gx)}:0,"
                 f"scale={OUT_W}:{gh},setsar=1[bot];"
                 f"[top][bot]vstack=inputs=2[v]")
@@ -91,7 +144,8 @@ def filtergraph(layout):
 
 def caption_y(layout):
     """Where captions sit (ASS \\pos y, 1920 tall): on the seam for stack, a bit below centre for crop."""
-    return CAM_H if (layout or {}).get("mode") == "stack" else 1080
+    lay = layout or {}
+    return lay.get("cam_h", CAM_H) if lay.get("mode") == "stack" else 1080
 
 
 def sample_faces(video, start, end, samples=SAMPLES, model=None):
@@ -122,6 +176,34 @@ def sample_faces(video, start, end, samples=SAMPLES, model=None):
     return faces
 
 
+def edge_profiles(video, start, end, face, samples=SAMPLES):
+    """Mean |Sobel| per column (rows around the face) and per row (columns around the face)."""
+    os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
+    import cv2
+    import numpy as np
+    fx, fy, fw, fh = face
+    cap = cv2.VideoCapture(str(video))
+    col = row = None
+    try:
+        span = max(end - start, 0.1)
+        for i in range(samples):
+            cap.set(cv2.CAP_PROP_POS_MSEC, (start + span * (i + 0.5) / samples) * 1000)
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+            H, W = g.shape
+            gx = np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3))
+            gy = np.abs(cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3))
+            c = gx[max(0, fy - fh):min(H, fy + 2 * fh)].mean(axis=0)
+            r = gy[:, max(0, fx - fw):min(W, fx + 2 * fw)].mean(axis=1)
+            col = c if col is None else col + c
+            row = r if row is None else row + r
+    finally:
+        cap.release()
+    return (None, None) if col is None else (col.tolist(), row.tolist())
+
+
 def detect_layout(video, start, end):
     try:
         W, H = probe_size(video)
@@ -131,4 +213,15 @@ def detect_layout(video, start, end):
         faces = sample_faces(video, start, end)
     except Exception:  # noqa: BLE001 - no OpenCV / unreadable frames: centred crop
         faces = []
-    return choose_layout(faces, W, H)
+    lay = choose_layout(faces, W, H)
+    if lay["mode"] == "stack":
+        try:
+            dom = dominant(faces, W)
+            face = tuple(int(median(f[i] for f in dom)) for i in range(4))
+            col, row = edge_profiles(video, start, end, face)
+            box = cam_box_from_profiles(col, row, face, W, H) if col else None
+            if box:
+                lay = choose_layout(faces, W, H, cam_box=box)
+        except Exception:  # noqa: BLE001 - keep the face-sized estimate
+            pass
+    return lay

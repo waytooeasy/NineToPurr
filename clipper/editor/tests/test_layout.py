@@ -27,6 +27,7 @@ def test_small_corner_face_means_facecam_stack():
     assert x <= 90 and y <= 70 and x + w >= 200 and y + h >= 180   # whole face inside the cam box
     g = L.filtergraph(lay)
     assert "vstack=inputs=2" in g and f"scale=1080:{L.CAM_H}" in g and f"scale=1080:{1920 - L.CAM_H}" in g
+    assert lay["cam_h"] == L.CAM_H
 
 
 def test_unknown_size_uses_ffmpeg_expressions():
@@ -51,3 +52,37 @@ def test_dominant_picks_the_face_seen_most():
 
 def test_missing_model_means_no_faces(tmp_path):
     assert L.sample_faces(tmp_path / "x.mp4", 0, 10, model=str(tmp_path / "none.onnx")) == []
+
+
+def _profile(n, peaks):
+    p = [1.0] * n
+    for i in peaks:
+        p[i] = 30.0
+    return p
+
+
+def test_cam_box_from_overlay_borders():
+    # xQc (VM, 2026-10-19): facecam flush top-left, borders at x=405 and y=315
+    face = (216, 87, 74, 104)
+    box = L.cam_box_from_profiles(_profile(1920, [405]), _profile(1080, [315]), face, 1920, 1080)
+    assert box == (0, 0, 405, 315)
+
+
+def test_cam_box_none_without_any_border():
+    assert L.cam_box_from_profiles([1.0] * 1920, [1.0] * 1080, (216, 87, 74, 104), 1920, 1080) is None
+
+
+def test_tall_overlay_gets_a_taller_panel_and_face_centred_crop():
+    # Valkyrae (VM): overlay 5..404 x 277..729 (portrait-ish) -> panel capped at 960 px tall
+    lay = L.stack_from_box((5, 277, 404, 729), 217, 511, 2560, 1440)
+    assert lay["cam_h"] == L.CAM_H_MAX
+    x, y, w, h = lay["cam"]
+    assert (x, w) == (5, 399) and 277 <= y and y + h <= 729 and abs(w / h - 1080 / 960) < 0.01
+    g = L.filtergraph(lay)
+    assert "scale=1080:960" in g and "scale=1080:960" in g and f"scale=1080:{1920 - 960}" in g
+    assert L.caption_y(lay) == 960
+
+
+def test_wide_overlay_keeps_its_shape():
+    lay = L.stack_from_box((0, 0, 405, 315), 253, 139, 1920, 1080)
+    assert lay["cam"] == [0, 0, 405, 315] and lay["cam_h"] == 840
