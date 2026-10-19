@@ -18,20 +18,18 @@ POLL_SECONDS = 30
 MAX_UPLOAD_BYTES = 49 * 1024 * 1024  # Bot API upload limit is 50 MB
 
 
-def keyboard(clip_id: int, n_hooks: int) -> InlineKeyboardMarkup:
-    approve_row = [InlineKeyboardButton(f"✅ Hook {i}", callback_data=f"a:{clip_id}:{i}")
-                   for i in range(1, n_hooks + 1)]
-    return InlineKeyboardMarkup([
-        approve_row,
-        [InlineKeyboardButton("✏️ Edit hook", callback_data=f"e:{clip_id}"),
-         InlineKeyboardButton("❌ Kill", callback_data=f"k:{clip_id}")],
-    ])
+def keyboard(clip_id: int, n_hooks: int = 0) -> InlineKeyboardMarkup:
+    """Lucas (2026-10-19): just Post or Kill. The clip posts as rendered (Writer's best hook)."""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Post", callback_data=f"p:{clip_id}"),
+        InlineKeyboardButton("❌ Kill", callback_data=f"k:{clip_id}"),
+    ]])
 
 
 def caption(row) -> str:
-    hooks = approvals.hooks_of(row)
-    text = f"Clip #{row['id']}\nContext: {row['context_line'] or '-'}\n\n"
-    text += "\n".join(f"{i}. {h}" for i, h in enumerate(hooks, 1)) or "(no hooks)"
+    text = f"Clip #{row['id']}: {row['title'] or '-'}\n{row['context_line'] or ''}".rstrip()
+    if row["music_risk"]:
+        text += "\n⚠️ music risk"
     return text[:1000]  # Telegram caption limit is 1024
 
 
@@ -90,7 +88,10 @@ async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError:
         return
 
-    if action == "a":
+    if action == "p":
+        ok = approvals.post(con, clip_id)
+        result = f"✅ Posting clip #{clip_id}"
+    elif action == "a":  # old messages with hook buttons
         ok = approvals.approve(con, clip_id, int(rest[0]))
         result = f"✅ Approved clip #{clip_id} (hook {rest[0]})"
     elif action == "k":

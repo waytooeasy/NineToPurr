@@ -68,6 +68,16 @@ def approve(con, clip_id: int, hook_index: int) -> bool:
     return _decide(con, clip_id, "approved", hook_index, hooks[hook_index - 1], True)
 
 
+def post(con, clip_id: int) -> bool:
+    """✅ Post: approve the clip exactly as rendered (its current hook_text)."""
+    row = con.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+    if row is None:
+        return False
+    hooks = hooks_of(row)
+    idx = hooks.index(row["hook_text"]) + 1 if row["hook_text"] in hooks else None
+    return _decide(con, clip_id, "approved", idx, row["hook_text"], False)
+
+
 def kill(con, clip_id: int) -> bool:
     return _decide(con, clip_id, "killed", None, None, False)
 

@@ -33,7 +33,8 @@ def test_push_sends_text_when_no_file_and_marks_sent(con, add_clip):
     ctx = make_ctx(con)
     assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1
     kw = ctx.application.bot.send_message.await_args.kwargs
-    assert kw["chat_id"] == ALLOWED and "Kai loses it" in kw["text"] and "h three" in kw["text"]
+    assert kw["chat_id"] == ALLOWED and "Kai loses it" in kw["text"]
+    assert [b.callback_data for r in kw["reply_markup"].inline_keyboard for b in r] == ["p:1", "k:1"]
     assert asyncio.run(approve_bot.push_pending(ctx.application)) == 0  # not sent twice
 
 
@@ -112,3 +113,21 @@ def test_stale_button_after_decision(con, add_clip):
     asyncio.run(approve_bot.on_button(upd, ctx))
     assert st(con, cid) == "killed"
     assert "already decided" in q.message.reply_text.await_args.args[0]
+
+
+def test_keyboard_is_post_or_kill():
+    kb = approve_bot.keyboard(7)
+    btns = [b for row in kb.inline_keyboard for b in row]
+    assert [(b.text, b.callback_data) for b in btns] == [("✅ Post", "p:7"), ("❌ Kill", "k:7")]
+
+
+def test_post_button_approves_as_rendered(con, add_clip):
+    cid = add_clip()
+    rendered = con.execute("SELECT hook_text FROM clips WHERE id=?", (cid,)).fetchone()[0]
+    upd, _ = button_update(f"p:{cid}")
+    asyncio.run(approve_bot.on_button(upd, make_ctx(con)))
+    assert st(con, cid) == "approved"
+    assert con.execute("SELECT hook_text FROM clips WHERE id=?", (cid,)).fetchone()[0] == rendered
+    upd2, q2 = button_update(f"p:{cid}")   # double tap
+    asyncio.run(approve_bot.on_button(upd2, make_ctx(con)))
+    q2.message.reply_text.assert_awaited_with(f"Clip #{cid} already decided.")
