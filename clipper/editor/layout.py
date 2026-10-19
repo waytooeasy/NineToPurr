@@ -151,10 +151,10 @@ def caption_y(layout):
 def sample_faces(video, start, end, samples=SAMPLES, model=None):
     """All face boxes (x, y, w, h, source pixels) found in `samples` frames between start and end."""
     os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
-    import cv2  # lazy: optional dependency
     model = model or os.environ.get("CLIPPER_FACE_MODEL", MODEL)
     if not os.path.exists(model):
         return []
+    import cv2  # lazy: optional dependency
     cap = cv2.VideoCapture(str(video))
     faces, det = [], None
     try:
