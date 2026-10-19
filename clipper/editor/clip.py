@@ -40,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 MAX_CLIP_S = 60.0
+MAX_TRIM_S = 2.0  # market window: viewers already chose this moment; trim at most dead air per end
 WINDOW_S, STRIDE_S = 120.0, 90.0   # transcript windows sent to the Writer
 
 
@@ -183,6 +184,18 @@ def writer_picks(work, n, creator, meta=None):
     return picks
 
 
+def market_window(pick, w_in, w_out, trim=MAX_TRIM_S):
+    """Keep the length the market chose. A Radar pick is a moment viewers already clipped (Twitch) or
+    replayed most (YouTube heatmap), so the Writer may only shave dead air: at most `trim` s per end.
+    First VM pass: the Writer cut a 16.7 s clip to 3.4 s and a 37 s clip to 6 s."""
+    s0, e0 = float(pick["start"]), float(pick["end"])
+    start = min(max(s0, float(w_in)), s0 + trim)
+    end = max(min(e0, float(w_out)), e0 - trim)
+    if end - start <= 0:
+        return s0, e0
+    return start, end
+
+
 def draft_pick(work, pick, creator, meta=None, clip_id=None):
     """Writer on the transcript inside one Radar pick -> pick with hook/hooks/context_line/title/score.
     `clip_id` = clips.id; tags the llm_usage rows."""
@@ -192,9 +205,7 @@ def draft_pick(work, pick, creator, meta=None, clip_id=None):
     if not lines:
         raise ValueError("no transcript inside the pick")
     pl = write_clip("\n".join(lines), creator, meta, clip_id=clip_id)
-    start, end = max(pick["start"], pl["in"]), min(pick["end"], pl["out"])
-    if end <= start:
-        start, end = pick["start"], pick["end"]
+    start, end = market_window(pick, pl["in"], pl["out"])
     return cap_pick({**pick, "start": start, "end": end, "hook": pl["hooks"][0], "hooks": pl["hooks"],
                      "hook_variant": 0, "context_line": pl["context_line"], "title": pl["title"],
                      "score": pl["score"], "music_risk": pl["music_risk"]})
