@@ -81,6 +81,13 @@ CLIPPER_DB=$DATA/db/clip.db $DATA/venv/bin/python "$CLIP/db/migrate.py"
 
 install_ytdlp_cron
 
+echo "== 6b. Caption font (Montserrat, SIL OFL) for the market-style captions"
+mkdir -p "$DATA/fonts"
+for f in Montserrat-Black Montserrat-ExtraBold; do
+  [[ -s "$DATA/fonts/$f.ttf" ]] || curl -fsSL -o "$DATA/fonts/$f.ttf" \
+    "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/$f.ttf" || echo "WARN: $f download failed (libass falls back)"
+done
+
 echo "== 7. Pre-download Whisper '$WHISPER_MODEL'"
 $DATA/venv/bin/python - <<PY
 from faster_whisper import WhisperModel

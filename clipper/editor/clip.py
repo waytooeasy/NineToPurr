@@ -10,8 +10,8 @@ Pipeline:
                         writes hooks + context line + title (needs ANTHROPIC_API_KEY)
        b) default     : writes transcript.txt -> paste into Claude chat ->
                         save the JSON answer as picks.json -> run again with --picks
-  4. ffmpeg cuts each pick, makes it 9:16 (blurred background fill), burns
-     word-pop captions + the hook text at the top
+  4. ffmpeg cuts each pick, makes it 9:16 like the market (face-centred full-bleed crop, or
+     facecam over gameplay; editor/layout.py), burns 2-word pop captions + a 2.5 s hook
   5. Appends every clip to clips_log.csv (the tracking sheet)
 
 Install (once):
@@ -32,7 +32,7 @@ Radar picks carry {"source_url", "creator", "clip_id", "start", "end"} instead (
 seconds inside source_url. With --auto the Writer fills hook/context_line/title.
 When the DB (CLIPPER_DB, default /opt/clipper/db/clip.db) has a clips row for the pick, the Writer
 output is stored there (D24) and the state moves captured -> drafted -> edited. CSV = debug log only.
-Every clip is hard-capped at 60 s (D8) and shows hook + context line (D7).
+Every clip is hard-capped at 60 s (D8) and opens on the hook (D7); the context line feeds the title/description.
 """
 import argparse, csv, datetime, json, os, re, sqlite3, subprocess, sys
 from pathlib import Path
@@ -221,19 +221,56 @@ def esc(t):
     return t.replace("\\", "").replace("{", "(").replace("}", ")")
 
 
-def build_ass(words, pick, path, chunk=3):
-    """Word-pop captions (3 words at a time, middle-lower screen) + hook on top."""
+FONTS_DIR = "/opt/clipper/fonts"   # setup.sh downloads Montserrat (OFL) here; libass falls back if missing
+FONT = "Montserrat Black"
+YELLOW = "&H0000E5FF&"             # ASS colours are &HBBGGRR&
+STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "at", "for", "is", "it", "i",
+        "you", "he", "she", "we", "they", "me", "my", "your", "this", "that", "was", "be", "so", "oh",
+        "yo", "bro", "like", "just", "what", "are", "do", "with", "im", "its", "dont", "not"}
+POP = r"{\fscx82\fscy82\t(0,90,\fscx100\fscy100)}"
+
+
+def fonts_dir():
+    return os.environ.get("CLIPPER_FONTS", FONTS_DIR)
+
+
+def _key_index(tokens):
+    """Index of the word to highlight: the longest non-filler word (>= 4 letters), else None."""
+    best = None
+    for i, t in enumerate(tokens):
+        w = re.sub(r"[^a-z0-9]", "", t.lower())
+        if len(w) >= 4 and w not in STOP and (best is None or len(w) > len(re.sub(r"[^a-z0-9]", "", tokens[best].lower()))):
+            best = i
+    return best
+
+
+def caption_text(tokens):
+    """ALL CAPS, keyword in yellow, pop-in scale (market style: NexxoRecaps/StreamBellz, 2026-10-19)."""
+    k = _key_index(tokens)
+    parts = [("{\\c" + YELLOW + "}" + esc(t.upper()) + "{\\c&H00FFFFFF&}") if i == k else esc(t.upper())
+             for i, t in enumerate(tokens)]
+    return POP + " ".join(parts)
+
+
+def build_ass(words, pick, path, chunk=2):
+    """Market-style captions: 2 words at a time, big heavy font, white + black outline, keyword in
+    yellow, pop-in, centred on the picture (seam for stack layouts). Hook only for the first 2.5 s.
+    No context-line banner: none of the top channels show one (format research 2026-10-19)."""
+    from layout import caption_y
     start, end = pick["start"], pick["end"]
-    head = """[Script Info]
+    lay = pick.get("layout")
+    y = caption_y(lay)
+    hook_y = 900 if (lay or {}).get("mode") == "stack" else 380
+    head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,Arial Black,92,&H00FFFFFF,&H0000FFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,7,2,2,60,60,560,1
-Style: Hook,Arial Black,70,&H0000E5FF,&H00FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,6,2,8,60,60,170,1
-Style: Ctx,Arial,48,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,1,0,0,0,100,100,0,0,1,4,1,8,70,70,330,1
+Style: Cap,{FONT},100,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
+Style: Hook,{FONT},84,&H0000E5FF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -241,35 +278,41 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ev = []
     dur = end - start
     if pick.get("hook"):
-        ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 4.0))},Hook,,0,0,0,,{esc(pick['hook'].upper())}")
-    if pick.get("context_line"):
-        # our angle (D7): who/why/what happened, under the hook, first 8 s
-        ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 8.0))},Ctx,,0,0,0,,{esc(pick['context_line'])}")
+        ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 2.5))},Hook,,0,0,0,,"
+                  f"{{\\pos(540,{hook_y})}}{POP}{esc(pick['hook'].upper())}")
+    pos = f"{{\\pos(540,{y})}}"
     if pick.get("es_words"):
         # translated captions: spread evenly over the clip
         toks = pick["es_words"].split()
         groups = [toks[i:i + chunk] for i in range(0, len(toks), chunk)]
         step = dur / max(len(groups), 1)
         for i, g in enumerate(groups):
-            ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{esc(' '.join(g).upper())}")
+            ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{pos}{caption_text(g)}")
     else:
         ws = [w for w in words if w["s"] >= start and w["e"] <= end and w["w"]]
         for i in range(0, len(ws), chunk):
             g = ws[i:i + chunk]
             t0 = g[0]["s"] - start
             t1 = (ws[i + chunk]["s"] - start) if i + chunk < len(ws) else g[-1]["e"] - start
-            ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{esc(' '.join(w['w'] for w in g).upper())}")
+            ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{pos}{caption_text([w['w'] for w in g])}")
     Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
 
 
+def ensure_layout(video, pick):
+    """Pick the 9:16 layout once per clip (face-centred crop or facecam-over-gameplay stack)."""
+    if not pick.get("layout"):
+        from layout import detect_layout
+        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"])}
+    return pick
+
+
 def render(video, pick, ass, out):
-    # 9:16: blurred full-frame background + sharp video centered, then captions
-    vf = ("[0:v]split[a][b];"
-          "[a]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:2[bg];"
-          "[b]scale=1080:-2[fg];"
-          "[bg][fg]overlay=(W-w)/2:(H-h)/2,"
-          f"ass='{Path(ass).as_posix().replace(':', chr(92) + ':')}'")
-    pick = cap_pick(pick)
+    # 9:16 like the market: full-bleed face-centred crop, or facecam over gameplay; then captions
+    from layout import filtergraph
+    pick = cap_pick(ensure_layout(video, pick))
+    sub = Path(ass).as_posix().replace(':', chr(92) + ':')
+    fd = Path(fonts_dir()).as_posix().replace(':', chr(92) + ':')
+    vf = filtergraph(pick["layout"]) + f";[v]ass='{sub}':fontsdir='{fd}'"
     run(["ffmpeg", "-y", "-ss", str(pick["start"]), "-t", f"{pick['end'] - pick['start']:.3f}", "-i", str(video),
          "-filter_complex", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
          "-c:a", "aac", "-b:a", "160k", "-r", "30", "-movflags", "+faststart", str(out)])
@@ -322,6 +365,7 @@ def render_picks(src, picks, a, out, con=None, slug=None):
             p = cap_pick(p)
             if row:
                 save_draft(con, row, p)
+            p = ensure_layout(video, p)
             name = f"{slug}_{i:02d}_{a.lang}"
             ass = work / f"{name}.ass"
             mp4 = out / f"{name}.mp4"
