@@ -2,7 +2,7 @@
 
 Reads the public JSON that kick.com's own channel pages load (no key needed; the documented developer API,
 api.kick.com/public/v1, needs an OAuth app and has no clips endpoint). Low volume: one page of 20 clips
-per channel per Radar pass, three pages per Heat measurement. If Kick answers with a challenge page or
+per window (day + week) per channel per Radar pass, three pages per Heat measurement. If Kick answers with a challenge page or
 403/429 instead of JSON, `KickBlocked` is raised and Kick is skipped for that pass: no bot-check
 workarounds, ever.
 
@@ -105,24 +105,26 @@ def dedupe(cands, ids=None):
     return kept
 
 
-def collect(kick, slugs, min_candidates, now=None, windows=("day", "week"), allowed=None, log=None):
-    """Per Kick channel: top clips of the last day; widen to the week if fewer than min_candidates.
-    A failing channel is logged and skipped; a block stops Kick for this pass."""
+def collect(kick, slugs, min_candidates=None, now=None, windows=("day", "week"), allowed=None, log=None):
+    """Per Kick channel: top clips of the day AND of the week, merged and ranked by views per hour.
+    Unlike Twitch there is no "widen only when thin": a channel's day list is often 20 clips of 4-50
+    views that would hide the week's real hit (28k views, 2026-10-19). `min_candidates` is kept for the
+    shared call signature. A failing channel is logged and skipped; a block stops Kick for this pass."""
     now = now or datetime.now(timezone.utc)
     log = log or (lambda m: print(m, file=sys.stderr))
     out = []
     for slug in top_clips.filter_allowed(slugs, allowed):
-        found = []
+        raw, blocked = {}, None
         try:
             for w in windows:
-                found = dedupe([normalize(r, slug, now) for r in kick.get_clips(slug, w) if usable(r)])
-                if len(found) >= min_candidates:
-                    break
+                for r in kick.get_clips(slug, w):
+                    raw.setdefault(r["id"], r)
         except KickBlocked as e:
-            log(f"[kick] blocked, skipping Kick this pass: {e}")
-            out.extend(found)
-            break
+            blocked = e
         except Exception as e:  # noqa: BLE001 - one bad channel must not stop Radar
             log(f"[kick] {slug}: {type(e).__name__}: {e}")
-        out.extend(found)
+        out.extend(dedupe([normalize(r, slug, now) for r in raw.values() if usable(r)]))
+        if blocked:
+            log(f"[kick] blocked, skipping Kick this pass: {blocked}")
+            break
     return sorted(out, key=lambda x: x["views_per_hour"], reverse=True)
