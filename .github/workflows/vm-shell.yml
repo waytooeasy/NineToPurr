@@ -1,0 +1,65 @@
+name: VM shell
+
+# Lets HQ run commands on the home VM (self-hosted runner "prm-vm") from the cloud.
+# Trigger: Lucas's account comments "/vm" + a ```bash block on an issue labeled "vm-shell".
+# Output (stdout+stderr, exit code) comes back as a reply comment on the same issue.
+# The runner connects OUT to GitHub, so no inbound ports open on the VM.
+# Security: anyone who can comment as waytooeasy can run commands as user `prm`
+# (no passwordless sudo). Keep the repo private. Never print .env or tokens.
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: vm-shell
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: >-
+      github.actor == 'waytooeasy' &&
+      startsWith(github.event.comment.body, '/vm') &&
+      contains(github.event.issue.labels.*.name, 'vm-shell') &&
+      !github.event.issue.pull_request
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    permissions:
+      issues: write
+    steps:
+      - name: Run command and reply with output
+        shell: bash {0}
+        env:
+          BODY: ${{ github.event.comment.body }}
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          body = os.environ["BODY"].replace("\r", "")
+          rest = body.split("\n", 1)[1] if "\n" in body else ""
+          m = re.search(r"```(?:bash|sh)?\n(.*?)```", rest, re.S)
+          with open(os.environ["RUNNER_TEMP"] + "/cmd.sh", "w") as f:
+              f.write(m.group(1) if m else rest)
+          PY
+          cd /opt/clipper 2>/dev/null || cd "$HOME"
+          start=$(date +%s)
+          timeout 25m bash "$RUNNER_TEMP/cmd.sh" > "$RUNNER_TEMP/out.txt" 2>&1 < /dev/null
+          code=$?
+          secs=$(( $(date +%s) - start ))
+          CODE=$code SECS=$secs python3 - <<'PY'
+          import json, os, urllib.request
+          out = open(os.environ["RUNNER_TEMP"] + "/out.txt", errors="replace").read()
+          limit = 60000
+          if len(out) > limit:
+              out = "...(truncated, last 60k chars)...\n" + out[-limit:]
+          out = out.replace("```", "``​`")
+          text = (f"**vm-shell** exit `{os.environ['CODE']}` in {os.environ['SECS']}s"
+                  f" (reply to {os.environ['COMMENT_URL']})\n```\n{out}\n```")
+          req = urllib.request.Request(
+              os.environ["API_URL"], data=json.dumps({"body": text}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                       "Accept": "application/vnd.github+json"}, method="POST")
+          urllib.request.urlopen(req, timeout=30).read()
+          PY
+          exit $code
