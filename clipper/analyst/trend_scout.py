@@ -25,6 +25,7 @@ sys.path.insert(0, str(HERE.parent))  # radar.twitch
 import scout_data as data  # noqa: E402
 import scout_resolve as resolve  # noqa: E402
 import scout_stats as stats  # noqa: E402
+import style_scout  # noqa: E402
 
 MODEL = "claude-sonnet-5-5"
 REPORT_MAX_LINES = 40
@@ -154,7 +155,7 @@ def render_report(llm_report, now, lb24, lb7, ranking, rising, weekly, notes, fi
 
 
 def scout(competitors, library, report, now=None, session=None, twitch=None, llm=None,
-          api_key=None, creators=None, ytdlp=data.fetch_ytdlp, resolve_run=subprocess.run):
+          api_key=None, creators=None, ytdlp=data.fetch_ytdlp, resolve_run=subprocess.run, vision=None):
     now = now or datetime.now(timezone.utc)
     cfg = load_yaml(competitors)
     logins = creator_logins() if creators is None else creators
@@ -203,6 +204,15 @@ def scout(competitors, library, report, now=None, session=None, twitch=None, llm
         notes.append("ANTHROPIC_API_KEY missing: LLM step skipped")
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    if vision is None and os.environ.get("ANTHROPIC_API_KEY"):
+        vision = style_scout.anthropic_vision
+    if vision and top:
+        try:  # caption style of today's top Shorts (thumbnails only) -> style.json for the renderer
+            if style_scout.run([v["id"] for v in top if v.get("id")], out_dir / "style.json",
+                               session, vision, now) is None:
+                notes.append("style: too few captioned thumbnails, kept the previous style.json")
+        except Exception as e:  # noqa: BLE001 - the report still goes out
+            notes.append(f"style scout failed: {type(e).__name__}")
     (out_dir / "creators_ranking.json").write_text(json.dumps(ranking, indent=2) + "\n")
     (out_dir / "creator_weights.json").write_text(json.dumps(weights, indent=2) + "\n")
     if new_lib:

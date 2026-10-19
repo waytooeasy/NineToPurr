@@ -31,3 +31,6 @@ python clipper/analyst/trend_scout.py --library clipper/formats/library.md --rep
 - Streamer detection in titles is alias matching (config + creators.yaml + Twitch names); short aliases like "Speed" can false-positive.
 
 **Next:** correct 'Fix me' handles after the first live run; YouTube Analytics API puller → `post_metrics`.
+
+## Style scout (`style_scout.py`, Lucas 2026-10-19)
+Each Trend Scout run sends the thumbnails (no video) of the day's top Shorts to Claude Haiku and writes `clipper/formats/style.json` (caption case, fill/highlight/outline colours, words per line, position, layout) to the `trends` branch. Needs ≥3 captioned thumbnails, else the old file stays. The VM copies it every pass (`run_pipeline.refresh_formats`); `editor/style.py` renders with it; the Telegram bot re-renders any clip made in an older style before sending it (`clips.style_version`, migration 009).

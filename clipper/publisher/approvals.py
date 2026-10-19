@@ -68,6 +68,26 @@ def approve(con, clip_id: int, hook_index: int) -> bool:
     return _decide(con, clip_id, "approved", hook_index, hooks[hook_index - 1], True)
 
 
+def post(con, clip_id: int) -> bool:
+    """✅ Post: approve the clip exactly as rendered (its current hook_text)."""
+    row = con.execute("SELECT * FROM clips WHERE id = ?", (clip_id,)).fetchone()
+    if row is None:
+        return False
+    hooks = hooks_of(row)
+    idx = hooks.index(row["hook_text"]) + 1 if row["hook_text"] in hooks else None
+    return _decide(con, clip_id, "approved", idx, row["hook_text"], False)
+
+
+def restyle(con, clip_id: int) -> bool:
+    """qc_passed -> needs_rerender without changing the hook: the market style changed after this
+    clip was rendered, so it is re-cut in today's style before Lucas sees it."""
+    with con:
+        cur = con.execute(
+            "UPDATE clips SET state = 'needs_rerender', state_changed_at = datetime('now')"
+            " WHERE id = ? AND state = ? AND approval_sent_at IS NULL", (clip_id, QC_PASSED))
+    return cur.rowcount == 1
+
+
 def kill(con, clip_id: int) -> bool:
     return _decide(con, clip_id, "killed", None, None, False)
 

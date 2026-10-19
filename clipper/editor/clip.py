@@ -100,8 +100,9 @@ def save_draft(con, row_id, pick):
 
 
 def save_edited(con, row_id, mp4):
-    """After render: drafted -> edited, file_path = the rendered Short."""
-    return _move(con, row_id, "file_path=?", (str(mp4),), ("drafted",), "edited")
+    """After render: drafted -> edited, file_path = the rendered Short, stamped with the style version."""
+    import style as S
+    return _move(con, row_id, "file_path=?, style_version=?", (str(mp4), S.version()), ("drafted",), "edited")
 
 
 def run(cmd):
@@ -223,7 +224,6 @@ def esc(t):
 
 FONTS_DIR = "/opt/clipper/fonts"   # setup.sh downloads Montserrat (OFL) here; libass falls back if missing
 FONT = "Montserrat Black"
-YELLOW = "&H0000E5FF&"             # ASS colours are &HBBGGRR&
 STOP = {"the", "a", "an", "and", "or", "but", "to", "of", "in", "on", "at", "for", "is", "it", "i",
         "you", "he", "she", "we", "they", "me", "my", "your", "this", "that", "was", "be", "so", "oh",
         "yo", "bro", "like", "just", "what", "are", "do", "with", "im", "its", "dont", "not"}
@@ -244,22 +244,30 @@ def _key_index(tokens):
     return best
 
 
-def caption_text(tokens):
-    """ALL CAPS, keyword in yellow, pop-in scale (market style: NexxoRecaps/StreamBellz, 2026-10-19)."""
+def caption_text(tokens, st=None):
+    """Market caption line: case + keyword highlight colour from today's style (editor/style.py), pop-in."""
+    import style as S
+    st = st or S.DEFAULT
     k = _key_index(tokens)
-    parts = [("{\\c" + YELLOW + "}" + esc(t.upper()) + "{\\c&H00FFFFFF&}") if i == k else esc(t.upper())
-             for i, t in enumerate(tokens)]
+    hi, fill = S.ass_color(st["highlight"]), S.ass_color(st["fill"])
+    parts = [("{\\c" + hi + "}" + esc(S.apply_case(t, st["case"])) + "{\\c" + fill + "}") if i == k
+             else esc(S.apply_case(t, st["case"])) for i, t in enumerate(tokens)]
     return POP + " ".join(parts)
 
 
-def build_ass(words, pick, path, chunk=2):
-    """Market-style captions: 2 words at a time, big heavy font, white + black outline, keyword in
-    yellow, pop-in, centred on the picture (seam for stack layouts). Hook only for the first 2.5 s.
-    No context-line banner: none of the top channels show one (format research 2026-10-19)."""
+def build_ass(words, pick, path, chunk=None, st=None):
+    """Market-style captions in today's style (editor/style.py: case, colours, words per line,
+    position; default = the 2026-10-19 research: 2 words, ALL CAPS, white + black outline, keyword in
+    yellow). Pop-in, heavy font, seam position for stack layouts. Hook only for the first 2.5 s.
+    No context-line banner: none of the top channels show one."""
+    import style as S
     from layout import caption_y
+    st = dict(st or S.load())
+    st["highlight"] = S.highlight_for(st, pick.get("hook") or pick.get("start"))
+    chunk = chunk or st["words"]
     start, end = pick["start"], pick["end"]
     lay = pick.get("layout")
-    y = caption_y(lay)
+    y = caption_y(lay) if (lay or {}).get("mode") == "stack" else S.POSITIONS[st["position"]]
     hook_y = 1180 if (lay or {}).get("mode") == "stack" else 380  # stack: in the gameplay, clear of the seam captions
     head = f"""[Script Info]
 ScriptType: v4.00+
@@ -269,8 +277,8 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{FONT},100,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
-Style: Hook,{FONT},84,&H0000E5FF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
+Style: Cap,{FONT},100,{S.ass_color(st["fill"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
+Style: Hook,{FONT},84,{S.ass_color(st["highlight"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -279,7 +287,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     dur = end - start
     if pick.get("hook"):
         ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 2.5))},Hook,,0,0,0,,"
-                  f"{{\\pos(540,{hook_y})}}{POP}{esc(pick['hook'].upper())}")
+                  f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(pick['hook'], st['case']))}")
     pos = f"{{\\pos(540,{y})}}"
     if pick.get("es_words"):
         # translated captions: spread evenly over the clip
@@ -287,14 +295,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         groups = [toks[i:i + chunk] for i in range(0, len(toks), chunk)]
         step = dur / max(len(groups), 1)
         for i, g in enumerate(groups):
-            ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{pos}{caption_text(g)}")
+            ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{pos}{caption_text(g, st)}")
     else:
         ws = [w for w in words if w["s"] >= start and w["e"] <= end and w["w"]]
         for i in range(0, len(ws), chunk):
             g = ws[i:i + chunk]
             t0 = g[0]["s"] - start
             t1 = (ws[i + chunk]["s"] - start) if i + chunk < len(ws) else g[-1]["e"] - start
-            ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{pos}{caption_text([w['w'] for w in g])}")
+            ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{pos}{caption_text([w['w'] for w in g], st)}")
     Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
 
 

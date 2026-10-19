@@ -50,7 +50,9 @@ jobs:
           [ -f clipper/formats/library.md ] || { echo "no library.md this run"; exit 0; }
           git config user.name "trend-scout"; git config user.email "actions@users.noreply.github.com"
           cp clipper/formats/library.md /tmp/library.md
+          [ -f clipper/formats/style.json ] && cp clipper/formats/style.json /tmp/style.json || true
           git fetch -q origin trends && git checkout -q -B trends origin/trends || git checkout -q --orphan trends
           git rm -rq . 2>/dev/null || true
           mkdir -p clipper/formats && cp /tmp/library.md clipper/formats/library.md
-          git add clipper/formats/library.md && git commit -qm "trends $d" && git push -q origin trends || echo "no change"
+          [ -f /tmp/style.json ] && cp /tmp/style.json clipper/formats/style.json || git checkout -q origin/trends -- clipper/formats/style.json 2>/dev/null || true
+          git add clipper/formats/ && git commit -qm "trends $d" && git push -q origin trends || echo "no change"

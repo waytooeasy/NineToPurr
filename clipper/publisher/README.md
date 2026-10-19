@@ -6,13 +6,14 @@
 
 ## Approval bot (D10: Lucas approves every Short)
 
-When a clip reaches `qc_passed`, the bot sends the mp4 (or text only if the file is missing or over 49 MB), the context line and the 3 hooks.
+When a clip reaches `qc_passed`, the bot sends the mp4 (or text only if the file is missing or over 49 MB) with its title and context line.
 
 | Button | Result |
 |---|---|
-| ✅ Hook 1/2/3 | `approved`, chosen hook saved to `clips.hook_text` |
-| ✏️ Edit hook | bot asks for text; your next message becomes the hook, state `needs_rerender` |
+| ✅ Post | `approved` exactly as rendered (the Writer's best hook) |
 | ❌ Kill | `killed` |
+
+Since 2026-10-19 (Lucas): just Post or Kill. Old messages with ✅ Hook 1/2/3 still work; the edit-hook flow (`e:` button + reply) stays in code but has no button.
 
 - `/status`: today's counts per state, how many wait for you and the oldest age, last error.
 - Only `TELEGRAM_ALLOWED_CHAT_ID` gets answers; everyone else is ignored silently.
