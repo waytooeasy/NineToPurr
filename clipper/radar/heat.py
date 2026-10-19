@@ -2,7 +2,8 @@
 """Heat Index (D33): which streamers are worth a Shorts slot today. Writes `streamer_heat`.
 
 Per streamer (all enabled watchlist entries with the same name are summed):
-  D = views on clips created in the last 24 h      (Twitch: Get Clips; YouTube: views of own live VODs from 24 h)
+  D = views on clips created in the last 24 h      (Twitch: Get Clips; Kick: top week clips; YouTube: views of
+                                                     own live VODs from 24 h)
   W = same, last 7 days;  B = W / 7 (daily baseline)
   momentum = (D + 1) / (B + 1)
   heat = ln(1 + D) * (1 + 0.5 * log2(momentum)) + 0.3 * ln(1 + B) + LIVE_BONUS * live_now
@@ -86,7 +87,7 @@ def allocate(opportunity, cap=5, last_posted=None, now=None, rng=None, max_per=2
 
 def load_watchlist(path=None):
     """-> {"cap", "max_per", "explore_days", "explore_top_n", "streamers": {name: [entries]}}.
-    Disabled entries (Kick) are dropped; a streamer with no enabled entry is dropped."""
+    Disabled entries are dropped; a streamer with no enabled entry is dropped."""
     cfg = yaml.safe_load(Path(path or HERE / "config" / "watchlist.yaml").read_text())
     streamers = {}
     for e in cfg.get("streamers", []):
@@ -154,13 +155,32 @@ def youtube_live(channel, runner=None):
     return bool(info.get("is_live"))
 
 
-def default_fetchers(tw=None):
-    """(views(entry, now) -> (D, W), live(entry) -> bool) backed by Twitch + yt-dlp."""
+KICK_PAGES = 3   # top 60 clips of the week per Kick channel; the tail adds little
+
+
+def kick_views(kc, slug, now, pages=KICK_PAGES):
+    """(D, W) from the channel's most-viewed Kick clips of the last 7 days (D = those from the last 24 h)."""
+    return clip_views(kc.get_clips(slug, "week", max_pages=pages), now)
+
+
+def default_fetchers(tw=None, kc=None):
+    """(views(entry, now) -> (D, W), live(entry) -> bool) backed by Twitch, yt-dlp and Kick (D45).
+    The Kick client is made on first use."""
+    kick = {"client": kc}
+
+    def kick_client():
+        if kick["client"] is None:
+            from .kick import Kick
+            kick["client"] = Kick()
+        return kick["client"]
+
     def views(e, now):
         if e["platform"] == "twitch":
             return twitch_views(tw, e["id"], now)
         if e["platform"] == "youtube":
             return youtube_views(e["id"], now)
+        if e["platform"] == "kick":
+            return kick_views(kick_client(), e["id"], now)
         return 0, 0
 
     def live(e):
@@ -168,6 +188,8 @@ def default_fetchers(tw=None):
             return tw.is_live(e["id"])
         if e["platform"] == "youtube":
             return youtube_live(e["id"])
+        if e["platform"] == "kick":
+            return kick_client().is_live(e["id"])
         return False
     return views, live
 

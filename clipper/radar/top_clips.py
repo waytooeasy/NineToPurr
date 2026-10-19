@@ -151,8 +151,10 @@ def register_clips(db, cands):
         row = db.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()
         if row is None or row[0] is not None:
             continue
-        db.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, 'twitch', ?)",
-                   (c["creator"], f"https://twitch.tv/{c['creator']}"))
+        kick = c.get("source") == "kick"
+        db.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, ?, ?)",
+                   (c["creator"], "kick" if kick else "twitch",
+                    f"https://kick.com/{c['creator']}" if kick else f"https://twitch.tv/{c['creator']}"))
         start_s, end_s = pick_window(c)
         creator_id = db.execute("SELECT id FROM creators WHERE name=?", (c["creator"],)).fetchone()[0]
         db.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
@@ -171,11 +173,14 @@ def register_clips(db, cands):
 def pick_window(c):
     """(start, end) in seconds inside the file behind source_url.
     Twitch: the source is the clip itself, so 0 -> duration. YouTube (D29): the source is the whole
-    live VOD, so start/end are VOD-absolute."""
+    live VOD, so start/end are VOD-absolute. Kick (D45): the clip itself, but Kick clips run up to 180 s
+    and end on the moment, so a longer clip keeps its last MAX_PICK_S seconds."""
     dur = min(c["duration_s"] or MAX_PICK_S, MAX_PICK_S)
     if c.get("source") == "youtube":
         start = c["vod_offset"]
         return start, start + dur
+    if c.get("source") == "kick" and (c["duration_s"] or 0) > MAX_PICK_S:
+        return c["duration_s"] - MAX_PICK_S, c["duration_s"]
     return 0, dur
 
 

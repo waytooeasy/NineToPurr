@@ -1,0 +1,23 @@
+{
+ "clips": [
+  {"id": "clip_01M53XKZ7J7VGSNTGTHP6T7JHM", "livestream_id": "132725881", "duration": 70, "view_count": 28208, "views": 28208,
+   "created_at": "2026-10-17T03:14:42.87276Z", "privacy": "public", "is_mature": false, "title": "opgkepor", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}},
+  {"id": "clip_01M4YFB1BJV1HAEVPK4NVW17MJ", "livestream_id": "132367809", "duration": 107, "view_count": 14182, "views": 14182,
+   "created_at": "2026-10-15T00:28:39.356934Z", "privacy": "public", "is_mature": false, "title": "AMANDA AND ?", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}},
+  {"id": "clip_01M4YFR37NS1N34AEVJCSGXNCR", "livestream_id": "132367809", "duration": 65, "view_count": 7744, "views": 7744,
+   "created_at": "2026-10-15T00:35:36.867812Z", "privacy": "public", "is_mature": false, "title": "Michael Beasley 👀", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}},
+  {"id": "clip_01M4YBGWKEH7YB4V7KFGN2BG2M", "livestream_id": "132367809", "duration": 62, "view_count": 5722, "views": 5722,
+   "created_at": "2026-10-14T23:22:06.940763Z", "privacy": "public", "is_mature": false, "title": "gg", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}},
+  {"id": "clip_01M4YDVFDDDJ4TXWP52RZA5P8B", "livestream_id": "132367809", "duration": 163, "view_count": 4751, "views": 4751,
+   "created_at": "2026-10-15T00:02:15.209244Z", "privacy": "public", "is_mature": false, "title": "pp", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}},
+  {"id": "clip_01M4YDWN02THK4A52JA0291A0D", "livestream_id": "132367809", "duration": 180, "view_count": 2554, "views": 2554,
+   "created_at": "2026-10-15T00:03:03.773426Z", "privacy": "public", "is_mature": false, "title": "faceoff", "vod_starts_at": 0,
+   "channel": {"slug": "adinross"}}
+ ],
+ "nextCursor": "{\"view\":866,\"id\":\"clip_01M4YF96JBHR2H3Q3B8371CHXG\"}"
+}
