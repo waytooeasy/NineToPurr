@@ -54,6 +54,11 @@ def _owner(tag, names):
     return None, False
 
 
+def _ranked(counter):
+    """Keys by weight, ties alphabetical (Counter order on ties follows set order, which varies by run)."""
+    return [k for k, _ in sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def summarize(videos, names, now, top_n=TOP_N, days=DAYS):
     recent = [v for v in videos if v.get("published") and v["published"] >= now - timedelta(days=days)]
     top = sorted(recent, key=lambda v: v.get("views") or 0, reverse=True)[:top_n]
@@ -84,15 +89,15 @@ def summarize(videos, names, now, top_n=TOP_N, days=DAYS):
                 continue
             kw_weight[k] += w
             kw_videos[k] += 1
-    generic = [f"#{t}" for t, _ in weight.most_common() if len(chans[t]) >= 2][:MAX_GENERIC]
-    keywords = [k for k, _ in kw_weight.most_common() if kw_videos[k] >= 2][:MAX_KEYWORDS]
+    generic = [f"#{t}" for t in _ranked(weight) if len(chans[t]) >= 2][:MAX_GENERIC]
+    keywords = [k for k in _ranked(kw_weight) if kw_videos[k] >= 2][:MAX_KEYWORDS]
     title_counts.sort()
     return {
         "updated": f"{now:%Y-%m-%d}", "sample": len(top),
         "title_share": round(in_title / total, 3),
         "title_tags": title_counts[len(title_counts) // 2] if title_counts else 0,
         "generic": generic,
-        "streamers": {n: f"#{c.most_common(1)[0][0]}" for n, c in sorted(per_streamer.items())},
+        "streamers": {n: f"#{_ranked(c)[0]}" for n, c in sorted(per_streamer.items())},
         "keywords": keywords,
     }
 
