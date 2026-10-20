@@ -193,3 +193,21 @@ def test_pool_shows_yesterdays_rising_clip_next_to_the_weeks_big_ones():
     assert len(out) == 31 and "new" in [c["clip_id"] for c in out]               # 25 by views + the other 6
     assert [c["view_count"] for c in out] == sorted((c["view_count"] for c in out), reverse=True)
     assert "new" not in [c["clip_id"] for c in match.pool(big + [fresh], n_views=25, n_fresh=0)]
+
+
+def test_verdict_same_passes_related_does_not():
+    ask = lambda p: json.dumps([{"short": "S0", "clip": "C0", "match": "same"},        # noqa: E731
+                                {"short": "S1", "clip": "C1", "match": "related"}])
+    out = match.match_streamer("Jynxzi", SHORTS[:2], CLIPS, ask)
+    assert [(s["id"], c["clip_id"], conf) for s, c, conf in out] == [("s0", "c-mom", 0.9)]
+
+
+def test_market_refresh_follows_the_streamers_radar_posts(con, tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_MARKET", str(tmp_path / "m.json"))
+    M.write({**MARKET, "updated": iso(7)})                                       # full scan 7 h ago
+    con.execute("INSERT INTO streamer_heat (streamer, ts, D, W, B, momentum, heat, opportunity)"
+                " VALUES ('Jynxzi', ?, 0, 0, 0, 1, 0, 9)", (iso(0),))
+    seen = {}
+    monkeypatch.setattr(M, "refresh", lambda d, key, now=None, names=None:
+                        seen.update(names=names) or {**d, "refreshed": now.strftime(ISO)})
+    assert run_pipeline.market_step(NOW, key="K", con=con) == "refreshed Jynxzi" and seen["names"] == ["Jynxzi"]

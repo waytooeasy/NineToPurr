@@ -195,3 +195,14 @@ def test_market_step_refreshes_every_6_hours(tmp_path, monkeypatch):
     assert run_pipeline.market_step(NOW + timedelta(hours=5), key="K") == "fresh"
     assert run_pipeline.market_step(NOW + timedelta(hours=6), key="K") == f"refreshed top {M.REFRESH_TOP}"
     assert run_pipeline.market_step(NOW + timedelta(hours=7), key="K") == "fresh"
+
+
+def test_refresh_scans_the_given_streamers_in_order(tmp_path):
+    wl = tmp_path / "w.yaml"
+    wl.write_text("streamers:\n  - {name: Jynxzi, platform: twitch, id: jynxzi}\n"
+                  "  - {name: Valkyrae, platform: twitch, id: valkyrae}\n  - {name: CaseOh, platform: twitch, id: caseoh_}\n")
+    old = {"updated": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": 48, "streamers": {
+        "Valkyrae": {"demand_vph": 9_000, "shorts": []}, "Jynxzi": {"demand_vph": 5, "shorts": []}}}
+    s = Session({"Jynxzi": JYNX})
+    M.refresh(old, "K", s, NOW, wl, top=2, names=["CaseOh", "Nobody", "Jynxzi", "Valkyrae"])
+    assert [q for c, q in s.calls if c == "search"] == ["CaseOh", "Jynxzi"]       # not by demand; unknown names skipped

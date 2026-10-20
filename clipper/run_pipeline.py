@@ -132,9 +132,9 @@ def paced_cap(cap, now):
     return min(cap, 1 + int(cap * sec / 86400))
 
 
-def market_step(now=None, key=None):
+def market_step(now=None, key=None, con=None):
     """Daily Shorts market scan (radar/market.py, D48): demand per streamer + today's popping titles; every
-    REFRESH_H hours in between, the top streamers are re-scanned (D54)."""
+    REFRESH_H hours in between, the streamers Radar posts (`match_streamers`, needs `con`) are re-scanned (D54)."""
     from radar import market
     now = now or datetime.now(timezone.utc)
     key = key or os.environ.get("YOUTUBE_API_KEY")
@@ -142,8 +142,14 @@ def market_step(now=None, key=None):
         m = market.load(now=now)
         if not key or not m or not market.refresh_due(m, now):
             return "fresh"
-        market.write(market.refresh(m, key, now=now))
-        return f"refreshed top {market.REFRESH_TOP}"
+        names = None
+        if con is not None:
+            try:
+                names = match_streamers(con, m, heat.load_watchlist()["streamers"], top=market.REFRESH_TOP)
+            except Exception:  # noqa: BLE001 - fall back to the demand ranking
+                traceback.print_exc()
+        market.write(market.refresh(m, key, now=now, **({"names": names} if names else {})))
+        return f"refreshed {', '.join(names)}" if names else f"refreshed top {market.REFRESH_TOP}"
     if not key:
         return "skipped: no YOUTUBE_API_KEY"
     data = market.scan(key, now=now)
@@ -483,7 +489,7 @@ def run_pass(con, steps=None):
     steps = steps or {
         "formats": refresh_formats,
         "metrics": lambda: metrics_step(con),
-        "market": market_step,                 # daily: what's popping on Shorts per streamer (D48)
+        "market": lambda: market_step(con=con),   # daily + 6-h refresh: what's popping on Shorts (D48, D54)
         "styles": styles_step,                 # daily: each streamer's popping look (D49)
         "match": lambda: match_step(con),      # per market scan: the clippers' popping moments (D54)
         "radar": lambda: radar_step(con, pace=True),

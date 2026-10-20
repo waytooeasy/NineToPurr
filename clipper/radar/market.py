@@ -190,15 +190,17 @@ def scan(key, session=None, now=None, wl_path=None):
     return {"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": WINDOW_H, "streamers": out}
 
 
-def refresh(data, key, session=None, now=None, wl_path=None, top=REFRESH_TOP):
-    """Re-scan the `top` streamers by demand between full scans (D54); the others keep the full scan's data.
-    A streamer whose re-scan fails keeps its previous entry."""
+def refresh(data, key, session=None, now=None, wl_path=None, top=REFRESH_TOP, names=None):
+    """Re-scan `names` (the streamers Radar posts, run_pipeline.match_streamers), else the `top` streamers by
+    demand, between full scans (D54); the others keep the full scan's data. A failing re-scan keeps the old
+    entry. By demand alone the first refresh (2026-10-20) spent slots on Speed/Kai (no footage we can use)
+    and skipped CaseOh and Stable Ronaldo."""
     import requests
     session = session or requests.Session()
     now = now or datetime.now(timezone.utc)
-    names = watchlist_names(wl_path)
-    ranked = sorted(data["streamers"], key=lambda n: -(data["streamers"][n].get("demand_vph") or 0))
-    new = _scan_names(names, [n for n in ranked if n in names][:top], key, session, now)
+    wl = watchlist_names(wl_path)
+    ranked = names or sorted(data["streamers"], key=lambda n: -(data["streamers"][n].get("demand_vph") or 0))
+    new = _scan_names(wl, [n for n in ranked if n in wl][:top], key, session, now)
     return {**data, "streamers": {**data["streamers"], **new}, "refreshed": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
 

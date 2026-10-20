@@ -19,7 +19,8 @@ MAX_CLIPS = 40
 CLIP_DAYS = 4           # Shorts are <= 48 h old and clippers post within a day or two of the moment
 POOL_VIEWS, POOL_FRESH = 25, 15
 MAX_SHORTS = 10
-MIN_CONF = 0.8          # VM dry run 2026-10-20: 0.7 let in 'same guest, another moment' pairs
+MIN_CONF = 0.8          # only "same" passes; "related" (same stream or guest, maybe another moment) doesn't
+VERDICT = {"same": 0.9, "related": 0.6}   # a verdict, not a number: the model's 0-1 scores were not calibrated
 KEEP_H = 72
 DB_TS = "%Y-%m-%d %H:%M:%S"
 PROMPT = """You match YouTube Shorts made by clip channels to {streamer}'s own stream clips of the SAME moment.
@@ -30,15 +31,17 @@ SHORTS (popping right now; other channels cut them from {streamer}'s stream):
 STREAM CLIPS ({streamer}'s own Twitch/Kick clips of the last 4 days, most viewed first):
 {clips}
 
-For each Short, name the stream clip that shows the same moment, or null. Stream clip titles are typed fast by
-viewers, often a word or two: a clip matches when its title points at the same event as the Short through a
-shared distinctive detail (the same person, thing, place, game event or quote; e.g. Short "Kai Says He Will
-NEVER Eat Sushi Again" ~ clip "no more sushi"), it was made before the Short was posted, and its length fits.
-Clippers post a moment within hours or a day or two, so a clip made days before the Short is less likely.
-A "?" time is unknown: judge by the titles. Titles that say nothing ("lol", "W", "om", emotes, the stream
-title) never match. confidence: 0.9 = both titles describe the same event; 0.7 = the same stream or topic but
-maybe another moment of it (e.g. a different vote, a different question to the same guest); 0.5 or less = a guess.
-Answer with JSON only: [{{"short": "S0", "clip": "C3" or null, "confidence": 0.0-1.0}}]"""
+For each Short, name the stream clip of the same moment and how it matches, or null. Stream clip titles are
+typed fast by viewers, often a word or two, with slang.
+- "same": both titles point at the same event through a shared distinctive detail (the same action, quote,
+  reaction, person or thing). E.g. Short "Kai Says He Will NEVER Eat Sushi Again" ~ clip "no more sushi";
+  Short "Kai Can't Stop Praising His Mom's Cooking" ~ clip "kai glazing moms food".
+- "related": the same stream, guest or topic, but the titles may be different moments. E.g. Short "Kai Votes
+  For X" ~ clip "KAI VOTES FOR Y" (another vote); Short "Guest Talks Food With Kai" ~ clip "guest hits 5 shots".
+The clip must be made before the Short was posted ("?" = unknown time: judge by the titles); clippers post
+within hours or a day or two of the moment. Titles that say nothing ("lol", "W", "om", emotes, the stream
+title) never match.
+Answer with JSON only: [{{"short": "S0", "clip": "C3" or null, "match": "same" | "related"}}]"""
 
 
 def log(msg):
@@ -117,7 +120,8 @@ def match_streamer(name, shorts, clips, ask=anthropic_ask, min_conf=MIN_CONF):
             continue
         try:
             si, cj = _index(x.get("short"), "S"), _index(x["clip"], "C")
-            conf = float(x.get("confidence") or 0)
+            conf = VERDICT.get(str(x.get("match", "")).strip().lower())
+            conf = float(x.get("confidence") or 0) if conf is None else conf
         except (TypeError, ValueError):
             continue
         if not (0 <= si < len(shorts) and 0 <= cj < len(clips)) or conf < min_conf:
