@@ -12,6 +12,11 @@ ln = natural log. The momentum factor is floored at MIN_MOMENTUM_FACTOR so a col
 (momentum < 1/4) cannot score negative. saturation = competitor Shorts about the streamer in the last
 24 h (Trend Scout); 0 when no data. Slots: see `allocate`.
 
+With a fresh Shorts market scan (radar/market.py, D48) the opportunity follows what is popping instead:
+  opportunity = sqrt(demand) * sqrt(min(1, D / SUPPLY_FULL)) * (LIVE_BOOST if live)
+demand = views/hour of the top Shorts naming the streamer in 48 h (any channel); the second factor is
+"is there fresh footage to clip" (Twitch/Kick clip views in 24 h). No demand -> no slot.
+
 Usage (from clipper/, every 30 min):
   python -m radar.heat                 # poll, write streamer_heat, print table + today's allocation
   python -m radar.heat --allocation allocation.json   # also write slots for `radar.top_clips --allocation`
@@ -32,6 +37,9 @@ import yaml
 HERE = Path(__file__).parent
 LIVE_BONUS = 1.0
 MIN_MOMENTUM_FACTOR = 0.1
+SUPPLY_FULL = 2000.0        # clip views in 24 h that count as plenty of fresh footage (D48)
+LIVE_BOOST = 1.15
+MIN_COVERAGE = 0.5          # market scan must cover half the watchlist, else the old formula is used
 
 
 def log(msg):
@@ -49,6 +57,27 @@ def compute_heat(D, W, live_now=False, saturation=0.0):
     return {"D": D, "W": W, "B": B, "momentum": momentum, "live_now": int(bool(live_now)),
             "saturation": saturation, "heat": heat,
             "opportunity": heat / (1 + 0.1 * saturation)}
+
+
+def market_opportunity(demand, D, live_now=False):
+    """Follow the market (D48): Shorts demand, discounted when there is little fresh footage to clip."""
+    supply = min(1.0, max(D, 0) / SUPPLY_FULL) ** 0.5
+    return math.sqrt(max(demand or 0, 0)) * supply * (LIVE_BOOST if live_now else 1.0)
+
+
+def apply_market(rows, market):
+    """Replace each row's opportunity by the market formula when the scan covers enough streamers.
+    Returns True if applied. Rows get a `demand` key (None when not applied)."""
+    ms = (market or {}).get("streamers") or {}
+    if not rows or len([n for n in rows if n in ms]) < MIN_COVERAGE * len(rows):
+        for r in rows.values():
+            r["demand"] = None
+        return False
+    for n, r in rows.items():
+        d = float((ms.get(n) or {}).get("demand_vph") or 0)
+        r["demand"] = d
+        r["opportunity"] = market_opportunity(d, r["D"], r["live_now"])
+    return True
 
 
 def allocate(opportunity, cap=5, last_posted=None, now=None, rng=None, max_per=2,
@@ -217,10 +246,10 @@ def write_rows(db, rows, now):
     ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     db.executemany(
         """INSERT OR REPLACE INTO streamer_heat
-           (streamer, ts, D, W, B, momentum, live_now, saturation, heat, opportunity)
-           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+           (streamer, ts, D, W, B, momentum, live_now, saturation, heat, opportunity, demand)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
         [(n, ts, r["D"], r["W"], r["B"], r["momentum"], r["live_now"], r["saturation"],
-          r["heat"], r["opportunity"]) for n, r in rows.items()])
+          r["heat"], r["opportunity"], r.get("demand")) for n, r in rows.items()])
     db.commit()
 
 
@@ -247,9 +276,10 @@ def last_posted(db, streamers):
     return out
 
 
-def run(db, cfg, views, live, saturation, now, rng=None):
-    """Measure, store, allocate. Returns (rows, slots)."""
+def run(db, cfg, views, live, saturation, now, rng=None, market=None):
+    """Measure, store, allocate. Returns (rows, slots). `market`: radar/market.py scan (D48) or None."""
     rows = measure(cfg["streamers"], views, live, saturation, now)
+    apply_market(rows, market)
     write_rows(db, rows, now)
     slots = allocate({n: r["opportunity"] for n, r in rows.items()}, cfg["cap"],
                      last_posted(db, cfg["streamers"]), now, rng, cfg["max_per"],
@@ -278,7 +308,8 @@ def main(argv=None):
     now = datetime.now(timezone.utc)
     views, live = default_fetchers(Twitch())
     db = connect()
-    rows, slots = run(db, cfg, views, live, load_saturation(), now)
+    from . import market
+    rows, slots = run(db, cfg, views, live, load_saturation(), now, market=market.load())
     for n, r in sorted(rows.items(), key=lambda kv: -kv[1]["opportunity"]):
         print(f"{n:<16} opp {r['opportunity']:6.2f} heat {r['heat']:6.2f} D {r['D']:>8.0f} "
               f"B {r['B']:>8.0f} mom {r['momentum']:5.2f} live {r['live_now']} sat {r['saturation']:.0f} "

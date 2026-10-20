@@ -160,3 +160,16 @@ def test_market_window_allows_small_dead_air_trims_and_clamps_outside():
 
 def test_market_window_short_pick_never_inverts():
     assert clip.market_window({"start": 0.0, "end": 3.0}, 2.5, 0.5) == (0.0, 3.0)
+
+
+def test_market_meta_gives_the_writer_todays_popping_titles(tmp_path, monkeypatch):
+    m = tmp_path / "market.json"
+    m.write_text(json.dumps({"updated": __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+                             .strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": 48, "streamers": {"CaseOh": {"shorts": [
+                                 {"title": "Someone needs to lock CaseOh up 😭🙏", "vph": 6869, "dur": 16, "en": True}]}}}))
+    monkeypatch.setenv("CLIPPER_MARKET", str(m))
+    name, titles = clip.market_meta("caseoh_")
+    assert name == "CaseOh" and titles[0]["title"].startswith("Someone needs")
+    monkeypatch.setenv("CLIPPER_MARKET", str(tmp_path / "none.json"))
+    assert clip.market_meta("caseoh_") == ("CaseOh", [])              # name fix works without a scan
+    assert clip.market_meta("somebody") == ("somebody", [])

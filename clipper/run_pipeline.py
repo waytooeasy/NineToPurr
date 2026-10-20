@@ -84,7 +84,8 @@ def heat_allocation(con, now=None, tw=None, cfg=None, views=None, live=None):
         if views is None:
             from radar.twitch import Twitch
             views, live = heat.default_fetchers(tw or Twitch())
-        _, slots = heat.run(con, cfg, views, live, heat.load_saturation(), now, rng)
+        from radar import market
+        _, slots = heat.run(con, cfg, views, live, heat.load_saturation(), now, rng, market=market.load())
     return heat.allocation_doc(cfg, slots)
 
 
@@ -122,6 +123,29 @@ def kick_moments(slugs, now, min_candidates):
     return kicksrc.collect(kicksrc.Kick(), slugs, min_candidates, now=now) if slugs else []
 
 
+def paced_cap(cap, now):
+    """How many clips may have been started by `now` (D48): the day's cap spread over the UTC day, one at
+    00:00 then one more every 24 h / cap. Before, all 5 started right after midnight UTC and went up in one
+    2.5 h burst with moments up to a day old; clip channels post through the day while moments are fresh."""
+    sec = now.hour * 3600 + now.minute * 60 + now.second
+    return min(cap, 1 + int(cap * sec / 86400))
+
+
+def market_step(now=None, key=None):
+    """Daily Shorts market scan (radar/market.py, D48): demand per streamer + today's popping titles."""
+    from radar import market
+    if not market.due(now=now):
+        return "fresh"
+    key = key or os.environ.get("YOUTUBE_API_KEY")
+    if not key:
+        return "skipped: no YOUTUBE_API_KEY"
+    data = market.scan(key, now=now)
+    if not data["streamers"]:
+        return "error: empty scan"
+    market.write(data)
+    return f"scanned {len(data['streamers'])} streamers"
+
+
 def _slots_left(con, alloc):
     """Allocated slots minus clips already started today for the same streamer (not killed)."""
     ids = {k.lower(): v for k, v in alloc["ids"].items()}
@@ -135,7 +159,7 @@ def _slots_left(con, alloc):
 
 
 def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_allocation,
-               youtube=youtube_moments, now=None, kick=kick_moments, kick_from=None):
+               youtube=youtube_moments, now=None, kick=kick_moments, kick_from=None, pace=False):
     """Register today's picks: Heat slots (D33) across creators, each creator's moments from Twitch top
     clips + YouTube VOD most-replayed windows (D29) + Kick top clips (D45), ranked by score, never more
     than the daily cap.
@@ -145,11 +169,13 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
     `kick_from`: Kick channel slugs (default: the watchlist's Kick channels when `creators` is the
     default, none when a creator list is passed in).
     `allocate(con, now)` -> allocation doc or None; if it fails the pass falls back to ranking all
-    creators (the cap still holds). Injectable so tests never touch the network."""
+    creators (the cap still holds). Injectable so tests never touch the network.
+    `pace=True` (the live pipeline): starts are spread over the day (`paced_cap`)."""
     now = now or datetime.now(timezone.utc)
     started = con.execute("SELECT COUNT(*) FROM clips WHERE date(created_at)=date('now') AND state!='killed'"
                           ).fetchone()[0]
-    want = max(0, cap - started)  # at the cap we still pull + store, but start nothing new
+    limit = paced_cap(cap, now) if pace else cap
+    want = max(0, limit - started)  # at the cap we still pull + store, but start nothing new
     cfgs = [c if isinstance(c, dict) else {"twitch": c, "youtube_channel": None}
             for c in (creators or radar_creators())]
     alloc = slots = allowed = None
@@ -298,7 +324,8 @@ def run_pass(con, steps=None):
     steps = steps or {
         "formats": refresh_formats,
         "metrics": lambda: metrics_step(con),
-        "radar": lambda: radar_step(con),
+        "market": market_step,                 # daily: what's popping on Shorts per streamer (D48)
+        "radar": lambda: radar_step(con, pace=True),
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),
         "qc": lambda: qc.run(con),
