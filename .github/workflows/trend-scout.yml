@@ -52,6 +52,9 @@ jobs:
           cp clipper/formats/library.md /tmp/library.md
           [ -f clipper/formats/style.json ] && cp clipper/formats/style.json /tmp/style.json || true
           [ -f clipper/formats/hashtags.json ] && cp clipper/formats/hashtags.json /tmp/hashtags.json || true
+          # the scout's outputs are untracked files in clipper/formats/: they block switching to the trends
+          # branch ("would be overwritten by checkout", every run since 2026-10-17). They are saved in /tmp.
+          git clean -fdqx -- clipper/formats
           git fetch -q origin trends && git checkout -q -B trends origin/trends || git checkout -q --orphan trends
           git rm -rq . 2>/dev/null || true
           mkdir -p clipper/formats && cp /tmp/library.md clipper/formats/library.md
