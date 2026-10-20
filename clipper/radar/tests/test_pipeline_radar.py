@@ -200,7 +200,7 @@ class FakeGit:
         self.cmds.append(cmd)
         if self.fail:
             raise subprocess.CalledProcessError(128, cmd)
-        return type("R", (), {"stdout": self.show if cmd[3] == "show" else ""})()
+        return type("R", (), {"stdout": self.show if "show" in cmd else ""})()
 
 
 def test_refresh_formats_copies_trends_library(tmp_path, monkeypatch):
@@ -209,7 +209,8 @@ def test_refresh_formats_copies_trends_library(tmp_path, monkeypatch):
     git = FakeGit("# Format library (updated today)\n")
     assert run_pipeline.refresh_formats(p, repo=tmp_path, runner=git) == "updated"  # style.json not JSON
     assert p.read_text() == "# Format library (updated today)\n"
-    assert git.cmds[0][3:5] == ["fetch", "-q"] and git.cmds[1][-1] == run_pipeline.FORMATS_REF
+    assert "fetch" in git.cmds[0] and git.cmds[1][-1] == run_pipeline.FORMATS_REF
+    assert all(c[1:3] == ["-c", f"safe.directory={tmp_path}"] for c in git.cmds)   # service runs as root (10-20)
 
 
 def test_refresh_formats_skips_when_fresh_and_keeps_old_copy_on_error(tmp_path):
@@ -225,7 +226,7 @@ def test_refresh_formats_skips_when_fresh_and_keeps_old_copy_on_error(tmp_path):
 class FakeGitStyle(FakeGit):
     def __call__(self, cmd, **kw):
         r = super().__call__(cmd, **kw)
-        if cmd[3] == "show" and cmd[-1] == run_pipeline.STYLE_REF:
+        if "show" in cmd and cmd[-1] == run_pipeline.STYLE_REF:
             return type("R", (), {"stdout": '{"caption": {"highlight": "#00FF66"}}'})()
         return r
 
@@ -240,7 +241,7 @@ def test_refresh_formats_also_copies_todays_style(tmp_path, monkeypatch):
 class FakeGitHashtags(FakeGit):
     def __call__(self, cmd, **kw):
         r = super().__call__(cmd, **kw)
-        if cmd[3] == "show" and cmd[-1] == run_pipeline.HASHTAGS_REF:
+        if "show" in cmd and cmd[-1] == run_pipeline.HASHTAGS_REF:
             return type("R", (), {"stdout": '{"generic": ["#shorts", "#twitch"], "title_share": 0.9}'})()
         return r
 

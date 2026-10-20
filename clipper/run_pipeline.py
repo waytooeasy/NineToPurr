@@ -286,7 +286,8 @@ FORMATS_MAX_AGE_S = 6 * 3600
 
 def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMATS_MAX_AGE_S, now=None):
     """Copy the Trend Scout's latest format library (trends branch) to $CLIPPER_FORMATS for the
-    Writer, at most every 6 h. Best effort: on any git error the old copy stays. -> 'fresh' |
+    Writer, at most every 6 h. git runs with safe.directory=<repo>: the systemd service runs as root while
+    the clone belongs to prm, and git refuses "dubious ownership" (every refresh failed on 2026-10-20). Best effort: on any git error the old copy stays. -> 'fresh' |
     'updated' | 'error: ...'."""
     p = Path(path or os.environ.get("CLIPPER_FORMATS", "/opt/clipper/formats/library.md"))
     repo = str(repo or HERE.parent)
@@ -294,9 +295,9 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
     if p.exists() and now - p.stat().st_mtime < max_age_s:
         return "fresh"
     try:
-        runner(["git", "-C", repo, "fetch", "-q", "origin", "trends:refs/remotes/origin/trends"],
+        runner(["git", "-c", f"safe.directory={repo}", "-C", repo, "fetch", "-q", "origin", "trends:refs/remotes/origin/trends"],
                capture_output=True, text=True, check=True, timeout=120)
-        out = runner(["git", "-C", repo, "show", FORMATS_REF],
+        out = runner(["git", "-c", f"safe.directory={repo}", "-C", repo, "show", FORMATS_REF],
                      capture_output=True, text=True, check=True, timeout=60).stdout
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
         return f"error: {type(e).__name__}"
@@ -308,7 +309,7 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
     except OSError as e:
         return f"error: {type(e).__name__}"
     try:  # today's market hashtags (hashtag scout); optional, the publisher has a default
-        ht = runner(["git", "-C", repo, "show", HASHTAGS_REF], capture_output=True, text=True, check=True,
+        ht = runner(["git", "-c", f"safe.directory={repo}", "-C", repo, "show", HASHTAGS_REF], capture_output=True, text=True, check=True,
                     timeout=60).stdout
         json.loads(ht)
         hp = Path(os.environ.get("CLIPPER_HASHTAGS", "/opt/clipper/formats/hashtags.json"))
@@ -317,7 +318,7 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError):
         pass
     try:  # today's caption style (style scout); optional, the renderer has a default
-        st = runner(["git", "-C", repo, "show", STYLE_REF], capture_output=True, text=True, check=True,
+        st = runner(["git", "-c", f"safe.directory={repo}", "-C", repo, "show", STYLE_REF], capture_output=True, text=True, check=True,
                     timeout=60).stdout
         json.loads(st)
         sp = Path(os.environ.get("CLIPPER_STYLE", "/opt/clipper/formats/style.json"))
