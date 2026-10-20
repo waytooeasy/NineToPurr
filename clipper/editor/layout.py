@@ -19,6 +19,8 @@ CAM_H_MIN, CAM_H_MAX = 600, 960   # a found facecam box keeps its own shape with
 EDGE_RATIO = 4.0            # an overlay border is a column/row this many times sharper than median
 FACECAM_MAX_H = 0.20        # a face smaller than this (share of frame height) ...
 FACECAM_EDGE = 0.34         # ... with its centre in the outer third -> corner facecam
+MIN_CAM_W = 0.18            # a facecam panel cut from less than this share of the source width is blown up
+                            # >3x and turns to mush (Lacy's 77x68 px cam bubble, 2026-10-20): full-bleed instead
 FACECAM_MIN_H = 0.045       # a corner face smaller than this is a mini cam over an event/IRL broadcast
                             # (Adin's 33 px cam, 2026-10-19): blown up it is mush, so full-bleed the shot
 SAMPLES = 8
@@ -50,11 +52,14 @@ def choose_layout(faces, W, H, cam_box=None):
     if fh < H * FACECAM_MIN_H:
         return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     if cam_box:
-        return stack_from_box(cam_box, cx, cy, W, H)
+        lay = stack_from_box(cam_box, cx, cy, W, H)
+        return lay if lay["cam"][2] >= MIN_CAM_W * W else {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     # no borders found: a few face-heights around the face, panel aspect 1080:768
     ch = min(H, fh * 3.0)
     cw = min(W, ch * OUT_W / CAM_H)
     ch = cw * CAM_H / OUT_W
+    if cw < MIN_CAM_W * W:
+        return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     x = min(max(cx - cw / 2, 0), W - cw)
     y = min(max(cy - ch / 2, 0), H - ch)
     return {"mode": "stack", "cam": [round(x), round(y), round(cw), round(ch)], "cam_h": CAM_H,
