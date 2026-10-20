@@ -35,10 +35,18 @@ def stop_keyboard(clip_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton("🛑 Stop", callback_data=f"s:{clip_id}")]])
 
 
+VQA_LABELS = {"double_captions": "double captions", "broken_glyphs": "broken symbols",
+              "blurry_panel": "blurry crop", "bad_crop": "subject cut off", "text_overlap": "text overlaps",
+              "black_bars": "black bars", "no_watermark": "no watermark"}
+
+
 def caption(row) -> str:
     text = f"Clip #{row['id']}: {row['title'] or '-'}\n{row['context_line'] or ''}".rstrip()
     if row["music_risk"]:
         text += "\n⚠️ music risk"
+    issues = approvals.vqa_issues(row)
+    if issues:
+        text += "\n⚠️ visual check: " + ", ".join(VQA_LABELS.get(c, c) for c in issues) + " (Post or Kill)"
     return text[:1000]  # Telegram caption limit is 1024
 
 
@@ -66,6 +74,8 @@ async def push_pending(app: Application) -> int:
         if row["style_version"] != current:
             approvals.restyle(con, row["id"])
             continue
+        if approvals.vqa_pending(row):
+            continue  # the pipeline's visual check has not looked at it yet (editor/visual_qa.py)
         try:
             auto = approvals.auto_post_enabled() and not approvals.needs_tap(row)
             if auto and not approvals.post(con, row["id"]):

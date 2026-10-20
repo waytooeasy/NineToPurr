@@ -225,3 +225,25 @@ def test_stats_command(con, add_clip):
     asyncio.run(approve_bot.on_stats(supd, make_ctx(con)))
     smsg.reply_text.assert_awaited()
     assert smsg.reply_text.await_args.args[0] == "No Shorts posted yet."
+
+
+def test_visual_check_gate_holds_unchecked_and_taps_failed(con, add_clip, monkeypatch):
+    # Lucas 2026-10-20: "should not repeat mistakes". Unchecked clips wait; failed ones need a tap.
+    monkeypatch.setenv("AUTO_POST", "1")
+    monkeypatch.setenv("VISUAL_QA", "1")
+    ok, bad = add_clip(), add_clip()
+    ctx = make_ctx(con)
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 0          # nothing checked yet
+    con.execute("UPDATE clips SET visual_qa=? WHERE id=?", ('{"ok": true, "issues": []}', ok))
+    con.execute("UPDATE clips SET visual_qa=? WHERE id=?",
+                ('{"ok": false, "issues": [{"code": "double_captions", "frame": 2}]}', bad))
+    con.commit()
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 2
+    assert st(con, ok) == "approved" and st(con, bad) == "qc_passed"           # failed one waits for a tap
+    texts = [c.kwargs.get("text", "") for c in ctx.application.bot.send_message.await_args_list]
+    assert any("visual check: double captions" in t for t in texts)
+    unknown = add_clip()
+    con.execute("UPDATE clips SET visual_qa=? WHERE id=?", ('{"ok": null, "error": "API down"}', unknown))
+    con.commit()
+    asyncio.run(approve_bot.push_pending(ctx.application))
+    assert st(con, unknown) == "approved"                                       # a broken check never blocks

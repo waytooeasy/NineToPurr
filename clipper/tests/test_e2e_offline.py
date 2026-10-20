@@ -27,6 +27,7 @@ import qc  # noqa: E402
 import rerender  # noqa: E402
 import run_pipeline  # noqa: E402
 import upload  # noqa: E402
+import visual_qa  # noqa: E402
 import writer  # noqa: E402
 from radar.tests.test_pipeline_radar import FakeTwitch, KAI, fake_youtube  # noqa: E402
 
@@ -114,8 +115,11 @@ def test_fresh_db_to_published(env, tmp_path, monkeypatch, synthetic_video):
         "editor": lambda: run_pipeline.editor_step(env, out=str(tmp_path / "clips")),
         "qc": lambda: qc.run(env),
         "rerender": lambda: rerender.run(env),
+        "vqa": lambda: visual_qa.run(env, vision=lambda imgs: '{"ok": true}' if len(imgs) == 3 and all(imgs)
+                                     else '{"ok": false, "issues": [{"code": "bad_crop"}]}'),
     })
     assert not any(str(v).startswith("error") for v in report.values()), report
+    assert sorted(report["vqa"]["passed"]) == [r[0] for r in env.execute("SELECT id FROM clips ORDER BY id")]
 
     sources = {r[0] for r in env.execute("SELECT source FROM radar_candidates")}
     assert sources == {"twitch", "youtube"}
