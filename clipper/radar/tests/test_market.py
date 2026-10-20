@@ -156,3 +156,18 @@ def test_market_step_runs_once_a_day(tmp_path, monkeypatch):
     assert run_pipeline.market_step(NOW, key="K") == "scanned 1 streamers"
     assert run_pipeline.market_step(NOW + timedelta(hours=3), key="K") == "fresh" and calls == ["K"]
     assert json.loads((tmp_path / "m.json").read_text())["streamers"]["X"]["demand_vph"] == 1
+
+
+def test_styles_step_heads_up_only_when_a_streamer_market_starts_a_format(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_MARKET", str(tmp_path / "m.json"))
+    monkeypatch.setenv("CLIPPER_STYLES", str(tmp_path / "s.json"))
+    M.write({"updated": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": 48, "streamers": {
+        "Fanum": {"demand_vph": 100, "shorts": [{"id": f"f{i}", "en": True} for i in range(6)]}}}, tmp_path / "m.json")
+    msgs = []
+    reply = '[' + ",".join(['{"captions": true, "font": "condensed", "chat": "stream", "actions": true}'] * 5) + ']'
+    out = run_pipeline.styles_step(NOW, vision=lambda imgs: reply, grab=lambda ids: [b"x"] * 5, notify=msgs.append)
+    assert "new formats: Fanum" in out and len(msgs) == 1
+    assert "Fanum's popping Shorts now use the stream's own chat + *action* captions" in msgs[0]
+    (tmp_path / "s.json").write_text((tmp_path / "s.json").read_text().replace(NOW.strftime("%Y-%m-%d"), "2026-10-01"))
+    run_pipeline.styles_step(NOW, vision=lambda imgs: reply, grab=lambda ids: [b"x"] * 5, notify=msgs.append)
+    assert len(msgs) == 1                                                       # same formats again: no repeat

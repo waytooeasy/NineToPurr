@@ -22,7 +22,8 @@ def test_run_writes_styles_for_top_streamers_with_enough_captioned_images(tmp_pa
                  now=NOW, top=2)
     assert list(doc["streamers"]) == ["Jynxzi"]
     assert doc["streamers"]["Jynxzi"] == {"logins": ["jynxzi"], "images": 5, "seen": 5, "caption": {
-        "font": "condensed", "case": "upper", "highlight": None, "words": 2, "header": "none"}}
+        "font": "condensed", "case": "upper", "highlight": None, "words": 2, "header": "none", "chat": "none",
+        "actions": False}}
     saved = json.loads((tmp_path / "s.json").read_text())
     assert saved["market"] == MARKET["updated"]
     assert SS.due(tmp_path / "s.json", MARKET["updated"], NOW + timedelta(hours=2)) is False
@@ -43,7 +44,8 @@ def test_majority_needs_a_real_majority():
            {"captions": True, "font": "geometric", "highlight": None, "header": "none", "words": 3},
            {"captions": False, "header": "none"}]
     d = SS.aggregate(per)
-    assert d == {"seen": 3, "font": "condensed", "highlight": "#FF00FF", "words": 3, "header": "none"}  # 2/4 box: no
+    assert d == {"seen": 3, "font": "condensed", "highlight": "#FF00FF", "words": 3, "chat": "none", "actions": False,
+                 "header": "none"}  # 2/4 box: no
     per[3]["header"] = "white_box"
     assert SS.aggregate(per)["header"] == "white_box"
 
@@ -60,3 +62,13 @@ def test_no_clear_majority_keeps_yesterdays_look(tmp_path):
                  grab=lambda ids: [i.encode() for i in ids][:5], now=NOW, top=2)
     assert doc["streamers"]["Jynxzi"]["caption"]["font"] == "condensed"          # split today -> yesterday's
     assert doc["streamers"]["CaseOh"]["caption"]["header"] == "white_box"        # no read today -> kept
+
+
+def test_chat_and_action_captions_only_when_most_popping_shorts_do_it():
+    # Lucas 2026-10-20: "don't add them if the clipper didn't add them or if it's already added; we imitate"
+    img = lambda chat, act: {"captions": True, "chat": chat, "actions": act}  # noqa: E731
+    d = SS.aggregate([img("added", True)] * 3 + [img("none", False)] * 2)
+    assert (d["chat"], d["actions"]) == ("added", True)
+    d = SS.aggregate([img("added", True), img("stream", False), img("none", False), img("none", True)])
+    assert d["chat"] == "none" and d["actions"] is False                       # no majority -> don't
+    assert SS.aggregate([img("stream", False)] * 3 + [img("none", False)])["chat"] == "stream"  # it's already there

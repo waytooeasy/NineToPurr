@@ -31,7 +31,9 @@ PROMPT = (
     "\"other\", \"case\": \"upper\"|\"lower\"|\"title\"|\"as_spoken\", \"fill\": \"#RRGGBB\", "
     "\"highlight\": \"#RRGGBB\" or null (no caption word in another colour), \"words\": <words in the caption "
     "line>, \"position\": \"upper\"|\"middle\"|\"lower\", \"header\": \"white_box\" (a title line in a white box) "
-    "| \"text\" (a title line without a box, separate from the captions) | \"none\"}]"
+    "| \"text\" (a title line without a box, separate from the captions) | \"none\", \"chat\": \"none\" | "
+    "\"stream\" (the streamer's own on-stream chat box is visible) | \"added\" (a chat box the clip channel put "
+    "on top), \"actions\": true|false (a caption describing an action in asterisks, like *LOOKS* or *CLOSES DOOR*)}]"
 )
 
 
@@ -112,6 +114,10 @@ def aggregate(per_image):
     words = sorted(int(x["words"]) for x in cap if str(x.get("words", "")).isdigit())
     if words:
         out["words"] = words[len(words) // 2]
+    chat = _majority([x.get("chat") or "none" for x in per_image], 0.0)
+    out["chat"] = chat if chat in ("stream", "added") and [x.get("chat") for x in per_image].count(chat) * 2 \
+        > len(per_image) else "none"                 # imitate: only when most popping Shorts show it
+    out["actions"] = sum(bool(x.get("actions")) for x in cap) * 2 > len(cap) if cap else False
     head = _majority([x.get("header", "none") for x in per_image], 0.0)
     out["header"] = head if head in ("white_box", "text") and [x.get("header") for x in per_image].count(head) \
         * 2 > len(per_image) else "none"
@@ -155,8 +161,8 @@ def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, t
             if old:
                 out[name] = prev[name]                # no clear read today: keep yesterday's look
             continue
-        cap = {k: d.get(k) for k in ("font", "case", "fill", "highlight", "outline", "words", "position", "header")
-               if k in d}
+        cap = {k: d.get(k) for k in ("font", "case", "fill", "highlight", "outline", "words", "position", "header",
+                                     "chat", "actions") if k in d}
         for k, v in old.items():
             cap.setdefault(k, v)
         out[name] = {"logins": sorted(logins.get(name, [])), "caption": cap, "images": len(imgs), "seen": d["seen"]}

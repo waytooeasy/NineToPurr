@@ -146,8 +146,31 @@ def market_step(now=None, key=None):
     return f"scanned {len(data['streamers'])} streamers"
 
 
-def styles_step(now=None, vision=None, grab=None):
-    """Per-streamer market look (editor/streamer_style.py, D49): after a new market scan, at most daily."""
+def _formats_in(path):
+    """{streamer: (chat mode, action captions)} from a styles.json, {} if missing."""
+    try:
+        d = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    return {n: (e.get("caption", {}).get("chat", "none"), bool(e.get("caption", {}).get("actions")))
+            for n, e in (d.get("streamers") or {}).items()}
+
+
+def telegram(text):
+    """FYI to Lucas through the approval bot's chat (publisher/upload.send_telegram); never raises."""
+    try:
+        sys.path.insert(0, str(HERE / "publisher"))
+        import upload
+        return upload.send_telegram(text)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def styles_step(now=None, vision=None, grab=None, notify=telegram):
+    """Per-streamer market look (editor/streamer_style.py, D49): after a new market scan, at most daily.
+    D50 (Lucas: "we imitate"): when most of a streamer's popping Shorts start showing chat (the stream's own
+    box or one the clipper added) or *action* captions, Lucas gets a heads-up: those formats are copied only
+    when the market for that streamer does it."""
     import streamer_style
     from radar import market
     m = market.load(now=now)
@@ -159,8 +182,16 @@ def styles_step(now=None, vision=None, grab=None):
         return "skipped: no ANTHROPIC_API_KEY"
     logins = {n: [e["id"].lower().lstrip("@") for e in es] for n, es in heat.load_watchlist()["streamers"].items()}
     kw = {k: v for k, v in (("vision", vision), ("grab", grab)) if v}
+    before = _formats_in(streamer_style.path())
     doc = streamer_style.run(m, logins, now=now, **kw)
-    return f"styled {len(doc['streamers'])} streamers"
+    after = _formats_in(streamer_style.path())
+    new = [n for n, (chat, actions) in after.items() if (chat != "none" or actions) and before.get(n) != (chat, actions)]
+    if new and notify:
+        notify("📺 Market check: " + "; ".join(
+            f"{n}'s popping Shorts now use " + " + ".join(x for x in [
+                {"stream": "the stream's own chat", "added": "an added chat box"}.get(after[n][0], ""),
+                "*action* captions" if after[n][1] else ""] if x) for n in new))
+    return f"styled {len(doc['streamers'])} streamers" + (f"; new formats: {', '.join(new)}" if new else "")
 
 
 def _slots_left(con, alloc):
