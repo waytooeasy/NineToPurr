@@ -173,3 +173,11 @@ def test_market_meta_gives_the_writer_todays_popping_titles(tmp_path, monkeypatc
     monkeypatch.setenv("CLIPPER_MARKET", str(tmp_path / "none.json"))
     assert clip.market_meta("caseoh_") == ("CaseOh", [])              # name fix works without a scan
     assert clip.market_meta("somebody") == ("somebody", [])
+
+
+def test_length_follows_the_top_clippers():
+    pick = {"start": 0, "end": 58}
+    assert clip.length_window(pick, 30, 52, 22) == (30, 52)                  # Writer's best 22 s part
+    assert clip.length_window(pick, 0, 58, 22) == (36, 58)                   # ignored the target -> last 22 s
+    assert clip.length_window(pick, 50, 80, 22) == (36, 58)                  # outside the window -> last 22 s
+    assert clip.length_window({"start": 0, "end": 15}, 0, 15, 22) == (0, 15)  # never longer than the window

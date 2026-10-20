@@ -95,3 +95,12 @@ def test_title_names_the_streamer_as_fans_write_it_and_never_copies_a_popping_ti
     assert W.check({**plan, "title": "Kai Cenat can't wait for Christmas"}, "kaicenat")      # login vs name: flat match
     with pytest.raises(ValueError, match="name the streamer"):
         W.check({**plan, "title": "bro fell off"}, "CaseOh")
+
+
+def test_target_length_is_enforced_when_given():
+    import writer as W
+    plan = {"score": 0.7, "in": 0.0, "out": 50.0, "hooks": ["a b", "c d", "e f"], "context_line": "Kai wins",
+            "title": "Kai Cenat wins", "music_risk": False}
+    with pytest.raises(ValueError, match="about 20s"):
+        W.check(plan, "Kai Cenat", (), 20)
+    assert W.check({**plan, "in": 28.0}, "Kai Cenat", (), 20)

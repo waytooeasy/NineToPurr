@@ -202,6 +202,28 @@ def write(data, p=None):
     return data
 
 
+MIN_LEN_S, MAX_LEN_S = 8, 60
+
+
+def _median(xs):
+    xs = sorted(xs)
+    return xs[len(xs) // 2] if xs else None
+
+
+def target_length(login, market=None, wl_path=None, min_n=3):
+    """Seconds the top clippers post for this creator's streamer right now (median length of their popping
+    English Shorts, D51); the market-wide median when that streamer has fewer than `min_n`; None without a scan."""
+    m = market if market is not None else load()
+    if not m:
+        return None
+    name = name_for(login, wl_path)
+    own = [s["dur"] for s in (m["streamers"].get(name) or {}).get("shorts", []) if s.get("en") and s.get("dur")]
+    if len(own) < min_n:
+        own = [s["dur"] for st in m["streamers"].values() for s in st.get("shorts", []) if s.get("en") and s.get("dur")]
+    t = _median(own)
+    return None if t is None else max(MIN_LEN_S, min(MAX_LEN_S, int(t)))
+
+
 def popping_titles(login, n=5, market=None, wl_path=None):
     """Today's most popping English Short titles for this creator's streamer (for the Writer)."""
     m = market if market is not None else load()

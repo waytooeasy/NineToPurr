@@ -187,6 +187,32 @@ def writer_picks(work, n, creator, meta=None):
     return picks
 
 
+LEN_SLACK = 1.25   # a window this much longer than the market length gets cut to the market length (D51)
+
+
+def market_length(creator):
+    """Length the top clippers post for this streamer (radar/market.py, D51), or None."""
+    try:
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.append(root)
+        from radar import market
+        return market.target_length(creator)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def length_window(pick, w_in, w_out, target):
+    """Follow the top clippers' length (D51): the Writer's part of the window if it lies inside it and is
+    about `target` s (0.6x-1.4x); otherwise the last `target` s (a stream clip ends on its payoff).
+    Never longer than the window."""
+    s0, e0 = float(pick["start"]), float(pick["end"])
+    a, b = max(s0, float(w_in)), min(e0, float(w_out))
+    if b - a > 0 and 0.6 * target <= b - a <= 1.4 * target:
+        return a, b
+    return max(s0, e0 - target), e0
+
+
 def market_window(pick, w_in, w_out, trim=MAX_TRIM_S):
     """Keep the length the market chose. A Radar pick is a moment viewers already clipped (Twitch) or
     replayed most (YouTube heatmap), so the Writer may only shave dead air: at most `trim` s per end.
@@ -224,8 +250,12 @@ def draft_pick(work, pick, creator, meta=None, clip_id=None):
     name, popping = market_meta(creator)
     if popping:
         meta = {**(meta or {}), "popping_now": popping}
+    target = market_length(creator)
+    cut = bool(target) and pick["end"] - pick["start"] > target * LEN_SLACK
+    if cut:
+        meta = {**(meta or {}), "target_len_s": target}
     pl = write_clip("\n".join(lines), name, meta, clip_id=clip_id)
-    start, end = market_window(pick, pl["in"], pl["out"])
+    start, end = length_window(pick, pl["in"], pl["out"], target) if cut else market_window(pick, pl["in"], pl["out"])
     return cap_pick({**pick, "start": start, "end": end, "hook": pl["hooks"][0], "hooks": pl["hooks"],
                      "hook_variant": 0, "context_line": pl["context_line"], "title": pl["title"],
                      "score": pl["score"], "music_risk": pl["music_risk"]})
