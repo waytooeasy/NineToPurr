@@ -6,11 +6,14 @@ Shorts about her in 48 h) instead of Jynxzi (108k) or CaseOh (46k). This scan me
 streamer, the most-viewed Shorts that name them, any channel, published in the last 48 h.
 
 Metadata only (search.list ~100 units + videos.list 1 unit per streamer); never downloads a video.
-Runs at most once a day from the pipeline (`run_pipeline.market_step`) and writes market.json:
-  {"updated": iso, "window_h": 48, "streamers": {name: {"demand_vph", "shorts": [top 10 by views/hour:
-   {"id", "title", "channel", "views", "vph", "dur", "hour_utc", "en"}], "dur_median", "hashtags"}}}
+A full scan runs once a day from the pipeline (`run_pipeline.market_step`); every REFRESH_H hours in
+between, the REFRESH_TOP streamers with the most demand (the ones Radar posts) are re-scanned (`refresh`, D54)
+so popping titles and matched moments follow the market within hours. Writes market.json:
+  {"updated": iso (full scan), "refreshed": iso (last refresh), "window_h": 48, "streamers": {name:
+   {"demand_vph", "shorts": [top 10 by views/hour: {"id", "title", "channel", "views", "vph", "dur",
+   "hour_utc", "published", "en", "desc"}], "dur_median", "hashtags"}}}
 Consumers: heat.py (demand-driven opportunity), the Writer (popping titles for the same streamer),
-the publisher (the streamer's own sub-market hashtags).
+the publisher (the streamer's own sub-market hashtags), radar/match.py (the same moments, D54).
 """
 import json
 import os
@@ -28,6 +31,8 @@ WINDOW_H = 48
 TOP = 10
 MAX_AGE_H = 24          # rescan once a day
 STALE_H = 72            # older than this: consumers ignore it
+REFRESH_H = 6           # re-scan the top streamers this often between full scans (D54)
+REFRESH_TOP = 8         # ~8 x 101 units per refresh; the full scan is ~30 x 101 of the 10k/day
 TAG = re.compile(r"#(\w+)", re.UNICODE)
 # Names that are ordinary words or famous non-streamers: a mention only counts next to a streaming word.
 AMBIGUOUS = {"sketch", "shroud", "lacy", "marlon", "tarik", "ludwig", "sam", "summit"}
@@ -149,23 +154,21 @@ def scan_streamer(name, aliases, key, session, now, others=frozenset(), other_al
             views = int(st.get("viewCount", 0) or 0)
             shorts.append({"id": it["id"], "title": sn.get("title", ""), "channel": sn.get("channelTitle", ""),
                            "views": views, "vph": round(views / age), "dur": _dur(it.get("contentDetails", {}).get("duration")),
-                           "hour_utc": pub.hour, "en": is_english(sn.get("title")),
+                           "hour_utc": pub.hour, "published": pub.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                           "en": is_english(sn.get("title")),
                            "desc": (sn.get("description") or "")[:200]})
     shorts.sort(key=lambda s: -s["vph"])
     top = shorts[:TOP]
     durs = sorted(s["dur"] for s in top if s["dur"])
-    return {"demand_vph": sum(s["vph"] for s in top), "shorts": [{k: v for k, v in s.items() if k != "desc"} for s in top],
+    return {"demand_vph": sum(s["vph"] for s in top), "shorts": top,
             "dur_median": durs[len(durs) // 2] if durs else None, "hashtags": _hashtags(top, others)}
 
 
-def scan(key, session=None, now=None, wl_path=None):
-    """Scan every watchlist streamer. A failing streamer is logged and left out."""
-    import requests
-    session = session or requests.Session()
-    now = now or datetime.now(timezone.utc)
-    names = watchlist_names(wl_path)
+def _scan_names(names, todo, key, session, now):
+    """{name: scan} for the names in `todo`. A failing streamer is logged and left out; a 403 (quota) stops."""
     out = {}
-    for n, al in names.items():
+    for n in todo:
+        al = names[n]
         other_al = {a for m, al2 in names.items() if m != n for a in al2} - al
         others = {flat(a) for a in other_al} - {flat(a) for a in al}
         try:
@@ -174,7 +177,43 @@ def scan(key, session=None, now=None, wl_path=None):
             log(f"{n}: {type(e).__name__}")
             if "403" in str(e):              # quota exhausted: stop, keep what we have
                 break
+    return out
+
+
+def scan(key, session=None, now=None, wl_path=None):
+    """Scan every watchlist streamer. A failing streamer is logged and left out."""
+    import requests
+    session = session or requests.Session()
+    now = now or datetime.now(timezone.utc)
+    names = watchlist_names(wl_path)
+    out = _scan_names(names, list(names), key, session, now)
     return {"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": WINDOW_H, "streamers": out}
+
+
+def refresh(data, key, session=None, now=None, wl_path=None, top=REFRESH_TOP):
+    """Re-scan the `top` streamers by demand between full scans (D54); the others keep the full scan's data.
+    A streamer whose re-scan fails keeps its previous entry."""
+    import requests
+    session = session or requests.Session()
+    now = now or datetime.now(timezone.utc)
+    names = watchlist_names(wl_path)
+    ranked = sorted(data["streamers"], key=lambda n: -(data["streamers"][n].get("demand_vph") or 0))
+    new = _scan_names(names, [n for n in ranked if n in names][:top], key, session, now)
+    return {**data, "streamers": {**data["streamers"], **new}, "refreshed": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
+def _iso(s):
+    return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+
+
+def fresh_at(data):
+    """Time of the newest market data in `data` (full scan or refresh)."""
+    return max(_iso(t) for t in (data.get("updated"), data.get("refreshed")) if t)
+
+
+def refresh_due(data, now=None, every_h=REFRESH_H):
+    now = now or datetime.now(timezone.utc)
+    return now - fresh_at(data) >= timedelta(hours=every_h)
 
 
 def load(p=None, now=None, max_age_h=STALE_H):

@@ -40,8 +40,11 @@ VQA_LABELS = {"double_captions": "double captions", "broken_glyphs": "broken sym
               "black_bars": "black bars", "no_watermark": "no watermark"}
 
 
-def caption(row) -> str:
+def caption(row, same=None) -> str:
+    """`same`: the popping clipper Short of this same moment (D54), shown so Lucas sees what we follow."""
     text = f"Clip #{row['id']}: {row['title'] or '-'}\n{row['context_line'] or ''}".rstrip()
+    if same and same.get("title"):
+        text += f"\n🎯 same moment as a popping Short: \"{same['title']}\" ({int(same.get('vph') or 0):,} views/h)"
     if row["music_risk"]:
         text += "\n⚠️ music risk"
     issues = approvals.vqa_issues(row)
@@ -50,12 +53,12 @@ def caption(row) -> str:
     return text[:1000]  # Telegram caption limit is 1024
 
 
-async def send_clip(bot, chat_id: int, row, auto: bool = False) -> None:
+async def send_clip(bot, chat_id: int, row, auto: bool = False, same=None) -> None:
     """auto: the clip is already approved; the message is an FYI with a 🛑 Stop button that works
     until the uploader takes it (next upload slot)."""
     kb = stop_keyboard(row["id"]) if auto else keyboard(row["id"], len(approvals.hooks_of(row)))
     path = row["file_path"]
-    text = ("🚀 Auto-posting at the next upload slot.\n" if auto else "") + caption(row)
+    text = ("🚀 Auto-posting at the next upload slot.\n" if auto else "") + caption(row, same)
     if path and os.path.isfile(path) and os.path.getsize(path) <= MAX_UPLOAD_BYTES:
         with open(path, "rb") as f:
             await bot.send_video(chat_id=chat_id, video=f, caption=text[:1000], reply_markup=kb)
@@ -80,7 +83,7 @@ async def push_pending(app: Application) -> int:
             auto = approvals.auto_post_enabled() and not approvals.needs_tap(row)
             if auto and not approvals.post(con, row["id"]):
                 continue  # decided meanwhile (double run)
-            await send_clip(app.bot, chat_id, row, auto=auto)
+            await send_clip(app.bot, chat_id, row, auto=auto, same=approvals.same_moment_of(con, row["id"]))
             approvals.mark_sent(con, row["id"])
             sent += 1
         except Exception as e:  # keep the loop alive; retry next poll

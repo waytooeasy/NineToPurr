@@ -39,6 +39,17 @@ def creator_of(con, clip_id: int):
     return r[0] if r else None
 
 
+def same_moment_of(con, clip_id: int):
+    """The popping clipper Short this clip is the same moment as (radar/match.py, D54): {title, vph} or None."""
+    try:
+        r = con.execute("SELECT m.short_title, m.short_vph FROM moment_matches m JOIN radar_candidates r"
+                        " ON r.clip_id = m.clip_id WHERE r.clips_id = ? ORDER BY m.short_vph DESC LIMIT 1",
+                        (clip_id,)).fetchone()
+    except sqlite3.Error:
+        return None
+    return {"title": r[0], "vph": r[1]} if r else None
+
+
 def mark_sent(con, clip_id: int) -> None:
     con.execute("UPDATE clips SET approval_sent_at = datetime('now') WHERE id = ?", (clip_id,))
     con.commit()

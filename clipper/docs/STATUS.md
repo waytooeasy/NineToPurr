@@ -3,12 +3,12 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-20 00:15 UTC_
+_Last updated: 2026-10-20 23:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
-| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48)** → **streamer styles (daily, D49)** → radar (**paced: 1 clip start every ~4.8 h**) → capture → Writer → render → QC → re-render → visual check (D47) |
+| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48; top 8 streamers re-scanned every 6 h, D54)** → **streamer styles (daily, D49)** → **same moments as the top clippers (after each scan, D54)** → radar (**paced: 1 clip start every 4 h**, D52) → capture → Writer → render → QC → re-render → visual check (D47) |
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips and clips that fail the visual check (with the reason) still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 6/day (D52) (`.env`: UTC window 00:00–23:59) |
@@ -19,7 +19,8 @@ _Last updated: 2026-10-20 00:15 UTC_
 
 ## The format today (follow the market, D36)
 - **Streamers:** picked by **Shorts demand** (what's popping about them on Shorts in 48 h, any channel) × fresh footage (D48). 2026-10-20: Jynxzi, Lacy, Stable Ronaldo, CaseOh on top; Speed/Kai have the most demand but no footage we can get.
-- **Sources:** Twitch clips + **Kick clips** (D45, once PR for #69 is merged and pulled): Heat Index picks from the ~36-streamer watchlist (Adin Ross, N3on, Clavicular, Ice Poseidon on Kick; xQc on both). YouTube footage blocked (YouTube answers 429 to the home IP), see #64.
+- **Moments (D54, Lucas: "same clips"):** the moments the top clippers' Shorts are popping with go first: each popping Short is matched to the streamer's own Twitch/Kick clip of that moment (Haiku on titles + times). Our title paraphrases theirs with synonyms (never identical); cut to their length. One moment is never posted twice.
+- **Sources:** Twitch clips + **Kick clips** (D45): Heat Index picks from the ~36-streamer watchlist (Adin Ross, N3on, Clavicular, Ice Poseidon on Kick; xQc on both). YouTube footage blocked (YouTube answers 429 to the home IP), see #64.
 - **Length (D51, Lucas: "always follow the top clippers"):** the length the top clippers post for that streamer right now (median of their popping Shorts; 2026-10-20: Lacy 19 s, Kai 20 s, Stable Ronaldo 26 s, CaseOh 27 s, Jynxzi 39 s). A longer clip is cut to its best part of that length (setup + payoff); never longer than the source; ≤60 s.
 - **Look:** full-bleed 9:16 centred on the face, or facecam on top + gameplay below. Captions per today's `style.json` (2026-10-19: ALL CAPS, white, black outline, 3 words, highlight colour rotating cyan/lime/pink per clip). Hook only for 2.5 s. No context-line banner.
 - **Text:** Writer (Haiku 5.5) follows today's format library: short casual titles with emoji, hook templates.
@@ -38,11 +39,11 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - AdSense signup + W-8BEN.
 - Anthropic Console spend limit.
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
-- Merge the Kick PR (#69).
 
 ## Next for Claude
-- Read the first 48 h of views; raise the 5/day cap when views per Short hold up.
+- Day-3 check (D53): views per Short + stayed % → keep/raise 6/day if stayed ≥ 60 %, cut to 3 strong slots if 0-view Shorts persist.
+- Check the first same-moment matches (`select streamer, short_title, clip_id, confidence from moment_matches`) against the clips: tune `MIN_CONF` if a match is wrong.
 - Feed views per streamer / format back into the Heat Index and the Writer (learning loop).
 
 ## On hold (until the first Shorts perform, D35)
-#70 YouTube streamers (Speed) source · #45 · #28. (#69 Kick: built, PR open.)
+#70 YouTube streamers (Speed) source · #45 · #28.

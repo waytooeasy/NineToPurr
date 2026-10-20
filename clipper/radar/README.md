@@ -4,7 +4,7 @@
 
 **HQ decisions (D13, D14):** Twitch Get Clips first (chat spikes later); creators from config; rank by views/hour; dedupe by VOD + overlapping offset; widen to 7 days when thin; table `radar_candidates` via `../db/migrations/002_radar.sql`.
 
-**Status:** v1 built; YouTube live-VOD source added (issue #19, D29); Kick clips source added (issue #69, D45). `pytest clipper/radar` passes offline (saved responses in `tests/fixtures/`).
+**Status:** v1 built; YouTube live-VOD source added (issue #19, D29); Kick clips source added (issue #69, D45); same moments as the top clippers (D54). `pytest clipper/radar` passes offline (saved responses in `tests/fixtures/`).
 
 ## Files
 - `config/creators.yaml` — per creator: a plain Twitch login, or `{twitch: kaicenat, youtube_channel: "@KaiCenatLive"}` to also pull that channel's livestream VODs.
@@ -16,7 +16,12 @@
 - `top_clips.register_clips` — with `--picks N`, the chosen candidates become `clips` rows with `state='found'`, linked via `radar_candidates.clips_id` (D22). Idempotent.
 
 ## Shorts market scan (`market.py`, D48, Lucas 2026-10-20: "follow what's popping")
-Daily (pipeline stage `market`, at most once per 24 h): for every watchlist streamer, the most-viewed English Shorts naming them in the last 48 h, any channel (`search.list` order=viewCount + `videos.list`; ~100 quota units per streamer, metadata only). `market.json` (`$CLIPPER_MARKET`, default `/opt/clipper/formats/market.json`): per streamer `demand_vph` (sum of views/hour of the top 10), the top Shorts (title, channel, views/h, length), median length, hashtags used by 2+ channels. Search is loose, so a Short only counts when it names the streamer as a whole word; names that are ordinary words or famous non-streamers (`AMBIGUOUS`: Sketch, Marlon, Lacy, Ludwig, ...) also need a streaming word or another watchlist streamer in the title/tags (the first scan counted Spanish DIY videos tagged #sketch and Marlon Wayans). Non-English titles are dropped (we post for the English market). Used by: the Heat Index (demand), the Writer (popping titles), the uploader (per-streamer hashtags).
+Daily (pipeline stage `market`, at most once per 24 h): for every watchlist streamer, the most-viewed English Shorts naming them in the last 48 h, any channel (`search.list` order=viewCount + `videos.list`; ~100 quota units per streamer, metadata only). `market.json` (`$CLIPPER_MARKET`, default `/opt/clipper/formats/market.json`): per streamer `demand_vph` (sum of views/hour of the top 10), the top Shorts (title, channel, views/h, length), median length, hashtags used by 2+ channels. Search is loose, so a Short only counts when it names the streamer as a whole word; names that are ordinary words or famous non-streamers (`AMBIGUOUS`: Sketch, Marlon, Lacy, Ludwig, ...) also need a streaming word or another watchlist streamer in the title/tags (the first scan counted Spanish DIY videos tagged #sketch and Marlon Wayans). Non-English titles are dropped (we post for the English market). Used by: the Heat Index (demand), the Writer (popping titles), the uploader (per-streamer hashtags), `match.py` (D54).
+**Refresh (D54):** between full scans, the 8 streamers with the most demand (`REFRESH_TOP`) are re-scanned every 6 h (`REFRESH_H`, `market.refresh`, ~800 units each); the others keep the full scan's data; `market.json.refreshed` = time of the last refresh. Each Short also keeps `published` (ISO) and the first 200 chars of its description for matching.
+
+## Same moments as the top clippers (`match.py`, D54, Lucas 2026-10-20: "same clips")
+Pipeline stage `match`, once per market scan/refresh (`match_runs`): for the 8 streamers Radar posts (latest Heat snapshot by opportunity, with popping Shorts and a Twitch/Kick channel), Claude Haiku (thinking off) compares their popping English Shorts (title, description, length, posted) with their own 40 most-viewed Twitch/Kick clips of the last 7 days (title, made, views, length) and names the clip of the same moment, or null. Kept: confidence ≥ 0.8 (`MIN_CONF`; 0.7 = same stream or guest but maybe another moment) and clip made before the Short was posted. `moment_matches` (migration 013) keeps them 72 h with the Radar candidate. `radar_step` → `same_moments_first`: a matched clip marks the pulled candidate of the same footage, or joins the list (only for streamers with a slot); matched moments rank first by the clipper Short's views/hour, the rest after them as before. The Editor (`clip.same_moment` → `draft_pick(same=...)`) gives the Writer that Short's title (paraphrase with synonyms, never identical; copy guard) and cuts to its length. Their video is never downloaded.
+- **Never the same moment twice:** `posted_moments` = Twitch/Kick candidates Radar started in the last 8 days (any state, killed too); a candidate with the same footage (`same_footage`: Twitch VOD offsets when both have them, else overlapping `[created_at - duration, created_at]`) is skipped.
 
 ## Heat Index (issue #33, D33)
 Decides *which streamers* get today's Shorts slots; Radar then ranks moments only inside them.
@@ -33,9 +38,9 @@ Decides *which streamers* get today's Shorts slots; Radar then ranks moments onl
 ## Pipeline wiring (issue #47, `run_pipeline.py` radar step)
 Every 20-min pass (D22): `radar_step` = **Heat slots → moments → picks**.
 - `heat_allocation` re-measures the Heat Index at most every 30 min (`HEAT_REFRESH_MIN`); in between it re-allocates from the latest `streamer_heat` snapshot. Exploration slot is seeded per day, so it stays stable. Slots already used today (clips started, not killed) are subtracted per streamer.
-- Per allocated creator: Twitch top clips (`top_clips.collect(allowed=...)`) **and** YouTube VOD most-replayed windows (`youtube_vods.collect`, creators with `youtube_channel`), merged and ranked by score; `apply_allocation` keeps the best `slots` per streamer, then the 5/day cap (`qc.DAILY_CAP`) trims the total. Already-registered moments are skipped before slots are applied.
+- Per allocated creator: Twitch top clips (`top_clips.collect(allowed=...)`) **and** YouTube VOD most-replayed windows (`youtube_vods.collect`, creators with `youtube_channel`), merged and ranked by score; matched moments first (D54), then `apply_allocation` keeps the best `slots` per streamer, then the 6/day cap (`qc.DAILY_CAP`) trims the total. Already-registered moments are skipped before slots are applied.
 - Heat unavailable (error) → logged, falls back to ranking all creators; the cap still holds. A yt-dlp failure keeps the Twitch picks.
-- **Pacing (D48, live pipeline `pace=True`):** the day's cap is spread over the UTC day: 1 clip may start at 00:00, then one more every 24 h / cap (≈ every 4.8 h for 5). Before, all 5 started right after midnight UTC and went up in one 2.5 h burst with moments up to a day old.
+- **Pacing (D48, live pipeline `pace=True`):** the day's cap is spread over the UTC day: 1 clip may start at 00:00, then one more every 24 h / cap (every 4 h for 6, D52). Before, all 5 started right after midnight UTC and went up in one 2.5 h burst with moments up to a day old.
 - `_picks` reads `clips.start_s/end_s` (set by `pick_window`, D23): Twitch `0 → duration`, YouTube VOD-absolute. `capture_step` gets those as is; `editor_step` gets YouTube picks shifted into the downloaded window file (`start - capture.section(pick)[0]`), same as `python -m radar.capture` does for `picks.json`. Previously every pick was `0 → duration`, wrong for VOD moments.
 - Kick (D45): `watchlist_kick_slugs()` (default when `creators` is the default; none when a creator list is passed in) filtered by the Heat slots → `kick_moments` → merged into the same ranking. A Kick failure keeps the other picks. After merging, `kick.dedupe` drops a clip whose footage overlaps a better clip of the same streamer on another platform (a clip covers the `duration_s` before its `created_at`), so one xQc moment clipped on Twitch and Kick is posted once.
 - Tests: `radar/tests/test_pipeline_radar.py` (fake Twitch, fake yt-dlp, fake Heat fetchers), `radar/tests/test_kick.py` (saved kick.com JSON in `tests/fixtures/kick/`).
@@ -69,6 +74,9 @@ pytest radar
 | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | from `/opt/clipper/.env` (never in git) |
 | `CLIPPER_DB` | default `/opt/clipper/db/clip.db` |
 | `CLIPPER_WORK` | default `/opt/clipper/work` |
+| `CLIPPER_MARKET` | market scan file, default `/opt/clipper/formats/market.json` (`market.py`, `match.py`) |
+| `YOUTUBE_API_KEY` | market scan + 6-h refresh (metadata only) |
+| `ANTHROPIC_API_KEY` | `match.py` (Haiku, ~8 calls per scan/refresh) |
 
 The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 
@@ -88,4 +96,4 @@ The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 
 **Resolved (HQ 2026-10-18):** the DB keeps VOD-absolute `start_s/end_s`; the Editor and re-render both shift into the window file.
 
-**Next:** saturation hand-off (the pipeline now runs the Heat allocation itself); chat spikes (live chat message-rate peaks → extra candidates).
+**Next:** check the first same-moment matches against what the clippers posted and tune `MIN_CONF` (`select streamer, short_title, clip_id, confidence from moment_matches`); give the matcher the clip's Twitch game name (viewer-typed clip titles are often one word, so recall is low); saturation hand-off; chat spikes (live chat message-rate peaks → extra candidates).

@@ -188,8 +188,11 @@ KICK_PAGES = 3   # top 60 clips of the week per Kick channel; the tail adds litt
 
 
 def kick_views(kc, slug, now, pages=KICK_PAGES):
-    """(D, W) from the channel's most-viewed Kick clips of the last 7 days (D = those from the last 24 h)."""
-    return clip_views(kc.get_clips(slug, "week", max_pages=pages), now)
+    """(D, W) from the channel's most-viewed Kick clips of the last 7 days (D = those from the last 24 h).
+    Only clips Radar may use count (public, not mature): Ice Poseidon's are all marked mature (2026-10-20),
+    so his footage must not win slots Radar can never fill."""
+    from .kick import usable
+    return clip_views([c for c in kc.get_clips(slug, "week", max_pages=pages) if usable(c)], now)
 
 
 def default_fetchers(tw=None, kc=None):

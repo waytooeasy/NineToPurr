@@ -169,3 +169,29 @@ def test_target_length_is_what_the_top_clippers_post(tmp_path):
     assert M.target_length("lacy", m, wl) == 21                                # too few -> market-wide median
     assert M.target_length("kaicenat", {"streamers": {"Kai Cenat": {"shorts": sh(3, 4, 5)}}}, wl) == 8   # floor
     assert M.target_length("kaicenat", {"streamers": {}}, wl) is None        # no data at all
+
+
+def test_refresh_rescans_the_top_streamers_between_full_scans(tmp_path, monkeypatch):
+    wl = tmp_path / "w.yaml"
+    wl.write_text("streamers:\n  - {name: Jynxzi, platform: twitch, id: jynxzi}\n"
+                  "  - {name: Valkyrae, platform: twitch, id: valkyrae}\n  - {name: CaseOh, platform: twitch, id: caseoh_}\n")
+    old = {"updated": (NOW - timedelta(hours=7)).strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": 48, "streamers": {
+        "Jynxzi": {"demand_vph": 900, "shorts": []}, "CaseOh": {"demand_vph": 500, "shorts": []},
+        "Valkyrae": {"demand_vph": 5, "shorts": [{"id": "v"}]}}}
+    assert M.refresh_due(old, NOW) and not M.refresh_due(old, NOW - timedelta(hours=2))
+    s = Session({"Jynxzi": JYNX}, fail_q={"CaseOh"})
+    new = M.refresh(old, "K", s, NOW, wl, top=2)
+    assert [q for c, q in s.calls if c == "search"] == ["Jynxzi", "CaseOh"]      # top 2 by demand only
+    assert new["streamers"]["Jynxzi"]["demand_vph"] > 900 and new["streamers"]["Jynxzi"]["shorts"][0]["published"]
+    assert new["streamers"]["CaseOh"] == old["streamers"]["CaseOh"]               # failed: keeps the old scan
+    assert new["streamers"]["Valkyrae"] == old["streamers"]["Valkyrae"] and new["updated"] == old["updated"]
+    assert M.fresh_at(new) == NOW and not M.refresh_due(new, NOW + timedelta(hours=5))
+
+
+def test_market_step_refreshes_every_6_hours(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_MARKET", str(tmp_path / "m.json"))
+    M.write({"updated": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "window_h": 48, "streamers": {"X": {"demand_vph": 1}}})
+    monkeypatch.setattr(M, "refresh", lambda d, key, now=None: {**d, "refreshed": now.strftime("%Y-%m-%dT%H:%M:%SZ")})
+    assert run_pipeline.market_step(NOW + timedelta(hours=5), key="K") == "fresh"
+    assert run_pipeline.market_step(NOW + timedelta(hours=6), key="K") == f"refreshed top {M.REFRESH_TOP}"
+    assert run_pipeline.market_step(NOW + timedelta(hours=7), key="K") == "fresh"
