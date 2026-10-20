@@ -156,3 +156,16 @@ def test_market_step_runs_once_a_day(tmp_path, monkeypatch):
     assert run_pipeline.market_step(NOW, key="K") == "scanned 1 streamers"
     assert run_pipeline.market_step(NOW + timedelta(hours=3), key="K") == "fresh" and calls == ["K"]
     assert json.loads((tmp_path / "m.json").read_text())["streamers"]["X"]["demand_vph"] == 1
+
+
+def test_target_length_is_what_the_top_clippers_post(tmp_path):
+    wl = tmp_path / "w.yaml"
+    wl.write_text("streamers:\n  - {name: Kai Cenat, platform: twitch, id: kaicenat}\n"
+                  "  - {name: Lacy, platform: twitch, id: lacy}\n")
+    sh = lambda *d: [{"dur": x, "en": True} for x in d]  # noqa: E731
+    m = {"streamers": {"Kai Cenat": {"shorts": sh(15, 20, 20, 36, 126) + [{"dur": 90, "en": False}]},
+                       "Lacy": {"shorts": sh(21)}}}
+    assert M.target_length("kaicenat", m, wl) == 20                            # Kai's own market
+    assert M.target_length("lacy", m, wl) == 21                                # too few -> market-wide median
+    assert M.target_length("kaicenat", {"streamers": {"Kai Cenat": {"shorts": sh(3, 4, 5)}}}, wl) == 8   # floor
+    assert M.target_length("kaicenat", {"streamers": {}}, wl) is None        # no data at all

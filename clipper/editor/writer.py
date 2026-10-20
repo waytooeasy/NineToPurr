@@ -43,7 +43,7 @@ def _flat(s):
     return re.sub(r"[\W_]+", "", str(s or "").lower())
 
 
-def check(plan, creator="", popping=()):
+def check(plan, creator="", popping=(), target=None):
     """Semantic limits the schema cannot express. Raises ValueError. `popping`: today's most popping
     titles for this streamer (radar/market.py): ours may follow their style but never copy one."""
     errs = []
@@ -58,6 +58,9 @@ def check(plan, creator="", popping=()):
         errs.append("context_line not 1-12 words")
     if creator and _flat(creator) not in _flat(plan["title"]):
         errs.append("title must name the streamer")
+    if target and not 0.6 * target <= plan["out"] - plan["in"] <= 1.4 * target:
+        errs.append(f"clip should be about {target:.0f}s long, like the top clippers post (now "
+                    f"{plan['out'] - plan['in']:.0f}s): pick the best part of that length")
     for p in popping or ():
         if SequenceMatcher(None, _flat(plan["title"]), _flat(p)).ratio() >= 0.9:
             errs.append(f"title copies the popping title {p!r}: paraphrase it with synonyms")
@@ -104,10 +107,16 @@ def write_clip(transcript, creator, meta=None, clip_id=None):
     prompt = user.format(creator=creator, meta=json.dumps(meta or {}, ensure_ascii=False),
                          transcript=format_window(transcript))
     popping = [p["title"] if isinstance(p, dict) else str(p) for p in (meta or {}).get("popping_now") or []]
+    target = (meta or {}).get("target_len_s")
     plan = llm(prompt, SCHEMA, system=system, clip_id=clip_id)
     try:
-        return check(plan, creator, popping)
+        return check(plan, creator, popping, target)
     except ValueError as e:
         plan = llm(prompt + f"\n\nYour previous answer broke the rules: {e}. Fix them.", SCHEMA,
                    system=system, clip_id=clip_id)
-        return check(plan, creator, popping)
+        try:
+            return check(plan, creator, popping, target)
+        except ValueError:
+            if not target:
+                raise
+            return check(plan, creator, popping)   # length is enforced by clip.length_window anyway

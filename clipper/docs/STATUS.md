@@ -20,7 +20,7 @@ _Last updated: 2026-10-20 00:15 UTC_
 ## The format today (follow the market, D36)
 - **Streamers:** picked by **Shorts demand** (what's popping about them on Shorts in 48 h, any channel) × fresh footage (D48). 2026-10-20: Jynxzi, Lacy, Stable Ronaldo, CaseOh on top; Speed/Kai have the most demand but no footage we can get.
 - **Sources:** Twitch clips + **Kick clips** (D45, once PR for #69 is merged and pulled): Heat Index picks from the ~36-streamer watchlist (Adin Ross, N3on, Clavicular, Ice Poseidon on Kick; xQc on both). YouTube footage blocked (YouTube answers 429 to the home IP), see #64.
-- **Length:** the length viewers chose (the Twitch clip / most-replayed window), trim ≤2 s per end, ≤60 s. Kick clips over 60 s keep their last 60 s.
+- **Length (D51, Lucas: "always follow the top clippers"):** the length the top clippers post for that streamer right now (median of their popping Shorts; 2026-10-20: Lacy 19 s, Kai 20 s, Stable Ronaldo 26 s, CaseOh 27 s, Jynxzi 39 s). A longer clip is cut to its best part of that length (setup + payoff); never longer than the source; ≤60 s.
 - **Look:** full-bleed 9:16 centred on the face, or facecam on top + gameplay below. Captions per today's `style.json` (2026-10-19: ALL CAPS, white, black outline, 3 words, highlight colour rotating cyan/lime/pink per clip). Hook only for 2.5 s. No context-line banner.
 - **Text:** Writer (Haiku 5.5) follows today's format library: short casual titles with emoji, hook templates.
 - **On screen:** plain words only (no emoji), `@Peakz.Recaps` watermark low-centre like NexxoRecaps (D46). **Per streamer, the look of their popping Shorts** (D49): font family (most use a condensed font like Anton), keyword colour or plain white, header box, words per line.
