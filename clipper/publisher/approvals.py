@@ -30,6 +30,15 @@ def pending_to_send(con):
     ).fetchall()
 
 
+def creator_of(con, clip_id: int):
+    """Radar creator login/slug of a clip (radar_candidates.creator), or None."""
+    try:
+        r = con.execute("SELECT creator FROM radar_candidates WHERE clips_id = ?", (clip_id,)).fetchone()
+    except sqlite3.Error:
+        return None
+    return r[0] if r else None
+
+
 def mark_sent(con, clip_id: int) -> None:
     con.execute("UPDATE clips SET approval_sent_at = datetime('now') WHERE id = ?", (clip_id,))
     con.commit()

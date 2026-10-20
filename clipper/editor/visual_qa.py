@@ -33,9 +33,10 @@ CODES = {
 }
 PROMPT = (
     "These are 3 frames (1080x1920) from one finished YouTube Short made by a stream-clip channel.\n"
-    "OUR text on it is exactly: (a) ONE caption line of 2-3 heavy ALL-CAPS words with a thick black outline "
-    "around the middle of the screen, (b) in frame 1 only, a short ALL-CAPS hook line higher up, (c) a small "
-    "semi-transparent '@Peakz.Recaps' handle near the bottom centre.\n"
+    "OUR text on it is exactly: (a) ONE caption line of 1-5 heavy words with an outline (wide or condensed "
+    "font, any case) in the middle or lower part of the screen, (b) a short hook/title line higher up or on the "
+    "seam: either only in frame 1, or staying in every frame (possibly as dark text in a white box), (c) a "
+    "small semi-transparent '@Peakz.Recaps' handle near the bottom centre.\n"
     "Check each frame carefully for these problems:\n"
     "- double_captions: ANY other subtitle-style text that transcribes speech is visible at the same time as "
     "our caption, e.g. the streamer's own live captions (usually sentence-case or lowercase white text near "

@@ -15,7 +15,7 @@ def test_bad_values_fall_back_and_good_ones_apply(tmp_path):
                                          "outline": "red", "words": 9, "position": "nowhere"}}))
     st = S.load(f)
     assert st == {"case": "title", "fill": "#FFFFFF", "highlight": "#00FF66", "outline": "#000000",
-                  "words": 3, "position": "middle"}
+                  "words": 3, "position": "middle", "font": "geometric", "header": "none", "highlight_on": True}
     assert S.version(f) != "default" and len(S.version(f)) == 12
 
 
@@ -53,3 +53,41 @@ def test_onscreen_strips_emoji_keeps_text():
     assert S.onscreen("No way ❤️‍🩹 bro") == "No way bro"
     assert S.onscreen("Speed's $100 bet!") == "Speed's $100 bet!"
     assert S.onscreen("👍🏽") == "" and S.onscreen(None) == ""
+
+
+def test_streamer_style_lays_over_the_global_one(tmp_path, monkeypatch):
+    # 2026-10-20: CaseOh clippers use a white header box and no keyword colour; Jynxzi's a condensed font.
+    g = tmp_path / "style.json"
+    g.write_text(json.dumps({"caption": {"highlight": "#00BFFF", "highlights": ["#00BFFF", "#CCFF00"], "words": 3}}))
+    sp = tmp_path / "styles.json"
+    sp.write_text(json.dumps({"streamers": {
+        "CaseOh": {"logins": ["caseoh_"], "caption": {"font": "geometric", "case": "title", "highlight": None,
+                                                     "header": "white_box", "words": 2}},
+        "Jynxzi": {"logins": ["jynxzi"], "caption": {"font": "condensed", "highlight": "#FF00FF", "position": "lower"}}}}))
+    case = S.load(g, "caseoh_", sp)
+    assert case["header"] == "white_box" and case["case"] == "title" and case["words"] == 2
+    assert case["highlight_on"] is False and S.highlight_for(case, "x") == case["fill"]
+    jyn = S.load(g, "Jynxzi", sp)
+    assert jyn["font"] == "condensed" and S.font_for(jyn)[0] == "Anton" and jyn["position"] == "lower"
+    assert jyn["highlight"] == "#FF00FF" and "highlights" not in jyn and jyn["words"] == 3   # rest from global
+    other = S.load(g, "xqc", sp)
+    assert other["font"] == "geometric" and other["highlights"] == ["#00BFFF", "#CCFF00"]
+    assert S.version(g, "caseoh_", sp) != S.version(g, "xqc", sp) == S.version(g, None, sp)
+
+
+def test_build_ass_white_box_header_and_condensed_font(tmp_path, monkeypatch):
+    sp = tmp_path / "styles.json"
+    sp.write_text(json.dumps({"streamers": {"CaseOh": {"logins": ["caseoh_"], "caption": {
+        "font": "condensed", "header": "white_box", "highlight": None}}}}))
+    monkeypatch.setenv("CLIPPER_STYLES", str(sp))
+    ass = tmp_path / "a.ass"
+    words = [{"s": 1, "e": 1.5, "w": "type"}, {"s": 1.5, "e": 2, "w": "timing"}]
+    lay = {"mode": "stack", "cam": [0, 0, 400, 300], "cam_h": 768, "W": 1920, "H": 1080}
+    clip.build_ass(words, {"start": 0, "end": 12, "hook": "W timing", "creator": "caseoh_", "layout": lay}, ass)
+    txt = ass.read_text()
+    assert "Style: Cap,Anton,124," in txt and ",3,16,0,5," in txt.split("Style: Head,")[1]   # opaque box style
+    head = [l for l in txt.splitlines() if ",Head," in l]
+    assert len(head) == 1 and "0:00:12.00" in head[0] and "\\pos(540,768)" in head[0]      # whole clip, on the seam
+    caps = [l for l in txt.splitlines() if ",Cap," in l]
+    assert caps and all("\\pos(540,1286)" in c for c in caps)                             # moved into the gameplay
+    assert all("\\c&H" not in c.split("}", 2)[-1] for c in caps)                           # no keyword colour

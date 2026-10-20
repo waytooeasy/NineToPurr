@@ -87,6 +87,9 @@ for f in Montserrat-Black Montserrat-ExtraBold; do
   [[ -s "$DATA/fonts/$f.ttf" ]] || curl -fsSL -o "$DATA/fonts/$f.ttf" \
     "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/$f.ttf" || echo "WARN: $f download failed (libass falls back)"
 done
+# condensed face the Jynxzi/CaseOh/Lacy clippers use (D49, SIL OFL)
+[[ -s "$DATA/fonts/Anton-Regular.ttf" ]] || curl -fsSL -o "$DATA/fonts/Anton-Regular.ttf" \
+  "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" || echo "WARN: Anton download failed (libass falls back)"
 mkdir -p "$DATA/models"
 [[ -s "$DATA/models/face_detection_yunet_2023mar.onnx" ]] || curl -fsSL -o "$DATA/models/face_detection_yunet_2023mar.onnx" \
   "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" \

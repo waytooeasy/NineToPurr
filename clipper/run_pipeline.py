@@ -146,6 +146,23 @@ def market_step(now=None, key=None):
     return f"scanned {len(data['streamers'])} streamers"
 
 
+def styles_step(now=None, vision=None, grab=None):
+    """Per-streamer market look (editor/streamer_style.py, D49): after a new market scan, at most daily."""
+    import streamer_style
+    from radar import market
+    m = market.load(now=now)
+    if not m:
+        return "skipped: no market scan"
+    if not streamer_style.due(market_updated=m.get("updated"), now=now):
+        return "fresh"
+    if vision is None and not os.environ.get("ANTHROPIC_API_KEY"):
+        return "skipped: no ANTHROPIC_API_KEY"
+    logins = {n: [e["id"].lower().lstrip("@") for e in es] for n, es in heat.load_watchlist()["streamers"].items()}
+    kw = {k: v for k, v in (("vision", vision), ("grab", grab)) if v}
+    doc = streamer_style.run(m, logins, now=now, **kw)
+    return f"styled {len(doc['streamers'])} streamers"
+
+
 def _slots_left(con, alloc):
     """Allocated slots minus clips already started today for the same streamer (not killed)."""
     ids = {k.lower(): v for k, v in alloc["ids"].items()}
@@ -325,6 +342,7 @@ def run_pass(con, steps=None):
         "formats": refresh_formats,
         "metrics": lambda: metrics_step(con),
         "market": market_step,                 # daily: what's popping on Shorts per streamer (D48)
+        "styles": styles_step,                 # daily: each streamer's popping look (D49)
         "radar": lambda: radar_step(con, pace=True),
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),

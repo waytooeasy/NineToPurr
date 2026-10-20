@@ -69,8 +69,8 @@ async def push_pending(app: Application) -> int:
     caption style than today's goes back for a re-render first (Lucas: always recheck the trending
     format before sending)."""
     con, chat_id, sent = app.bot_data["con"], app.bot_data["chat_id"], 0
-    current = style.version()
     for row in approvals.pending_to_send(con):
+        current = style.version(creator=approvals.creator_of(con, row["id"]))   # global + streamer style (D49)
         if row["style_version"] != current:
             approvals.restyle(con, row["id"])
             continue
