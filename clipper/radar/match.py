@@ -28,10 +28,13 @@ SHORTS (popping right now; other channels cut them from {streamer}'s stream):
 STREAM CLIPS ({streamer}'s own Twitch/Kick clips of the last 7 days, most viewed first):
 {clips}
 
-For each Short, name the stream clip that shows the same moment, or null when none clearly does. Same moment =
-the same event (same people, same action, same quote or reaction), told by both titles; the clip must be made
-before the Short was posted. A clip whose title says nothing about what happens in it (the stream title,
-"lol", emotes) is not a match. Don't guess: null is better than a wrong clip.
+For each Short, name the stream clip that shows the same moment, or null. Stream clip titles are typed fast by
+viewers, often a word or two: a clip matches when its title points at the same event as the Short through a
+shared distinctive detail (the same person, thing, place, game event or quote; e.g. Short "CaseOh Says He Will
+NEVER Visit The Nether Again" ~ clip "forget the nether"), it was made before the Short was posted, and its
+length fits. Clippers post a moment within hours or a day or two, so a clip made days before the Short is less
+likely. A "?" time is unknown: judge by the titles. Titles that say nothing ("lol", "W", "om", emotes, the
+stream title) never match. confidence: 0.9 = surely the same event, 0.7 = likely, 0.5 or less = a guess.
 Answer with JSON only: [{{"short": "S0", "clip": "C3" or null, "confidence": 0.0-1.0}}]"""
 
 
