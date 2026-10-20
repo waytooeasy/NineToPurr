@@ -30,7 +30,7 @@ MAX_AGE_H = 24          # rescan once a day
 STALE_H = 72            # older than this: consumers ignore it
 TAG = re.compile(r"#(\w+)", re.UNICODE)
 # Names that are ordinary words or famous non-streamers: a mention only counts next to a streaming word.
-AMBIGUOUS = {"sketch", "shroud", "lacy", "marlon", "tarik", "ludwig"}
+AMBIGUOUS = {"sketch", "shroud", "lacy", "marlon", "tarik", "ludwig", "sam", "summit"}
 CONTEXT = re.compile(r"(?<![a-z0-9])(stream|streams|streamer|streaming|twitch|kick|clip|clips|chat|live)(?![a-z0-9])")
 EN_WORDS = {"the", "a", "an", "to", "and", "is", "are", "his", "her", "he", "she", "him", "me", "my", "you", "your",
             "it", "on", "in", "of", "for", "this", "that", "after", "before", "with", "gets", "got", "when", "was",
@@ -76,15 +76,20 @@ def name_for(login, wl_path=None):
     return None
 
 
-def mentions(text, aliases):
-    """True if the lowercase text names the streamer as a whole word (or #tag); common-word names also
-    need a streaming word next to them (a 'sketch' drawing tutorial is not Sketch)."""
+def _word(a, t):
+    return bool(re.search(r"(?<![a-z0-9])" + re.escape(a) + r"(?![a-z0-9])", t))
+
+
+def mentions(text, aliases, others=(), context_text=None):
+    """True if the text names the streamer as a whole word (or #tag). A name that is also an ordinary word
+    or a famous non-streamer (AMBIGUOUS) only counts when `context_text` (title + tags) is about streaming:
+    a streaming word or another watchlist streamer. "#sketch" on a DIY video or "Marlon Wayans" is not."""
     t = str(text or "").lower()
-    hit = any(re.search(r"(?<![a-z0-9])" + re.escape(a) + r"(?![a-z0-9])", t) for a in aliases if a)
-    if not hit:
+    if not any(_word(a, t) for a in aliases if a):
         return False
     if aliases & AMBIGUOUS:
-        return bool(CONTEXT.search(t)) or any(f"#{flat(a)}" in t for a in aliases)
+        c = str(context_text if context_text is not None else text).lower()
+        return bool(CONTEXT.search(c)) or any(_word(o, c) for o in others if o and len(o) >= 4)
     return True
 
 
@@ -117,8 +122,9 @@ def _hashtags(shorts, others, min_channels=2):
     return [f"#{t}" for t in sorted(keep, key=lambda t: (-w[t], t))][:6]
 
 
-def scan_streamer(name, aliases, key, session, now, others=frozenset()):
-    """Top Shorts naming `name` in the last WINDOW_H hours (any channel) + demand = sum of their views/hour."""
+def scan_streamer(name, aliases, key, session, now, others=frozenset(), other_aliases=frozenset()):
+    """Top English Shorts naming `name` in the last WINDOW_H hours (any channel) + demand = sum of their
+    views/hour. English only: we post for the English market (drops reposts in other languages)."""
     after = (now - timedelta(hours=WINDOW_H)).strftime("%Y-%m-%dT%H:%M:%SZ")
     r = session.get(f"{API}/search", timeout=30, params={
         "part": "id", "q": name, "type": "video", "videoDuration": "short", "order": "viewCount",
@@ -132,9 +138,12 @@ def scan_streamer(name, aliases, key, session, now, others=frozenset()):
         v.raise_for_status()
         for it in v.json().get("items", []):
             sn, st = it.get("snippet", {}), it.get("statistics", {})
-            if not mentions(f"{sn.get('title', '')} {sn.get('description', '')} {' '.join(sn.get('tags') or [])}",
-                            aliases):
+            tags = " ".join(sn.get("tags") or [])
+            if not mentions(f"{sn.get('title', '')} {sn.get('description', '')} {tags}", aliases, other_aliases,
+                            context_text=f"{sn.get('title', '')} {tags} {(sn.get('description') or '')[:120]}"):
                 continue                       # search is loose: keep Shorts that actually name the streamer
+            if not is_english(sn.get("title")):
+                continue
             pub = datetime.fromisoformat(sn["publishedAt"].replace("Z", "+00:00"))
             age = max((now - pub).total_seconds() / 3600, 0.5)
             views = int(st.get("viewCount", 0) or 0)
@@ -157,9 +166,10 @@ def scan(key, session=None, now=None, wl_path=None):
     names = watchlist_names(wl_path)
     out = {}
     for n, al in names.items():
-        others = {flat(a) for m, al2 in names.items() if m != n for a in al2} - {flat(a) for a in al}
+        other_al = {a for m, al2 in names.items() if m != n for a in al2} - al
+        others = {flat(a) for a in other_al} - {flat(a) for a in al}
         try:
-            out[n] = scan_streamer(n, al, key, session, now, others)
+            out[n] = scan_streamer(n, al, key, session, now, others, other_al)
         except Exception as e:  # noqa: BLE001 - quota/network: keep the rest
             log(f"{n}: {type(e).__name__}")
             if "403" in str(e):              # quota exhausted: stop, keep what we have

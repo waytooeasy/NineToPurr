@@ -66,16 +66,18 @@ def test_scan_streamer_measures_demand_from_shorts_that_name_him():
     al = {"jynxzi"}
     r = M.scan_streamer("Jynxzi", al, "K", Session({"Jynxzi": JYNX}), NOW)
     ids = [s["id"] for s in r["shorts"]]
-    assert "j4" not in ids and ids[0] == "j1"                                         # 27k v/h first
-    assert r["demand_vph"] == sum(s["vph"] for s in r["shorts"]) == 27000 + 22800 + 3500 + 8556
-    assert [s["en"] for s in r["shorts"] if s["id"] == "j5"] == [False]
+    assert "j4" not in ids and "j5" not in ids and ids[0] == "j1"                    # unrelated / not English
+    assert r["demand_vph"] == sum(s["vph"] for s in r["shorts"]) == 27000 + 22800 + 3500
     assert r["dur_median"] == 25 and r["hashtags"] == ["#jynxzi", "#r6"]               # both used by 2 channels
 
 
 def test_ambiguous_names_need_stream_context():
     al = {"sketch"}
     assert not M.mentions("pencil sketch tutorial for beginners", al)
-    assert M.mentions("Sketch goes crazy on stream", al) and M.mentions("lol #sketch", al)
+    assert not M.mentions("Por favor comparte con tus amigos #pov #sketch", al)          # 2026-10-20 scan
+    assert M.mentions("Sketch goes crazy on stream", al)
+    assert not M.mentions("When Marlon Wayans Almost Got Sued", {"marlon"}, {"kai cenat"})
+    assert M.mentions("Joe Bart Calls Ludwig about his IShowSpeed take", {"ludwig"}, {"ishowspeed"})
     assert not M.mentions("a classic fallacy", {"lacy"}) and M.mentions("Kai Cenat cant wait", {"kai cenat"})
 
 
