@@ -6,7 +6,8 @@ IShowSpeed (NexxoRecaps). The Shorts that pop about Jynxzi, CaseOh, Lacy, xQc lo
 mostly use a condensed font (Anton/Bebas-like), Lacy/CaseOh/Ice Poseidon a white header box, some no
 keyword colour. Daily, for the streamers the market scan ranks highest, this reads the thumbnails (oar2,
 public images, never the video) of their most popping English Shorts and asks Claude Haiku (vision) for the
-dominant text style -> styles.json; editor/style.py lays it over the global style when rendering that
+text style of each image; the majority per field (in code, so one odd thumbnail or one odd reply can't
+flip the look day to day) -> styles.json; editor/style.py lays it over the global style when rendering that
 streamer's clips. Needs >= MIN_SEEN captioned images, else that streamer keeps the global look.
 """
 import base64
@@ -19,18 +20,18 @@ from pathlib import Path
 
 MODEL = "claude-haiku-5-5"
 TOP_STREAMERS = 10
-IMAGES = 5
+IMAGES = 8
 MIN_SEEN = 3
 MAX_AGE_H = 24
 PROMPT = (
     "These are thumbnails (frames) of today's most popular YouTube Shorts about ONE streamer, made by different "
-    "clip channels. Describe the dominant burned-in text style as JSON only: {\"seen\": <number of images with "
-    "burned-in captions>, \"font\": \"condensed\" (tall narrow heavy, like Anton/Bebas/Impact) | \"geometric\" "
-    "(wide heavy, like Montserrat Black) | \"rounded\" | \"other\", \"case\": \"upper\"|\"lower\"|\"title\"|"
-    "\"as_spoken\", \"fill\": \"#RRGGBB\", \"highlight\": \"#RRGGBB\" or null (no word in another colour), "
-    "\"outline\": \"#RRGGBB\" or null, \"words\": <typical words per caption line>, \"position\": \"upper\"|"
-    "\"middle\"|\"lower\", \"header\": \"white_box\" (a title line in a white box that stays on screen) | \"text\" "
-    "(a title line without a box that stays on screen) | \"none\"}"
+    "clip channels. Classify EACH image on its own. Answer with a JSON list, one object per image in order: "
+    "[{\"captions\": true|false (burned-in caption words of the speech), \"font\": \"condensed\" (tall narrow "
+    "heavy, like Anton/Bebas/Impact) | \"geometric\" (wide heavy, like Montserrat Black) | \"rounded\" | "
+    "\"other\", \"case\": \"upper\"|\"lower\"|\"title\"|\"as_spoken\", \"fill\": \"#RRGGBB\", "
+    "\"highlight\": \"#RRGGBB\" or null (no caption word in another colour), \"words\": <words in the caption "
+    "line>, \"position\": \"upper\"|\"middle\"|\"lower\", \"header\": \"white_box\" (a title line in a white box) "
+    "| \"text\" (a title line without a box, separate from the captions) | \"none\"}]"
 )
 
 
@@ -55,12 +56,12 @@ def thumbnails(ids, session=None, limit=IMAGES):
     return out
 
 
-def anthropic_vision(images):
+def anthropic_vision(images):  # noqa: D103
     import anthropic  # lazy
     content = [{"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
                                             "data": base64.b64encode(b).decode()}} for b in images]
     content.append({"type": "text", "text": PROMPT})
-    msg = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=400, thinking={"type": "disabled"},
+    msg = anthropic.Anthropic().messages.create(model=MODEL, max_tokens=1200, thinking={"type": "disabled"},
                                                 messages=[{"role": "user", "content": content}])
     try:
         import llm
@@ -71,14 +72,50 @@ def anthropic_vision(images):
 
 
 def parse(text):
-    m = re.search(r"\{.*\}", text or "", re.S)
+    """Model reply -> list of per-image dicts (a single object is accepted as a one-item list)."""
+    m = re.search(r"\[.*\]", text or "", re.S) or re.search(r"\{.*\}", text or "", re.S)
     if not m:
         return None
     try:
         d = json.loads(m.group(0))
     except ValueError:
         return None
-    return d if isinstance(d, dict) else None
+    d = [d] if isinstance(d, dict) else d
+    return [x for x in d if isinstance(x, dict)] if isinstance(d, list) else None
+
+
+def _majority(values, min_share=0.5):
+    """Most common value if it covers more than `min_share` of the votes, else None (no clear market)."""
+    vals = [json.dumps(v) for v in values]
+    if not vals:
+        return None
+    best = max(sorted(set(vals)), key=vals.count)
+    return json.loads(best) if vals.count(best) / len(vals) > min_share else None
+
+
+def aggregate(per_image):
+    """Majority per field over the images that show captions. Colours: the most common exact value, else
+    the field is left out (the global style keeps it). The header needs a majority of ALL images."""
+    cap = [x for x in per_image if x.get("captions")]
+    out = {"seen": len(cap)}
+    for k in ("font", "case", "position"):
+        v = _majority([x.get(k) for x in cap])
+        if v is not None:
+            out[k] = v
+    hl = [x.get("highlight") for x in cap]
+    if hl and sum(h is None for h in hl) / len(hl) > 0.5:
+        out["highlight"] = None                      # most popping clips use no keyword colour
+    else:
+        v = _majority([h.upper() for h in hl if isinstance(h, str)], 0.0)
+        if v:
+            out["highlight"] = v
+    words = sorted(int(x["words"]) for x in cap if str(x.get("words", "")).isdigit())
+    if words:
+        out["words"] = words[len(words) // 2]
+    head = _majority([x.get("header", "none") for x in per_image], 0.0)
+    out["header"] = head if head in ("white_box", "text") and [x.get("header") for x in per_image].count(head) \
+        * 2 > len(per_image) else "none"
+    return out
 
 
 def due(p=None, market_updated=None, now=None):
@@ -104,15 +141,16 @@ def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, t
         ids = [s["id"] for s in m.get("shorts", []) if s.get("en")][:IMAGES + 3]
         try:
             imgs = grab(ids)
-            d = parse(vision(imgs)) if len(imgs) >= MIN_SEEN else None
+            per = parse(vision(imgs)) if len(imgs) >= MIN_SEEN else None
         except Exception as e:  # noqa: BLE001 - one streamer must not stop the rest
             log(f"{name}: {type(e).__name__}")
             continue
-        if not d or int(d.get("seen") or 0) < MIN_SEEN:
+        d = aggregate(per or [])
+        if d["seen"] < MIN_SEEN:
             continue
         cap = {k: d.get(k) for k in ("font", "case", "fill", "highlight", "outline", "words", "position", "header")
                if k in d}
-        out[name] = {"logins": sorted(logins.get(name, [])), "caption": cap, "images": len(imgs)}
+        out[name] = {"logins": sorted(logins.get(name, [])), "caption": cap, "images": len(imgs), "seen": d["seen"]}
     doc = {"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "market": market.get("updated", ""), "streamers": out}
     p = Path(out_path or path())
     p.parent.mkdir(parents=True, exist_ok=True)

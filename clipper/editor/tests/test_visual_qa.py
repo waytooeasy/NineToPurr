@@ -97,3 +97,11 @@ def test_double_captions_teach_the_streamer_and_rerender_once(con, monkeypatch, 
     con.commit()
     res = V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])
     assert res["failed"] == {1: ["double_captions"]} and res["rerender"] == []
+
+
+def test_prompt_names_our_own_header_so_it_is_not_double_captions():
+    p = V.prompt_for({"hook": "Lacy's hands are full today", "header": "white_box"})
+    assert "\"Lacy's hands are full today\"" in p and "WHITE BOX" in p and "is NOT ours" in p
+    assert V.prompt_for(None) == V.PROMPT
+    r = V.check("x.mp4", vision=lambda imgs: "I think it looks fine", grab=lambda v: [b"a"] * 3)
+    assert r["ok"] is None and r["raw"].startswith("I think")                     # unreadable: keep the reply

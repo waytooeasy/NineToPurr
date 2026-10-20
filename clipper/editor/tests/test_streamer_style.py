@@ -13,14 +13,16 @@ MARKET = {"updated": "2026-10-20T10:00:00Z", "streamers": {
 
 
 def test_run_writes_styles_for_top_streamers_with_enough_captioned_images(tmp_path):
-    replies = {"j": '{"seen": 5, "font": "condensed", "case": "upper", "highlight": null, "header": "none"}',
-               "c": 'ok {"seen": 2, "font": "geometric"}'}                                 # too few captions
+    img = '{"captions": true, "font": "condensed", "case": "upper", "highlight": null, "header": "none", "words": 2}'
+    replies = {"j": "[" + ",".join([img] * 4 + ['{"captions": true, "font": "geometric", "highlight": "#FF00FF",'
+                                                 ' "header": "white_box", "words": 3}']) + "]",
+               "c": '[{"captions": true, "font": "geometric"}, {"captions": false}]'}       # too few captions
     doc = SS.run(MARKET, {"Jynxzi": ["jynxzi"], "CaseOh": ["caseoh_"]}, tmp_path / "s.json",
                  vision=lambda imgs: replies[imgs[0][:1].decode()], grab=lambda ids: [i.encode() for i in ids][:5],
                  now=NOW, top=2)
     assert list(doc["streamers"]) == ["Jynxzi"]
-    assert doc["streamers"]["Jynxzi"] == {"logins": ["jynxzi"], "images": 5, "caption": {
-        "font": "condensed", "case": "upper", "highlight": None, "header": "none"}}
+    assert doc["streamers"]["Jynxzi"] == {"logins": ["jynxzi"], "images": 5, "seen": 5, "caption": {
+        "font": "condensed", "case": "upper", "highlight": None, "words": 2, "header": "none"}}
     saved = json.loads((tmp_path / "s.json").read_text())
     assert saved["market"] == MARKET["updated"]
     assert SS.due(tmp_path / "s.json", MARKET["updated"], NOW + timedelta(hours=2)) is False
@@ -33,3 +35,14 @@ def test_a_failing_streamer_is_skipped(tmp_path):
         raise RuntimeError("API down")
     doc = SS.run(MARKET, {}, tmp_path / "s.json", vision=boom, grab=lambda ids: [b"x"] * 5, now=NOW)
     assert doc["streamers"] == {}
+
+
+def test_majority_needs_a_real_majority():
+    per = [{"captions": True, "font": "condensed", "highlight": "#ff00ff", "header": "white_box", "words": 4},
+           {"captions": True, "font": "condensed", "highlight": "#FF00FF", "header": "white_box", "words": 2},
+           {"captions": True, "font": "geometric", "highlight": None, "header": "none", "words": 3},
+           {"captions": False, "header": "none"}]
+    d = SS.aggregate(per)
+    assert d == {"seen": 3, "font": "condensed", "highlight": "#FF00FF", "words": 3, "header": "none"}  # 2/4 box: no
+    per[3]["header"] = "white_box"
+    assert SS.aggregate(per)["header"] == "white_box"
