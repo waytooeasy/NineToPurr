@@ -74,6 +74,9 @@ pytest radar
 | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | from `/opt/clipper/.env` (never in git) |
 | `CLIPPER_DB` | default `/opt/clipper/db/clip.db` |
 | `CLIPPER_WORK` | default `/opt/clipper/work` |
+| `CLIPPER_MARKET` | market scan file, default `/opt/clipper/formats/market.json` (`market.py`, `match.py`) |
+| `YOUTUBE_API_KEY` | market scan + 6-h refresh (metadata only) |
+| `ANTHROPIC_API_KEY` | `match.py` (Haiku, ~8 calls per scan/refresh) |
 
 The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 
@@ -93,4 +96,4 @@ The DB is built by `python db/migrate.py` (needs 002 + 004 + 007).
 
 **Resolved (HQ 2026-10-18):** the DB keeps VOD-absolute `start_s/end_s`; the Editor and re-render both shift into the window file.
 
-**Next:** saturation hand-off (the pipeline now runs the Heat allocation itself); chat spikes (live chat message-rate peaks → extra candidates).
+**Next:** check the first same-moment matches against what the clippers posted and tune `MIN_CONF` (`select streamer, short_title, clip_id, confidence from moment_matches`); give the matcher the clip's Twitch game name (viewer-typed clip titles are often one word, so recall is low); saturation hand-off; chat spikes (live chat message-rate peaks → extra candidates).
