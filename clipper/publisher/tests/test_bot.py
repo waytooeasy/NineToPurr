@@ -247,3 +247,19 @@ def test_visual_check_gate_holds_unchecked_and_taps_failed(con, add_clip, monkey
     con.commit()
     asyncio.run(approve_bot.push_pending(ctx.application))
     assert st(con, unknown) == "approved"                                       # a broken check never blocks
+
+
+def test_fyi_names_the_popping_clipper_short_of_the_same_moment(con, add_clip, monkeypatch):
+    monkeypatch.setenv("AUTO_POST", "1")
+    cid = add_clip()
+    con.execute("INSERT INTO radar_candidates (clip_id, creator, title, url, duration_s, view_count, clip_created_at,"
+                " views_per_hour, clips_id) VALUES ('c-mom', 'jynxzi', 'mom walked in', 'u', 30, 9, '2026-10-20T04:00:00Z',"
+                " 1, ?)", (cid,))
+    con.execute("INSERT INTO moment_matches (short_id, streamer, clip_id, short_title, short_vph, candidate_json)"
+                " VALUES ('s0', 'Jynxzi', 'c-mom', 'Jynxzi''s Mom Walks In On Stream', 9120, '{}')")
+    con.commit()
+    ctx = make_ctx(con)
+    asyncio.run(approve_bot.push_pending(ctx.application))
+    text = ctx.application.bot.send_message.await_args.kwargs["text"]
+    assert "🎯 same moment as a popping Short: \"Jynxzi's Mom Walks In On Stream\" (9,120 views/h)" in text
+    assert approvals.same_moment_of(con, cid + 1) is None

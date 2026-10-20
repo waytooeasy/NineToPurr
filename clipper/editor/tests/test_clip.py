@@ -181,3 +181,32 @@ def test_length_follows_the_top_clippers():
     assert clip.length_window(pick, 0, 58, 22) == (36, 58)                   # ignored the target -> last 22 s
     assert clip.length_window(pick, 50, 80, 22) == (36, 58)                  # outside the window -> last 22 s
     assert clip.length_window({"start": 0, "end": 15}, 0, 15, 22) == (0, 15)  # never longer than the window
+
+
+def test_same_moment_title_and_length_follow_that_clippers_short(tmp_path, monkeypatch):
+    import writer
+    (tmp_path / "transcript.txt").write_text("\n".join(f"[{t}.0-{t + 2}.0] words" for t in range(0, 58, 2)))
+    monkeypatch.setattr(clip, "market_meta", lambda c: ("Jynxzi", [{"title": "Other popping title", "vph": 5, "dur": 30}]))
+    monkeypatch.setattr(clip, "market_length", lambda c: 30)
+    seen = {}
+
+    def fake(win, creator, meta=None, clip_id=None):
+        seen.update(meta)
+        return {**PLAN, "title": "Jynxzi's mom catches him live", "in": 30.0, "out": 52.0}
+    monkeypatch.setattr(writer, "write_clip", fake)
+    same = {"title": "Jynxzi's Mom Walks In On Stream 😭", "dur": 22, "vph": 9000}
+    p = clip.draft_pick(tmp_path, {"start": 0.0, "end": 58.0}, "jynxzi", {}, same=same)
+    assert seen["same_moment"] == {"title": same["title"], "dur": 22}
+    assert [x["title"] for x in seen["popping_now"]] == [same["title"], "Other popping title"]  # copy guard covers it
+    assert seen["target_len_s"] == 22 and (p["start"], p["end"]) == (30.0, 52.0)               # their length
+
+
+def test_same_moment_lookup_needs_a_db_and_a_match(tmp_path):
+    import sqlite3
+    assert clip.same_moment(None, "c1") is None
+    con = sqlite3.connect(":memory:")
+    assert clip.same_moment(con, "c1") is None                      # no table yet: no crash
+    con.execute("CREATE TABLE moment_matches (short_id, streamer, clip_id, confidence, short_title, short_vph,"
+                " short_dur, candidate_json, matched_at)")
+    con.execute("INSERT INTO moment_matches VALUES ('s', 'Jynxzi', 'c1', 0.9, 'T', 900, 21, '{}', '2026-10-20 10:00:00')")
+    assert clip.same_moment(con, "c1") == {"title": "T", "dur": 21, "vph": 900}

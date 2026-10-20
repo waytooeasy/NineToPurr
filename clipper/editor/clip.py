@@ -239,18 +239,39 @@ def market_meta(creator):
         return creator, []
 
 
-def draft_pick(work, pick, creator, meta=None, clip_id=None):
+def same_moment(con, radar_clip_id):
+    """The top clipper's popping Short of this exact moment (radar/match.py, D54): {title, dur, vph} or None."""
+    if con is None or not radar_clip_id:
+        return None
+    try:
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.append(root)
+        from radar import match
+        return match.for_clip(con, radar_clip_id)
+    except Exception:  # noqa: BLE001 - the Writer works without it
+        return None
+
+
+def draft_pick(work, pick, creator, meta=None, clip_id=None, same=None):
     """Writer on the transcript inside one Radar pick -> pick with hook/hooks/context_line/title/score.
-    `clip_id` = clips.id; tags the llm_usage rows."""
+    `clip_id` = clips.id; tags the llm_usage rows. `same`: the clipper Short of this same moment (D54):
+    its title is paraphrased (and guarded against copying) and its length is the target."""
     from writer import write_clip
     lines = [ln for ln in (work / "transcript.txt").read_text().splitlines()
              if (m := re.match(r"\[(\d+(?:\.\d+)?)-", ln)) and pick["start"] <= float(m.group(1)) < pick["end"]]
     if not lines:
         raise ValueError("no transcript inside the pick")
     name, popping = market_meta(creator)
+    if same and same.get("title"):
+        popping = [{"title": same["title"], "vph": same.get("vph"), "dur": same.get("dur")}] + \
+            [p for p in popping if p.get("title") != same["title"]]
+        meta = {**(meta or {}), "same_moment": {"title": same["title"], "dur": same.get("dur")}}
     if popping:
         meta = {**(meta or {}), "popping_now": popping}
     target = market_length(creator)
+    if same and same.get("dur"):
+        target = max(8, min(int(MAX_CLIP_S), int(same["dur"])))   # cut like that clipper's Short
     cut = bool(target) and pick["end"] - pick["start"] > target * LEN_SLACK
     if cut:
         meta = {**(meta or {}), "target_len_s": target}
@@ -505,7 +526,7 @@ def render_picks(src, picks, a, out, con=None, slug=None):
         try:
             if a.auto and p.get("source_url") and "hook" not in p:
                 p = draft_pick(work, p, a.creator or p.get("creator", ""), {**meta, "clip_id": p.get("clip_id")},
-                               clip_id=row)
+                               clip_id=row, same=same_moment(con, p.get("clip_id")))
             p = cap_pick(p)
             if row:
                 save_draft(con, row, p)

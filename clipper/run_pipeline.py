@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""One pipeline pass (D22, D27): radar -> capture -> writer/editor -> qc -> rerender -> visual check.
+"""One pipeline pass (D22, D27): market -> match -> radar -> capture -> writer/editor -> qc -> rerender -> visual
+check.
 
 Safe to run every 20 min from a systemd timer: an exclusive non-blocking flock on $CLIPPER_LOCK
 (default /opt/clipper/pipeline.lock) makes an overlapping pass exit at once; every stage only
@@ -132,11 +133,17 @@ def paced_cap(cap, now):
 
 
 def market_step(now=None, key=None):
-    """Daily Shorts market scan (radar/market.py, D48): demand per streamer + today's popping titles."""
+    """Daily Shorts market scan (radar/market.py, D48): demand per streamer + today's popping titles; every
+    REFRESH_H hours in between, the top streamers are re-scanned (D54)."""
     from radar import market
-    if not market.due(now=now):
-        return "fresh"
+    now = now or datetime.now(timezone.utc)
     key = key or os.environ.get("YOUTUBE_API_KEY")
+    if not market.due(now=now):
+        m = market.load(now=now)
+        if not key or not m or not market.refresh_due(m, now):
+            return "fresh"
+        market.write(market.refresh(m, key, now=now))
+        return f"refreshed top {market.REFRESH_TOP}"
     if not key:
         return "skipped: no YOUTUBE_API_KEY"
     data = market.scan(key, now=now)
@@ -161,6 +168,111 @@ def styles_step(now=None, vision=None, grab=None):
     kw = {k: v for k, v in (("vision", vision), ("grab", grab)) if v}
     doc = streamer_style.run(m, logins, now=now, **kw)
     return f"styled {len(doc['streamers'])} streamers"
+
+
+def match_streamers(con, m, wl, top=None):
+    """Streamers to match moments for (D54): the ones Radar posts = latest Heat snapshot by opportunity
+    (market demand when there is none), with popping Shorts in the scan and a Twitch/Kick channel."""
+    from radar import match
+    rows = con.execute("SELECT streamer, opportunity FROM streamer_heat WHERE ts=(SELECT MAX(ts) FROM streamer_heat)"
+                       ).fetchall()
+    rank = {r[0]: r[1] or 0 for r in rows} or {n: s.get("demand_vph") or 0 for n, s in m["streamers"].items()}
+    ok = [n for n in sorted(rank, key=lambda n: -rank[n])
+          if (m["streamers"].get(n) or {}).get("shorts")
+          and any(e["platform"] in ("twitch", "kick") for e in wl.get(n, []))]
+    return ok[:top or match.TOP_STREAMERS]
+
+
+def own_clips(entries, now, clients):
+    """A streamer's own most-viewed Twitch/Kick clips of the last 7 days, as Radar candidates (D54).
+    `clients`: {"twitch": Twitch, "kick": Kick}, filled lazily. A failing channel is logged and skipped."""
+    out = []
+    for e in entries:
+        login = e["id"].lower()
+        try:
+            if e["platform"] == "twitch":
+                if "twitch" not in clients:
+                    from radar.twitch import Twitch
+                    clients["twitch"] = Twitch()
+                tw = clients["twitch"]
+                raw = tw.get_clips(tw.broadcaster_id(login), now - timedelta(days=7), now, max_clips=100)
+                out += [top_clips.normalize(r, login, now) for r in raw]
+            elif e["platform"] == "kick":
+                kc = clients.setdefault("kick", kicksrc.Kick())
+                out += [kicksrc.normalize(r, login, now) for r in kc.get_clips(login, "week", 2) if kicksrc.usable(r)]
+        except Exception as ex:  # noqa: BLE001 - the other channel of a multistreamer still counts
+            print(f"[match] {e['platform']}/{login}: {type(ex).__name__}: {ex}", file=sys.stderr)
+    return out
+
+
+def match_step(con, now=None, ask=None, clips_for=None):
+    """Same moments as the top clippers (radar/match.py, D54): after each market scan or refresh, the popping
+    Shorts of the streamers Radar posts are matched to those streamers' own Twitch/Kick clips."""
+    from radar import market, match
+    now = now or datetime.now(timezone.utc)
+    m = market.load(now=now)
+    if not m:
+        return "skipped: no market scan"
+    if not match.due(con, market.fresh_at(m)):
+        return "fresh"
+    if ask is None and not os.environ.get("ANTHROPIC_API_KEY"):
+        return "skipped: no ANTHROPIC_API_KEY"
+    wl = heat.load_watchlist()["streamers"]
+    names = match_streamers(con, m, wl)
+    if clips_for is None:
+        clients = {}
+        clips_for = lambda name: own_clips(wl.get(name, []), now, clients)  # noqa: E731
+    r = match.run(con, m, names, clips_for, now, **({"ask": ask} if ask else {}))
+    return f"matched {r['matches']} moments ({r['streamers']} streamers)"
+
+
+def same_footage(a, b, ids=None):
+    """Same streamer, same stretch of stream: Twitch with VOD offsets on both sides -> the offsets overlap;
+    otherwise (Kick, or no offset) the [created_at - duration, created_at] spans overlap. YouTube VOD
+    windows never count (their created_at is not the moment)."""
+    sa, sb = a.get("source") or "twitch", b.get("source") or "twitch"
+    if "youtube" in (sa, sb):
+        return False
+    try:
+        if sa == sb == "twitch" and top_clips._has_vod(a) and top_clips._has_vod(b):
+            return top_clips._same_moment(a, b)
+        return kicksrc.same_moment(a, b, ids)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def same_moments_first(con, cands, now, allowed=None, ids=None):
+    """Moments a top clipper's Short is popping with go first (D54). A matched stream clip (radar/match.py)
+    marks the candidate showing the same footage, or joins the list when Radar didn't pull it. Matched ones
+    rank by that Short's views/hour, the rest after them by their own views/hour."""
+    from radar import match
+    try:
+        matched = match.candidates(con, now)
+    except sqlite3.Error:  # before migration 013
+        matched = []
+    out = [dict(c) for c in cands]
+    for m in matched:
+        if allowed is not None and not top_clips.filter_allowed([m["creator"]], allowed):
+            continue
+        hit = next((c for c in out if c["clip_id"] == m["clip_id"] or same_footage(c, m, ids)), None)
+        if hit is None:
+            m["views_per_hour"] = top_clips.score(m, now)
+            out.append(m)
+        elif (hit.get("match") or {}).get("vph", -1) < m["match"]["vph"]:
+            hit["match"] = m["match"]
+    return sorted(out, key=lambda c: (0, -c["match"]["vph"]) if c.get("match") else (1, -c["views_per_hour"]))
+
+
+def posted_moments(con, now, days=8):
+    """Twitch/Kick moments Radar already started (any state, killed too) in the last `days` days, so the
+    same footage is never posted twice under another clip id (D54: a matched clip may be a second clip of a
+    moment we already posted)."""
+    cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = con.execute("SELECT clip_id, creator, clip_created_at, duration_s, source, video_id, vod_offset"
+                       " FROM radar_candidates WHERE clips_id IS NOT NULL AND clip_created_at >= ?"
+                       " AND COALESCE(source, 'twitch') IN ('twitch', 'kick')", (cutoff,)).fetchall()
+    return [{"clip_id": r[0], "creator": r[1], "created_at": r[2], "duration_s": float(r[3] or 0),
+             "source": r[4] or "twitch", "video_id": r[5], "vod_offset": r[6]} for r in rows]
 
 
 def _slots_left(con, alloc):
@@ -220,11 +332,18 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
             cands += kick(slugs, now, max(10, want))
         except Exception:  # noqa: BLE001 - a Kick failure keeps the other picks
             traceback.print_exc()
-    cands = kicksrc.dedupe(cands, alloc["ids"] if alloc else None)  # one moment on Twitch + Kick -> one pick
+    ids = alloc["ids"] if alloc else None
+    cands = kicksrc.dedupe(cands, ids)  # one moment on Twitch + Kick -> one pick
+    try:
+        cands = same_moments_first(con, cands, now, allowed, ids)   # the clippers' popping moments first (D54)
+    except Exception:  # noqa: BLE001 - matching is a ranking layer; Radar still works without it
+        traceback.print_exc()
     top_clips.store(con, cands)
+    done = posted_moments(con, now)
     fresh = [c for c in cands
              if con.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()[0] is None
-             and not top_clips.looks_like_music(c["title"])]   # singing/music: nothing to caption, claim risk
+             and not top_clips.looks_like_music(c["title"])     # singing/music: nothing to caption, claim risk
+             and not any(same_footage(c, d, ids) for d in done)]   # a moment we already started
     if alloc:
         fresh = top_clips.apply_allocation(fresh, slots, alloc["ids"])
     return top_clips.register_clips(con, fresh[:want])
@@ -363,6 +482,7 @@ def run_pass(con, steps=None):
         "metrics": lambda: metrics_step(con),
         "market": market_step,                 # daily: what's popping on Shorts per streamer (D48)
         "styles": styles_step,                 # daily: each streamer's popping look (D49)
+        "match": lambda: match_step(con),      # per market scan: the clippers' popping moments (D54)
         "radar": lambda: radar_step(con, pace=True),
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),
