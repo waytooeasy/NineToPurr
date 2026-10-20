@@ -8,7 +8,7 @@ _Last updated: 2026-10-20 00:15 UTC_
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
-| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48)** → radar (**paced: 1 clip start every ~4.8 h**) → capture → Writer → render → QC → re-render → visual check (D47) |
+| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48)** → **streamer styles (daily, D49)** → radar (**paced: 1 clip start every ~4.8 h**) → capture → Writer → render → QC → re-render → visual check (D47) |
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips and clips that fail the visual check (with the reason) still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 5/day (`.env`: UTC window 00:00–23:59) |
@@ -23,7 +23,7 @@ _Last updated: 2026-10-20 00:15 UTC_
 - **Length:** the length viewers chose (the Twitch clip / most-replayed window), trim ≤2 s per end, ≤60 s. Kick clips over 60 s keep their last 60 s.
 - **Look:** full-bleed 9:16 centred on the face, or facecam on top + gameplay below. Captions per today's `style.json` (2026-10-19: ALL CAPS, white, black outline, 3 words, highlight colour rotating cyan/lime/pink per clip). Hook only for 2.5 s. No context-line banner.
 - **Text:** Writer (Haiku 5.5) follows today's format library: short casual titles with emoji, hook templates.
-- **On screen:** plain words only (no emoji), `@Peakz.Recaps` watermark low-centre like NexxoRecaps (D46).
+- **On screen:** plain words only (no emoji), `@Peakz.Recaps` watermark low-centre like NexxoRecaps (D46). **Per streamer, the look of their popping Shorts** (D49): font family (most use a condensed font like Anton), keyword colour or plain white, header box, words per line.
 - **Hashtags:** daily from the top Shorts (`hashtags.json`): streamer tag at the end of the title, popping tags + #shorts in the description (D46).
 
 ## Clips so far

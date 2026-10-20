@@ -56,7 +56,7 @@ def test_run_checks_each_qc_passed_clip_once(con, monkeypatch):
         calls.append(len(imgs))
         return '{"ok": true}' if len(calls) == 1 else '{"ok": false, "issues": [{"code": "blurry_panel"}]}'
     res = V.run(con, vision=vision, grab=lambda v: [b"a", b"b", b"c"])
-    assert res["passed"] == [1] and res["failed"] == {2: ["blurry_panel"]} and calls == [3, 3]
+    assert res["passed"] == [1] and res["failed"] == {2: ["blurry_panel"]} and calls == [3, 3, 3]  # fail = 2 looks
     assert res["rerender"] == []
     assert json.loads(con.execute("SELECT visual_qa FROM clips WHERE id=2").fetchone()[0])["ok"] is False
     assert V.run(con, vision=vision, grab=lambda v: [b"a"]) == {"passed": [], "failed": {}, "unchecked": [], "rerender": []}
@@ -105,3 +105,13 @@ def test_prompt_names_our_own_header_so_it_is_not_double_captions():
     assert V.prompt_for(None) == V.PROMPT
     r = V.check("x.mp4", vision=lambda imgs: "I think it looks fine", grab=lambda v: [b"a"] * 3)
     assert r["ok"] is None and r["raw"].startswith("I think")                     # unreadable: keep the reply
+
+
+def test_a_failure_needs_a_second_look_to_count():
+    replies = iter(['{"ok": false, "issues": [{"code": "double_captions"}]}', '{"ok": true}'])
+    r = V.check("x.mp4", vision=lambda imgs: next(replies), grab=lambda v: [b"a"] * 3)
+    assert r["ok"] is True and r["unconfirmed"] == ["double_captions"]
+    replies = iter(['{"ok": false, "issues": [{"code": "double_captions"}, {"code": "black_bars"}]}',
+                    '{"ok": false, "issues": [{"code": "double_captions"}]}'])
+    r = V.check("x.mp4", vision=lambda imgs: next(replies), grab=lambda v: [b"a"] * 3)
+    assert r["ok"] is False and [i["code"] for i in r["issues"]] == ["double_captions"]

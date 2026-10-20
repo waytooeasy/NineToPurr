@@ -4,6 +4,8 @@ Unit tests check code, not the picture. Day 1 shipped emoji boxes in the hook, a
 up to the top panel and a second caption track on Sykkuno's live captions. This looks at 3 frames of the
 rendered file (hook at 1 s, ~45 %, ~80 %) with Claude Haiku (vision) against a fixed checklist.
 
+- a failure counts only when a second look flags the same problem (VM test: one of two looks called our own
+  white header box "double captions"; Sykkuno's real double captions were flagged every time)
 - pass  -> the clip goes on as before (auto-post)
 - double captions on a streamer not known to caption their stream -> learned (creator_flags), the clip is
   re-rendered without our captions and checked again (Sykkuno, Valkyrae)
@@ -128,10 +130,19 @@ def check(video, vision=None, grab=frames, expected=None):
                 return {"ok": None, "issues": [], "error": "no ANTHROPIC_API_KEY", "at": at}
             p = prompt_for(expected)
             vision = lambda imgs: anthropic_vision(imgs, p)  # noqa: E731
-        reply = vision(grab(video))
+        imgs = grab(video)
+        reply = vision(imgs)
         res = parse(reply)
         if res is None:
             return {"ok": None, "issues": [], "error": "unreadable reply", "raw": str(reply)[:300], "at": at}
+        if res["ok"] is False:
+            # a second, independent look must flag the same problem: one odd reply must not hold a good clip
+            again = parse(vision(imgs)) or {"ok": None, "issues": []}
+            codes = {i.get("code") for i in again.get("issues") or []}
+            kept = [i for i in res["issues"] if i.get("code") in codes]
+            if not kept:
+                return {"ok": True, "issues": [], "unconfirmed": [i.get("code") for i in res["issues"]], "at": at}
+            res = {"ok": False, "issues": kept}
         return {**res, "at": at}
     except Exception as e:  # noqa: BLE001 - the check must never stop the channel
         return {"ok": None, "issues": [], "error": f"{type(e).__name__}: {e}"[:200], "at": at}

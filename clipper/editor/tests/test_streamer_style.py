@@ -46,3 +46,17 @@ def test_majority_needs_a_real_majority():
     assert d == {"seen": 3, "font": "condensed", "highlight": "#FF00FF", "words": 3, "header": "none"}  # 2/4 box: no
     per[3]["header"] = "white_box"
     assert SS.aggregate(per)["header"] == "white_box"
+
+
+def test_no_clear_majority_keeps_yesterdays_look(tmp_path):
+    p = tmp_path / "s.json"
+    p.write_text(json.dumps({"streamers": {
+        "Jynxzi": {"logins": ["jynxzi"], "caption": {"font": "condensed", "header": "none", "highlight": None}},
+        "CaseOh": {"logins": ["caseoh_"], "caption": {"font": "geometric", "header": "white_box"}}}}))
+    split = '[{"captions": true, "font": "condensed"}, {"captions": true, "font": "geometric"},' \
+            ' {"captions": true, "font": "rounded"}, {"captions": true, "font": "other"}]'
+    doc = SS.run(MARKET, {"Jynxzi": ["jynxzi"]}, p,
+                 vision=lambda imgs: split if imgs[0][:1] == b"j" else "[]",
+                 grab=lambda ids: [i.encode() for i in ids][:5], now=NOW, top=2)
+    assert doc["streamers"]["Jynxzi"]["caption"]["font"] == "condensed"          # split today -> yesterday's
+    assert doc["streamers"]["CaseOh"]["caption"]["header"] == "white_box"        # no read today -> kept

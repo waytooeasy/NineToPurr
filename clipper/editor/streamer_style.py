@@ -136,6 +136,10 @@ def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, t
     now = now or datetime.now(timezone.utc)
     vision = vision or anthropic_vision
     ranked = sorted(market["streamers"].items(), key=lambda kv: -kv[1].get("demand_vph", 0))[:top]
+    try:  # yesterday's looks: a field with no clear majority today keeps yesterday's value (no flip-flop)
+        prev = json.loads(Path(out_path or path()).read_text()).get("streamers") or {}
+    except (OSError, ValueError, AttributeError):
+        prev = {}
     out = {}
     for name, m in ranked:
         ids = [s["id"] for s in m.get("shorts", []) if s.get("en")][:IMAGES + 3]
@@ -146,10 +150,15 @@ def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, t
             log(f"{name}: {type(e).__name__}")
             continue
         d = aggregate(per or [])
+        old = (prev.get(name) or {}).get("caption") or {}
         if d["seen"] < MIN_SEEN:
+            if old:
+                out[name] = prev[name]                # no clear read today: keep yesterday's look
             continue
         cap = {k: d.get(k) for k in ("font", "case", "fill", "highlight", "outline", "words", "position", "header")
                if k in d}
+        for k, v in old.items():
+            cap.setdefault(k, v)
         out[name] = {"logins": sorted(logins.get(name, [])), "caption": cap, "images": len(imgs), "seen": d["seen"]}
     doc = {"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "market": market.get("updated", ""), "streamers": out}
     p = Path(out_path or path())
