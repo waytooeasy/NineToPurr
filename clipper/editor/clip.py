@@ -99,10 +99,12 @@ def save_draft(con, row_id, pick):
                  ("captured", "drafted"), "drafted")
 
 
-def save_edited(con, row_id, mp4):
-    """After render: drafted -> edited, file_path = the rendered Short, stamped with the style version."""
+def save_edited(con, row_id, mp4, creator=None):
+    """After render: drafted -> edited, file_path = the rendered Short, stamped with the style version
+    in force for this creator (global + their streamer style, D49)."""
     import style as S
-    return _move(con, row_id, "file_path=?, style_version=?", (str(mp4), S.version()), ("drafted",), "edited")
+    return _move(con, row_id, "file_path=?, style_version=?", (str(mp4), S.version(creator=creator)),
+                 ("drafted",), "edited")
 
 
 def run(cmd):
@@ -300,8 +302,8 @@ def caption_text(tokens, st=None):
     import style as S
     st = st or S.DEFAULT
     tokens = [t for t in (S.onscreen(t) for t in tokens) if t]   # no emoji on screen
-    k = _key_index(tokens)
     hi, fill = S.ass_color(st["highlight"]), S.ass_color(st["fill"])
+    k = _key_index(tokens) if hi != fill else None     # no keyword colour in this market: plain words
     parts = [("{\\c" + hi + "}" + esc(S.apply_case(t, st["case"])) + "{\\c" + fill + "}") if i == k
              else esc(S.apply_case(t, st["case"])) for i, t in enumerate(tokens)]
     return POP + " ".join(parts)
@@ -316,13 +318,23 @@ def build_ass(words, pick, path, chunk=None, st=None):
     shows live captions (watchlist `own_captions`) gets no second caption track."""
     import style as S
     from layout import caption_y
-    st = dict(st or S.load())
+    st = dict(st or S.load(creator=pick.get("creator")))   # this streamer's market look when known (D49)
     st["highlight"] = S.highlight_for(st, pick.get("hook") or pick.get("start"))
     chunk = chunk or st["words"]
     start, end = pick["start"], pick["end"]
     lay = pick.get("layout")
-    y = caption_y(lay) if (lay or {}).get("mode") == "stack" else S.POSITIONS[st["position"]]
-    hook_y = 1180 if (lay or {}).get("mode") == "stack" else 380  # stack: in the gameplay, clear of the seam captions
+    stack = (lay or {}).get("mode") == "stack"
+    header = st.get("header", "none")
+    font, size = S.font_for(st)
+    seam = caption_y(lay) if stack else None
+    if header != "none":
+        # persistent header like the market's ("W Timing" in a white box): on the seam for stack layouts
+        # (captions move into the gameplay), upper third for full-bleed
+        hook_y = seam if stack else 430
+        y = round(seam + (1920 - seam) * 0.45) if stack else S.POSITIONS[st["position"]]
+    else:
+        y = seam if stack else S.POSITIONS[st["position"]]
+        hook_y = 1180 if stack else 380  # stack: in the gameplay, clear of the seam captions
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -331,8 +343,9 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,{FONT},100,{S.ass_color(st["fill"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
-Style: Hook,{FONT},84,{S.ass_color(st["highlight"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
+Style: Cap,{font},{size},{S.ass_color(st["fill"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,9,4,5,70,70,0,1
+Style: Hook,{font},{round(size * 0.84)},{S.ass_color(st["highlight"] if header == "none" else st["fill"])},&H00FFFFFF,{S.ass_color(st["outline"])},&H96000000,1,0,0,0,100,100,1,0,1,8,4,5,80,80,0,1
+Style: Head,{font},{round(size * 0.66)},&H00000000,&H00FFFFFF,&H00FFFFFF,&H00000000,1,0,0,0,100,100,0,0,3,16,0,5,90,90,0,1
 Style: Mark,{FONT},42,&H66FFFFFF,&H00FFFFFF,&H99000000,&HFF000000,1,0,0,0,100,100,1,0,1,2,0,5,80,80,0,1
 
 [Events]
@@ -341,7 +354,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     ev = []
     dur = end - start
     hook = S.onscreen(pick.get("hook"))   # no emoji on screen (they render as boxes)
-    if hook:
+    if hook and header == "white_box":     # white box with dark text, whole clip
+        ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(dur)},Head,,0,0,0,,{{\\pos(540,{hook_y})}}{esc(hook)}")
+    elif hook and header == "text":        # persistent title text, whole clip
+        ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(dur)},Hook,,0,0,0,,"
+                  f"{{\\pos(540,{hook_y})}}{esc(S.apply_case(hook, st['case']))}")
+    elif hook:
         ev.append(f"Dialogue: 1,{ass_time(0)},{ass_time(min(dur, 2.5))},Hook,,0,0,0,,"
                   f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(hook, st['case']))}")
     if watermark():
@@ -376,9 +394,35 @@ def ensure_layout(video, pick):
     return pick
 
 
+FONT_FILES = {  # family name in the .ass -> (file, OFL source); setup.sh fetches them, render() self-heals
+    "Montserrat Black": ("Montserrat-Black.ttf", "https://github.com/JulietaUla/Montserrat/raw/master/fonts/ttf/Montserrat-Black.ttf"),
+    "Anton": ("Anton-Regular.ttf", "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf"),
+}
+
+
+def ensure_fonts(families, d=None):
+    """Download a missing caption font (best effort; libass falls back to a default face)."""
+    d = Path(d or fonts_dir())
+    if not d.is_dir():          # only on a box set up by setup.sh (never in CI / tests)
+        return
+    for fam in families:
+        f, url = FONT_FILES.get(fam, (None, None))
+        if not f or (d / f).exists():
+            continue
+        try:
+            import requests
+            r = requests.get(url, timeout=30)
+            r.raise_for_status()
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f).write_bytes(r.content)
+        except Exception as e:  # noqa: BLE001
+            print(f"font {fam} not available: {e}", file=sys.stderr)
+
+
 def render(video, pick, ass, out):
     # 9:16 like the market: full-bleed face-centred crop, or facecam over gameplay; then captions
     from layout import filtergraph
+    ensure_fonts([m.group(1) for m in re.finditer(r"^Style: \w+,([^,]+),", Path(ass).read_text(), re.M)])
     pick = cap_pick(ensure_layout(video, pick))
     sub = Path(ass).as_posix().replace(':', chr(92) + ':')
     fd = Path(fonts_dir()).as_posix().replace(':', chr(92) + ':')
@@ -449,7 +493,7 @@ def render_picks(src, picks, a, out, con=None, slug=None):
                 con.commit()
             continue
         if row:
-            save_edited(con, row, mp4)
+            save_edited(con, row, mp4, p.get("creator"))
         (out / f"{name}.txt").write_text(p.get("title", ""), encoding="utf-8")
         log({"date": datetime.date.today().isoformat(), "campaign": a.campaign,
              "source": src, "clip_file": str(mp4), "start": p["start"], "end": p["end"],

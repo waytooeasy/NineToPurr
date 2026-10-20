@@ -4,6 +4,8 @@ Unit tests check code, not the picture. Day 1 shipped emoji boxes in the hook, a
 up to the top panel and a second caption track on Sykkuno's live captions. This looks at 3 frames of the
 rendered file (hook at 1 s, ~45 %, ~80 %) with Claude Haiku (vision) against a fixed checklist.
 
+- a failure counts only when a second look flags the same problem (VM test: one of two looks called our own
+  white header box "double captions"; Sykkuno's real double captions were flagged every time)
 - pass  -> the clip goes on as before (auto-post)
 - double captions on a streamer not known to caption their stream -> learned (creator_flags), the clip is
   re-rendered without our captions and checked again (Sykkuno, Valkyrae)
@@ -33,9 +35,10 @@ CODES = {
 }
 PROMPT = (
     "These are 3 frames (1080x1920) from one finished YouTube Short made by a stream-clip channel.\n"
-    "OUR text on it is exactly: (a) ONE caption line of 2-3 heavy ALL-CAPS words with a thick black outline "
-    "around the middle of the screen, (b) in frame 1 only, a short ALL-CAPS hook line higher up, (c) a small "
-    "semi-transparent '@Peakz.Recaps' handle near the bottom centre.\n"
+    "OUR text on it is exactly: (a) ONE caption line of 1-5 heavy words with an outline (wide or condensed "
+    "font, any case) in the middle or lower part of the screen, (b) a short hook/title line higher up or on the "
+    "seam: either only in frame 1, or staying in every frame (possibly as dark text in a white box), (c) a "
+    "small semi-transparent '@Peakz.Recaps' handle near the bottom centre.\n"
     "Check each frame carefully for these problems:\n"
     "- double_captions: ANY other subtitle-style text that transcribes speech is visible at the same time as "
     "our caption, e.g. the streamer's own live captions (usually sentence-case or lowercase white text near "
@@ -68,6 +71,20 @@ def frames(video, run=subprocess.run):
                 capture_output=True, check=True)
         out.append(r.stdout)
     return out
+
+
+def prompt_for(expected=None):
+    """The checklist plus exactly what this clip burns in (hook/header text and mode), so our own header box
+    is never mistaken for a second caption track (Lacy preview, 2026-10-20)."""
+    if not expected:
+        return PROMPT
+    hook, header = (expected.get("hook") or "").strip(), expected.get("header") or "none"
+    where = {"white_box": "as dark text in a WHITE BOX that stays in every frame",
+             "text": "as a title line that stays in every frame",
+             "none": "in frame 1 only"}.get(header, "in frame 1 only")
+    own = f"OUR hook/title text on this clip is \"{hook}\", shown {where}. " if hook else ""
+    return PROMPT.replace("Check each frame carefully", own + "Everything else that transcribes speech "
+                          "is NOT ours. Check each frame carefully", 1)
 
 
 def anthropic_vision(images, prompt=PROMPT):
@@ -103,17 +120,29 @@ def parse(text):
     return {"ok": True, "issues": []} if d.get("ok") is not False else None
 
 
-def check(video, vision=None, grab=frames):
-    """{"ok": True|False|None, "issues": [...], "at": ...}. Any error -> ok None (never blocks)."""
+def check(video, vision=None, grab=frames, expected=None):
+    """{"ok": True|False|None, "issues": [...], "at": ...}. Any error -> ok None (never blocks).
+    `expected`: {"hook", "header"} burned into this clip (see prompt_for)."""
     at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     try:
         if vision is None:
             if not os.environ.get("ANTHROPIC_API_KEY"):
                 return {"ok": None, "issues": [], "error": "no ANTHROPIC_API_KEY", "at": at}
-            vision = anthropic_vision
-        res = parse(vision(grab(video)))
+            p = prompt_for(expected)
+            vision = lambda imgs: anthropic_vision(imgs, p)  # noqa: E731
+        imgs = grab(video)
+        reply = vision(imgs)
+        res = parse(reply)
         if res is None:
-            return {"ok": None, "issues": [], "error": "unreadable reply", "at": at}
+            return {"ok": None, "issues": [], "error": "unreadable reply", "raw": str(reply)[:300], "at": at}
+        if res["ok"] is False:
+            # a second, independent look must flag the same problem: one odd reply must not hold a good clip
+            again = parse(vision(imgs)) or {"ok": None, "issues": []}
+            codes = {i.get("code") for i in again.get("issues") or []}
+            kept = [i for i in res["issues"] if i.get("code") in codes]
+            if not kept:
+                return {"ok": True, "issues": [], "unconfirmed": [i.get("code") for i in res["issues"]], "at": at}
+            res = {"ok": False, "issues": kept}
         return {**res, "at": at}
     except Exception as e:  # noqa: BLE001 - the check must never stop the channel
         return {"ok": None, "issues": [], "error": f"{type(e).__name__}: {e}"[:200], "at": at}
@@ -123,6 +152,14 @@ def enabled(env=None):
     """VISUAL_QA=0 in /opt/clipper/.env turns the check off."""
     e = os.environ if env is None else env
     return str(e.get("VISUAL_QA", "1")).strip().lower() not in ("0", "false", "no", "off")
+
+
+def _header_for(creator):
+    try:
+        import style
+        return style.load(creator=creator).get("header", "none")
+    except Exception:  # noqa: BLE001
+        return "none"
 
 
 def learn_own_captions(con, creator, clip_id):
@@ -142,11 +179,12 @@ def run(con, vision=None, grab=frames):
     res = {"passed": [], "failed": {}, "unchecked": [], "rerender": []}
     if not enabled():
         return res
-    rows = con.execute("SELECT c.id, c.file_path, r.creator FROM clips c"
+    rows = con.execute("SELECT c.id, c.file_path, r.creator, c.hook_text FROM clips c"
                        " LEFT JOIN radar_candidates r ON r.clips_id = c.id"
                        " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
-    for cid, path, creator in rows:
-        r = check(path, vision, grab) if path and os.path.isfile(path) else \
+    for cid, path, creator, hook in rows:
+        expected = {"hook": hook, "header": _header_for(creator)}
+        r = check(path, vision, grab, expected) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}
         codes = {i.get("code") for i in r.get("issues") or []}
         if r["ok"] is False and "double_captions" in codes and learn_own_captions(con, creator, cid) \

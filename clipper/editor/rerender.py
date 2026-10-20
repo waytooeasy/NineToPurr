@@ -81,7 +81,7 @@ def run(con, model="small", out_dir=None):
             "UPDATE clips SET state='qc_passed', state_changed_at=datetime('now'), file_path=?, file_hash=?,"
             " approval_sent_at=NULL, last_error=NULL, style_version=?, visual_qa=NULL"
             " WHERE id=? AND state='needs_rerender'",
-            (str(mp4), digest, style.version(), row["id"]))
+            (str(mp4), digest, style.version(creator=row["creator"]), row["id"]))
         con.commit()
         if cur.rowcount:
             res["done"].append(row["id"])
