@@ -1,0 +1,30 @@
+{
+  "updated": "2026-10-20",
+  "sample": [
+    "Vs7Xn2VZeVw",
+    "YMxYa1qwO8g",
+    "lNFkK3o3i9g",
+    "PdwI12r3kg4",
+    "fMW-S2hK_jk",
+    "9Xayrfkp9hk",
+    "PXz0uBappy4",
+    "raH1AWNWHBM"
+  ],
+  "seen": 9,
+  "caption": {
+    "case": "upper",
+    "fill": "#FFFFFF",
+    "highlight": "#E8E822",
+    "outline": "#000000",
+    "words": 3,
+    "position": "middle",
+    "highlights": [
+      "#E8E822",
+      "#E8272B",
+      "#3A9BFF",
+      "#FFD700"
+    ]
+  },
+  "layout": "fullbleed",
+  "notes": "Bold uppercase captions, 1-3 words, colored emphasis words, dark outline, mostly centered."
+}

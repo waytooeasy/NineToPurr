@@ -1,6 +1,0 @@
-pytest
-pyyaml
-requests
-python-telegram-bot>=21
-pyyaml
-requests

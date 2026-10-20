@@ -1,31 +1,47 @@
-# Format library (updated 2026-10-17)
+# Format Library (updated 2026-10-20)
 
-## Rules that still hold
-- Titles are under ~60 characters and end with 1-2 emoji (😭 ❤️‍🩹 🥶 😂 💀).
-- Add the #{streamer} hashtag on roast and wholesome titles.
-- Open on the payoff moment, with no slow intro.
-- Use our own sourced and edited clips only, never competitor uploads.
+Based on a small sample (n=20, mostly IShowSpeed). Re-validate weekly. Copy patterns only; never copy competitor videos or titles verbatim.
 
-## Hook templates (copy and fill)
-1. **Lookalike roast:** `{S} with {trait} is {celebrity} 😭 #{S}`. Best performer so far at 145k vph.
-2. **Wholesome surprise:** `No way {person} came on stream ❤️‍🩹 #{S}`. Also `The way {person} supports {S} is awesome ❤️‍🩹`.
-3. **Superlative:** `{Name} is by far the best {role} EVER 🥶`. Also `{S} is the most talented guy ever 🥶`.
-4. **Quoted line:** `He really said {X} 😭`. Football names (Ronaldo, Mbappe) help.
-5. **Stakes:** `{S} risked {big thing} on {tiny thing} 😂`. Works for Minecraft and game clips.
+## Title rules
+- Short and casual, lowercase-leaning. One or two emojis at the end.
+- Add `#{streamer}` (e.g. `#ishowspeed`) on emotional or IRL clips.
+- Emoji set that works: 😭 ❤️‍🩹 🙏 🤯 🥶 😂 💀.
 
-## Format notes
-- **Nickname praise:** `Thats why we call him W {S} 😭❤️‍🩹` reached 49k vph.
-- **Football crossover:** `Ronaldo movie hits different 💀` reached 21k vph.
-- **Weak, avoid:** generic 'Bro {did X}' titles with no name or specific hook (4k-5k vph).
-- **Length:** unknown, because duration data is missing. Keep clips tight (under 30s) until we have data.
+## Hook templates (ranked by vph)
+1. `bro found the one on camera 😭❤️‍🩹 #{S}` (63k)
+2. `no way his {family/guest} came on stream ❤️‍🩹 #{S}` (40k)
+3. `thats why we call him W {S} 😭❤️‍🩹` (38k)
+4. `that {person} has so much aura 🤯 #{S}` (34k)
+5. `{S}'s last {bark/word/move} 😭🙏` (30k)
 
-## Post windows
-- **A:** 09:00-13:00 UTC (06:00-10:00 Asuncion).
-- **B:** 02:00-05:00 UTC (23:00-02:00 Asuncion).
-- **Avoid:** 23:00 UTC (20:00 Asuncion).
-- Low sample, so re-check next run.
+## Secondary templates (mid-tier, 7–19k)
+- `the {person} is definitely {funny label} 😭 #{S}`
+- `{S} is the most talented guy ever🥶`
+- `{S} risked {big thing} on one {small thing} 😂`
+- `he really said {quote} 😭`
+- `the {NPC/villager} had a personal problem with {S}😂`
+- `how did {S} win that?! 😭🔥`
 
-## Streamers
-- **Core:** IShowSpeed.
-- **Test slot:** Kai Cenat.
-- **Watch:** Druski.
+## Weak or untested
+- Question hooks (`what did {X} say at the end?`) at about 4.7k vph. Retest on older clips.
+- `this method doesn't work bruh` at about 4.8k.
+
+## Content priority
+1. IRL, family or wholesome stream moments.
+2. Funny reactions and animal moments.
+3. Gaming and Minecraft moments.
+4. Football and meme-quote clips.
+
+## Posting windows
+- Primary: 11:00–13:30 UTC, which is 08:00–10:30 America/Asuncion (UTC-3).
+- Secondary: 16:00 UTC, and 02–05 UTC.
+- Avoid: 04, 10 and 15 UTC until more data.
+
+## Streamer slots
+- Core: IShowSpeed.
+- Test: Kai Cenat.
+- Watch: CaseOh.
+
+## Open gaps
+- No duration data, so length is unknown.
+- No rising-streamer data yet.

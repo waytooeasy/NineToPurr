@@ -1,6 +1,0 @@
-# Streamers Radar pulls from. Add a line to add a streamer.
-# A plain string is a Twitch login. Use a mapping to also pull the creator's own YouTube
-# livestream VODs (D29): only that channel's /streams, never Shorts or other channels.
-creators:
-  - twitch: kaicenat
-    youtube_channel: "@KaiCenat"
