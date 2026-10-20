@@ -17,7 +17,7 @@ MODEL = "claude-haiku-5-5"
 TOP_STREAMERS = 8
 MAX_CLIPS = 40
 MAX_SHORTS = 10
-MIN_CONF = 0.7
+MIN_CONF = 0.8          # VM dry run 2026-10-20: 0.7 let in 'same guest, another moment' pairs
 KEEP_H = 72
 DB_TS = "%Y-%m-%d %H:%M:%S"
 PROMPT = """You match YouTube Shorts made by clip channels to {streamer}'s own stream clips of the SAME moment.
@@ -30,11 +30,12 @@ STREAM CLIPS ({streamer}'s own Twitch/Kick clips of the last 7 days, most viewed
 
 For each Short, name the stream clip that shows the same moment, or null. Stream clip titles are typed fast by
 viewers, often a word or two: a clip matches when its title points at the same event as the Short through a
-shared distinctive detail (the same person, thing, place, game event or quote; e.g. Short "CaseOh Says He Will
-NEVER Visit The Nether Again" ~ clip "forget the nether"), it was made before the Short was posted, and its
-length fits. Clippers post a moment within hours or a day or two, so a clip made days before the Short is less
-likely. A "?" time is unknown: judge by the titles. Titles that say nothing ("lol", "W", "om", emotes, the
-stream title) never match. confidence: 0.9 = surely the same event, 0.7 = likely, 0.5 or less = a guess.
+shared distinctive detail (the same person, thing, place, game event or quote; e.g. Short "Kai Says He Will
+NEVER Eat Sushi Again" ~ clip "no more sushi"), it was made before the Short was posted, and its length fits.
+Clippers post a moment within hours or a day or two, so a clip made days before the Short is less likely.
+A "?" time is unknown: judge by the titles. Titles that say nothing ("lol", "W", "om", emotes, the stream
+title) never match. confidence: 0.9 = both titles describe the same event; 0.7 = the same stream or topic but
+maybe another moment of it (e.g. a different vote, a different question to the same guest); 0.5 or less = a guess.
 Answer with JSON only: [{{"short": "S0", "clip": "C3" or null, "confidence": 0.0-1.0}}]"""
 
 
