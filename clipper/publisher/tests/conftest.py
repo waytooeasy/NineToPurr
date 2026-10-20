@@ -12,6 +12,7 @@ DB = pathlib.Path(__file__).resolve().parents[2] / "db"
 def _no_style_file(monkeypatch, tmp_path):
     """Tests run with the default caption style (version 'default') unless they write a style file."""
     monkeypatch.setenv("CLIPPER_STYLE", str(tmp_path / "style.json"))
+    monkeypatch.setenv("VISUAL_QA", "0")   # bot tests that need the visual-check gate turn it back on
 
 
 @pytest.fixture

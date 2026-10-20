@@ -21,7 +21,9 @@
 | `clip.py` | Download → Whisper → (`--auto`: Writer on 120 s transcript windows, best N non-overlapping) → render → CSV log. |
 
 ## Status
+- **Visual check (`visual_qa.py`, D47):** every finished Short (state `qc_passed`) is looked at before it can post: 3 frames (hook at 1 s, ~45 %, ~80 %) → Claude Haiku vision against a fixed checklist (double captions, broken glyphs, blurry panel, bad crop, text overlap, black bars, no watermark) → `clips.visual_qa` (migration 010). Pass → auto-post as before; fail → waits in Telegram with the reason; API error → never blocks. Double captions on a streamer we didn't know captions their stream → learned in `creator_flags`, the clip re-renders without ours and is checked again (once). VM test 2026-10-20 on day-1 Shorts: caught Sykkuno's double captions, found Valkyrae's live captions, flagged the old renders' missing watermark. `VISUAL_QA=0` turns it off. ~3 small images per clip.
 - **On-screen text = plain words (Lucas 2026-10-19):** `style.onscreen()` strips emoji/pictographs from the burned-in hook and captions (the font has no emoji, they render as boxes); titles keep theirs. Watermark `@Peakz.Recaps` low-centre (y 1630, ~60 % opaque) like NexxoRecaps; `CLIPPER_WATERMARK` overrides, empty = off.
+- Streamers whose stream already shows live captions (watchlist `own_captions: true`, e.g. Sykkuno) get no second caption track; hook + watermark stay (`clip.own_caption_logins`).
 - Layout: a corner face under 4.5 % of frame height is a mini cam over an event/IRL broadcast → full-bleed centre crop, not a stack (Adin's 33 px cam was blown up to the top panel).
 - `--auto` now uses `writer.py` (no direct Anthropic call). Needs `--creator "Kai Cenat"`; `--meta '<json>'` passes Radar metadata.
 - `cap_pick()` enforces ≤60 s on every pick (also `--picks` files) and `render()` cuts with `-t`.

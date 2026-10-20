@@ -45,8 +45,8 @@ def rerender_one(con, row, model="small", out_dir=None):
     work.mkdir(parents=True, exist_ok=True)
     words = clip.transcribe(source, work, model)
     start, end = window_pick_times(row)
-    pick = clip.cap_pick({"start": start, "end": end, "hook": hook,
-                          "context_line": row["context_line"]})
+    pick = clip.cap_pick({"start": start, "end": end, "hook": hook, "context_line": row["context_line"],
+                          "creator": row["creator"] if "creator" in row.keys() else None})
     mp4 = Path(row["file_path"]) if row["file_path"] else Path(out_dir) / f"{row['radar_id']}_01_en.mp4"
     mp4.parent.mkdir(parents=True, exist_ok=True)
     tmp = mp4.with_name(mp4.stem + ".rr.mp4")
@@ -64,7 +64,7 @@ def run(con, model="small", out_dir=None):
     res = {"done": [], "failed": {}}
     rows = con.execute(
         "SELECT c.id, c.hook_text, c.context_line, c.start_s, c.end_s, c.file_path,"
-        " r.clip_id AS radar_id, r.file_path AS source_file, r.source"
+        " r.clip_id AS radar_id, r.file_path AS source_file, r.source, r.creator"
         " FROM clips c JOIN radar_candidates r ON r.clips_id = c.id"
         " WHERE c.state='needs_rerender'"
         " AND (c.last_error IS NULL OR c.state_changed_at < datetime('now','-2 hours'))"
@@ -79,7 +79,8 @@ def run(con, model="small", out_dir=None):
             continue
         cur = con.execute(
             "UPDATE clips SET state='qc_passed', state_changed_at=datetime('now'), file_path=?, file_hash=?,"
-            " approval_sent_at=NULL, last_error=NULL, style_version=? WHERE id=? AND state='needs_rerender'",
+            " approval_sent_at=NULL, last_error=NULL, style_version=?, visual_qa=NULL"
+            " WHERE id=? AND state='needs_rerender'",
             (str(mp4), digest, style.version(), row["id"]))
         con.commit()
         if cur.rowcount:

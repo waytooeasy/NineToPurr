@@ -95,12 +95,35 @@ def auto_post_enabled(env=None) -> bool:
     return str(e.get("AUTO_POST", "")).strip().lower() in ("1", "true", "yes", "on")
 
 
+def visual_qa_enabled(env=None) -> bool:
+    """VISUAL_QA=0 turns the pre-post visual check (editor/visual_qa.py) off."""
+    e = os.environ if env is None else env
+    return str(e.get("VISUAL_QA", "1")).strip().lower() not in ("0", "false", "no", "off")
+
+
+def vqa_issues(row) -> list:
+    """Issue codes when the visual check failed this clip (clips.visual_qa, migration 010), else []."""
+    try:
+        d = json.loads(row["visual_qa"] or "{}")
+    except (IndexError, KeyError, ValueError, TypeError):
+        return []
+    return [str(i.get("code")) for i in d.get("issues") or [] if isinstance(i, dict)] if d.get("ok") is False else []
+
+
+def vqa_pending(row, env=None) -> bool:
+    """The pipeline has not looked at this clip yet: hold it (never send it unchecked)."""
+    try:
+        return visual_qa_enabled(env) and row["visual_qa"] is None
+    except (IndexError, KeyError):
+        return False
+
+
 def needs_tap(row, env=None) -> bool:
-    """Even with AUTO_POST, a music-risk clip waits for Lucas (AUTO_POST_MUSIC=1 posts those too):
-    a music claim can block or demonetise a Short."""
+    """Even with AUTO_POST, a clip waits for Lucas when it has music risk (AUTO_POST_MUSIC=1 posts those
+    too: a music claim can block or demonetise a Short) or failed the visual check."""
     e = os.environ if env is None else env
     music_ok = str(e.get("AUTO_POST_MUSIC", "")).strip().lower() in ("1", "true", "yes", "on")
-    return bool(row["music_risk"]) and not music_ok
+    return (bool(row["music_risk"]) and not music_ok) or bool(vqa_issues(row))
 
 
 def stop(con, clip_id: int) -> bool:

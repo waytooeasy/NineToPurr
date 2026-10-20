@@ -236,6 +236,33 @@ def fonts_dir():
     return os.environ.get("CLIPPER_FONTS", FONTS_DIR)
 
 
+WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
+
+
+def own_caption_logins(path=None, db=None):
+    """Logins/slugs whose streams already burn in live captions: watchlist `own_captions: true` plus what
+    the visual check learned (creator_flags, migration 010)."""
+    import sqlite3
+    import yaml
+    out = set()
+    try:
+        cfg = yaml.safe_load(Path(path or WATCHLIST).read_text()) or {}
+        out |= {str(e["id"]).lower().lstrip("@") for e in cfg.get("streamers", []) if e.get("own_captions")}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        pass
+    db = db or os.environ.get("CLIPPER_DB", "/opt/clipper/db/clip.db")
+    if os.path.exists(db):
+        try:
+            con = sqlite3.connect(db, timeout=30)
+            try:
+                out |= {str(r[0]).lower() for r in con.execute("SELECT creator FROM creator_flags WHERE own_captions=1")}
+            finally:
+                con.close()
+        except sqlite3.Error:
+            pass
+    return out
+
+
 def watermark():
     """Channel handle burned low-centre; CLIPPER_WATERMARK overrides, empty turns it off."""
     return os.environ.get("CLIPPER_WATERMARK", WATERMARK).strip()
@@ -268,7 +295,8 @@ def build_ass(words, pick, path, chunk=None, st=None):
     position; default = the 2026-10-19 research: 2 words, ALL CAPS, white + black outline, keyword in
     yellow). Pop-in, heavy font, seam position for stack layouts. Hook only for the first 2.5 s.
     No context-line banner: none of the top channels show one. No emoji on screen (style.onscreen);
-    the channel handle sits low-centre like the top channels' watermark."""
+    the channel handle sits low-centre like the top channels' watermark. A streamer whose stream already
+    shows live captions (watchlist `own_captions`) gets no second caption track."""
     import style as S
     from layout import caption_y
     st = dict(st or S.load())
@@ -303,6 +331,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(dur)},Mark,,0,0,0,,"
                   f"{{\\pos(540,{WATERMARK_Y})}}{esc(S.onscreen(watermark()))}")
     pos = f"{{\\pos(540,{y})}}"
+    if str(pick.get("creator") or "").lower().lstrip("@") in own_caption_logins():
+        Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")   # theirs are on screen already
+        return
     if pick.get("es_words"):
         # translated captions: spread evenly over the clip
         toks = pick["es_words"].split()

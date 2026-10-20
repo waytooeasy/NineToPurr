@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One pipeline pass (D22, D27): radar -> capture -> writer/editor -> qc -> rerender.
+"""One pipeline pass (D22, D27): radar -> capture -> writer/editor -> qc -> rerender -> visual check.
 
 Safe to run every 20 min from a systemd timer: an exclusive non-blocking flock on $CLIPPER_LOCK
 (default /opt/clipper/pipeline.lock) makes an overlapping pass exit at once; every stage only
@@ -29,6 +29,7 @@ from radar import capture, heat, top_clips, youtube_vods  # noqa: E402
 from radar import kick as kicksrc  # noqa: E402
 import qc  # noqa: E402  (editor/ is on sys.path, same as clip.py and rerender.py)
 import rerender  # noqa: E402
+import visual_qa  # noqa: E402
 
 DB = "/opt/clipper/db/clip.db"
 LOCK = "/opt/clipper/pipeline.lock"
@@ -302,6 +303,7 @@ def run_pass(con, steps=None):
         "editor": lambda: editor_step(con, model),
         "qc": lambda: qc.run(con),
         "rerender": lambda: rerender.run(con, model, os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")),
+        "vqa": lambda: visual_qa.run(con),   # look at the finished Short before it can post
     }
     report = {}
     for name, fn in steps.items():

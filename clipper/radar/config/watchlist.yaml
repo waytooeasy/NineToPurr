@@ -2,6 +2,8 @@
 # platform: twitch | youtube | kick. id = Twitch login, YouTube channel handle (@x) or UC id, Kick slug.
 # Several entries may share a `name` (their numbers are summed). `disabled: true` = kept, not polled.
 # Kick = channel slug from kick.com/<slug> (D45). An unknown login/slug is logged and skipped.
+# own_captions: true = the stream already shows live captions; the Editor adds no captions of its own
+# (two caption tracks on one Short, Sykkuno 2026-10-20). Hook + watermark stay.
 # daily_cap = Shorts slots per day (D33: 5 for two weeks, then HQ raises it).
 daily_cap: 5
 max_per_streamer: 2
@@ -35,8 +37,8 @@ streamers:
   - {name: Ludwig, platform: twitch, id: ludwig}
   - {name: xQc, platform: twitch, id: xqc}
   - {name: xQc, platform: kick, id: xqc}
-  - {name: Sykkuno, platform: twitch, id: sykkuno}
-  - {name: Valkyrae, platform: twitch, id: valkyrae}
+  - {name: Sykkuno, platform: twitch, id: sykkuno, own_captions: true}   # burns live captions on stream
+  - {name: Valkyrae, platform: twitch, id: valkyrae, own_captions: true}   # live captions (visual check, 10-20)
   - {name: Tfue, platform: twitch, id: tfue}
   - {name: TimTheTatman, platform: twitch, id: timthetatman}
   - {name: Summit1g, platform: twitch, id: summit1g}
