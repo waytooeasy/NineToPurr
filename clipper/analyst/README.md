@@ -35,5 +35,8 @@ python clipper/analyst/trend_scout.py --library clipper/formats/library.md --rep
 ## Style scout (`style_scout.py`, Lucas 2026-10-19)
 Each Trend Scout run sends the thumbnails (no video) of the day's top Shorts to Claude Haiku and writes `clipper/formats/style.json` (caption case, fill/highlight/outline colours, words per line, position, layout) to the `trends` branch. Needs ≥3 captioned thumbnails, else the old file stays. The VM copies it every pass (`run_pipeline.refresh_formats`); `editor/style.py` renders with it; the Telegram bot re-renders any clip made in an older style before sending it (`clips.style_version`, migration 009).
 
+## Hashtag scout (`hashtag_scout.py`, Lucas 2026-10-19)
+Each Trend Scout run also reads description + tags of the competitor Shorts (`videos.list` snippet, same quota) and writes `clipper/formats/hashtags.json` to the `trends` branch, view-weighted over the top 40 Shorts of 7 days: `title_share` (share of views with a hashtag in the title), `generic` (tags naming no streamer, used by 2+ channels, so no channel brand tags), `streamers` (the tag the market uses per streamer), `keywords` (hidden tags). The VM copies it every pass; `publisher/hashtags.py` applies it.
+
 ## Metrics puller (`metrics.py`, D35 post-launch)
 Every pipeline pass runs `metrics` first: public stats (views, likes, comments) of our own Shorts via the YouTube Data API key → `post_metrics`, at most hourly per Short, for 30 days. `python clipper/analyst/metrics.py --report` prints the table. Engaged views / swipe-away need the YouTube Analytics API (token with `yt-analytics.readonly`, not granted yet). Next: feed views per streamer/format back into the Heat Index and the Writer.

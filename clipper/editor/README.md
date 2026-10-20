@@ -21,6 +21,8 @@
 | `clip.py` | Download → Whisper → (`--auto`: Writer on 120 s transcript windows, best N non-overlapping) → render → CSV log. |
 
 ## Status
+- **On-screen text = plain words (Lucas 2026-10-19):** `style.onscreen()` strips emoji/pictographs from the burned-in hook and captions (the font has no emoji, they render as boxes); titles keep theirs. Watermark `@Peakz.Recaps` low-centre (y 1630, ~60 % opaque) like NexxoRecaps; `CLIPPER_WATERMARK` overrides, empty = off.
+- Layout: a corner face under 4.5 % of frame height is a mini cam over an event/IRL broadcast → full-bleed centre crop, not a stack (Adin's 33 px cam was blown up to the top panel).
 - `--auto` now uses `writer.py` (no direct Anthropic call). Needs `--creator "Kai Cenat"`; `--meta '<json>'` passes Radar metadata.
 - `cap_pick()` enforces ≤60 s on every pick (also `--picks` files) and `render()` cuts with `-t`.
 - Context line drawn under the hook (first 8 s); word captions unchanged.

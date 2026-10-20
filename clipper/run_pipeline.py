@@ -236,6 +236,7 @@ def editor_step(con, model="small", out=None):
 
 FORMATS_REF = "origin/trends:clipper/formats/library.md"
 STYLE_REF = "origin/trends:clipper/formats/style.json"
+HASHTAGS_REF = "origin/trends:clipper/formats/hashtags.json"
 FORMATS_MAX_AGE_S = 6 * 3600
 
 
@@ -262,6 +263,15 @@ def refresh_formats(path=None, repo=None, runner=subprocess.run, max_age_s=FORMA
         p.write_text(out, encoding="utf-8")
     except OSError as e:
         return f"error: {type(e).__name__}"
+    try:  # today's market hashtags (hashtag scout); optional, the publisher has a default
+        ht = runner(["git", "-C", repo, "show", HASHTAGS_REF], capture_output=True, text=True, check=True,
+                    timeout=60).stdout
+        json.loads(ht)
+        hp = Path(os.environ.get("CLIPPER_HASHTAGS", "/opt/clipper/formats/hashtags.json"))
+        hp.parent.mkdir(parents=True, exist_ok=True)
+        hp.write_text(ht, encoding="utf-8")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError):
+        pass
     try:  # today's caption style (style scout); optional, the renderer has a default
         st = runner(["git", "-C", repo, "show", STYLE_REF], capture_output=True, text=True, check=True,
                     timeout=60).stdout

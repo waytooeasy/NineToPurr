@@ -121,7 +121,9 @@ def slot_due(now: datetime, slots: list[datetime]) -> bool:
 
 # ---------------------------------------------------------------- metadata
 
-def build_metadata(clip, cfg: Config, privacy: str | None = None) -> dict:
+def build_metadata(clip, cfg: Config, privacy: str | None = None, streamer=None, market=None) -> dict:
+    """videos.insert body. With `market` (publisher/hashtags.py) the title/description/tags carry
+    today's market hashtags for `streamer` (Lucas 2026-10-19)."""
     title = (clip["title"] or clip["hook_text"] or "Short").strip().replace("\n", " ")
     title = title[:100].strip() or "Short"
     parts = [p for p in [(clip["context_line"] or "").strip()] if p]
@@ -129,13 +131,12 @@ def build_metadata(clip, cfg: Config, privacy: str | None = None) -> dict:
     tags = ["#Shorts"]
     topics = (clip["topic_tags"] if "topic_tags" in clip.keys() else None) or ""
     tags += [t.strip() for t in topics.split(",") if t.strip()]
+    snippet = {"title": title, "description": "\n\n".join(parts), "tags": tags, "categoryId": cfg.category_id}
+    if market is not None:
+        import hashtags
+        snippet = hashtags.apply(snippet, clip["context_line"], streamer, market)
     return {
-        "snippet": {
-            "title": title,
-            "description": "\n\n".join(parts),
-            "tags": tags,
-            "categoryId": cfg.category_id,
-        },
+        "snippet": snippet,
         "status": {"privacyStatus": privacy or cfg.privacy, "selfDeclaredMadeForKids": False},
     }
 
@@ -279,7 +280,8 @@ def run_once(con, cfg: Config, uploader, alert, now: datetime | None = None) -> 
         if not path or not os.path.isfile(path):
             _fail(con, cid, f"file missing: {path}", alert)
             continue
-        meta = build_metadata(clip, cfg)
+        import hashtags
+        meta = build_metadata(clip, cfg, streamer=hashtags.streamer_for(con, cid), market=hashtags.load())
         try:
             vid = uploader(path, meta)
         except QuotaExceeded as exc:

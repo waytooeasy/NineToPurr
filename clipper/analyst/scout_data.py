@@ -55,13 +55,14 @@ def parse_iso_duration(s):
 
 
 def enrich_api(videos, api_key, session=None, batch=50):
-    """Fill duration + exact views/likes from videos.list. Failures leave videos as-is."""
+    """Fill duration, exact views/likes, description and tags from videos.list (one quota unit per 50
+    videos whatever the parts). Failures leave videos as-is."""
     http = session or requests
     by_id = {v["id"]: v for v in videos}
     ids = list(by_id)
     for i in range(0, len(ids), batch):
         try:
-            r = http.get(API, params={"part": "contentDetails,statistics", "key": api_key,
+            r = http.get(API, params={"part": "snippet,contentDetails,statistics", "key": api_key,
                                       "id": ",".join(ids[i:i + batch])}, timeout=20)
             r.raise_for_status()
             items = r.json().get("items", [])
@@ -78,6 +79,10 @@ def enrich_api(videos, api_key, session=None, batch=50):
                 v["views"] = int(st["viewCount"])
             if "likeCount" in st:
                 v["likes"] = int(st["likeCount"])
+            sn = it.get("snippet") or {}
+            if sn:
+                v["description"] = sn.get("description") or ""
+                v["tags"] = list(sn.get("tags") or [])
     return videos
 
 

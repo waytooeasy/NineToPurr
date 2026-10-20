@@ -235,3 +235,19 @@ def test_refresh_formats_also_copies_todays_style(tmp_path, monkeypatch):
     monkeypatch.setenv("CLIPPER_STYLE", str(sp))
     assert run_pipeline.refresh_formats(tmp_path / "library.md", repo=tmp_path, runner=FakeGitStyle()) == "updated (+style)"
     assert "#00FF66" in sp.read_text()
+
+
+class FakeGitHashtags(FakeGit):
+    def __call__(self, cmd, **kw):
+        r = super().__call__(cmd, **kw)
+        if cmd[3] == "show" and cmd[-1] == run_pipeline.HASHTAGS_REF:
+            return type("R", (), {"stdout": '{"generic": ["#shorts", "#twitch"], "title_share": 0.9}'})()
+        return r
+
+
+def test_refresh_formats_also_copies_todays_hashtags(tmp_path, monkeypatch):
+    hp = tmp_path / "hashtags.json"
+    monkeypatch.setenv("CLIPPER_HASHTAGS", str(hp))
+    monkeypatch.setenv("CLIPPER_STYLE", str(tmp_path / "style.json"))
+    run_pipeline.refresh_formats(tmp_path / "library.md", repo=tmp_path, runner=FakeGitHashtags())
+    assert "#twitch" in hp.read_text()

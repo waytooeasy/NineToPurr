@@ -86,3 +86,11 @@ def test_tall_overlay_gets_a_taller_panel_and_face_centred_crop():
 def test_wide_overlay_keeps_its_shape():
     lay = L.stack_from_box((0, 0, 405, 315), 253, 139, 1920, 1080)
     assert lay["cam"] == [0, 0, 405, 315] and lay["cam_h"] == 840
+
+
+def test_mini_corner_cam_over_a_broadcast_is_full_bleed_not_stack():
+    # Adin Ross on Kick, 2026-10-19: two 33 px faces in a tiny corner cam over a boxing broadcast.
+    # Stacking blew a 100x89 px crop up to 1080x960. Full-bleed the shot instead.
+    faces = [(408, 948, 30, 35), (407, 948, 31, 36), (414, 954, 25, 30), (408, 959, 27, 33)] * 2
+    lay = L.choose_layout(faces, 1920, 1080)
+    assert lay["mode"] == "crop" and lay["cx"] == 960

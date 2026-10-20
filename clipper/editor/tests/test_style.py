@@ -46,3 +46,10 @@ def test_palette_varies_per_clip_but_is_stable():
     picks = {S.highlight_for(st, f"hook {i}") for i in range(20)}
     assert picks == {"#33CCFF", "#99FF33"}
     assert S.highlight_for(st, "same") == S.highlight_for(st, "same")
+
+
+def test_onscreen_strips_emoji_keeps_text():
+    assert S.onscreen("He really said never seen this 😭") == "He really said never seen this"
+    assert S.onscreen("No way ❤️‍🩹 bro") == "No way bro"
+    assert S.onscreen("Speed's $100 bet!") == "Speed's $100 bet!"
+    assert S.onscreen("👍🏽") == "" and S.onscreen(None) == ""
