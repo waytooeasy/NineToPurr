@@ -13,7 +13,7 @@ _Last updated: 2026-10-20 00:15 UTC_
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 5/day (`.env`: UTC window 00:00–23:59) |
 | Metrics (`metrics` stage of every pass) | ✅ views/likes/comments per Short hourly → `post_metrics`; Telegram `/stats` + daily recap 23:00 Asunción |
-| Trend Scout (GitHub Actions, 10:30 UTC daily) | ✅ report issue + `trends` branch: `library.md` (titles/hooks) + `style.json` (caption style) |
+| Trend Scout (GitHub Actions, 10:30 UTC daily) | ✅ report issue + `trends` branch: `library.md` (titles/hooks), `style.json` (caption style), `hashtags.json` (D46). Publishing to `trends` was broken 2026-10-17 → 10-20 (generated files blocked the branch switch); fixed in the trends-publish PR |
 | Keys in `/opt/clipper/.env` | ✅ Anthropic, YouTube API key + upload token (OAuth app published), Twitch, Telegram |
 | Access for Claude | ✅ SSH from moon's local shell, `/vm` on issue #58, scoped sudo for restarting `clipper-*` services |
 
