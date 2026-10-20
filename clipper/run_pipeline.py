@@ -184,8 +184,10 @@ def match_streamers(con, m, wl, top=None):
 
 
 def own_clips(entries, now, clients):
-    """A streamer's own most-viewed Twitch/Kick clips of the last 7 days, as Radar candidates (D54).
+    """A streamer's own most-viewed Twitch/Kick clips of the last match.CLIP_DAYS days, as Radar candidates (D54).
     `clients`: {"twitch": Twitch, "kick": Kick}, filled lazily. A failing channel is logged and skipped."""
+    from radar import match
+    since = now - timedelta(days=match.CLIP_DAYS)
     out = []
     for e in entries:
         login = e["id"].lower()
@@ -195,11 +197,12 @@ def own_clips(entries, now, clients):
                     from radar.twitch import Twitch
                     clients["twitch"] = Twitch()
                 tw = clients["twitch"]
-                raw = tw.get_clips(tw.broadcaster_id(login), now - timedelta(days=7), now, max_clips=100)
+                raw = tw.get_clips(tw.broadcaster_id(login), since, now, max_clips=100)
                 out += [top_clips.normalize(r, login, now) for r in raw]
             elif e["platform"] == "kick":
                 kc = clients.setdefault("kick", kicksrc.Kick())
-                out += [kicksrc.normalize(r, login, now) for r in kc.get_clips(login, "week", 2) if kicksrc.usable(r)]
+                out += [c for c in (kicksrc.normalize(r, login, now) for r in kc.get_clips(login, "week", 2)
+                                    if kicksrc.usable(r)) if top_clips.parse_ts(c["created_at"]) >= since]
         except Exception as ex:  # noqa: BLE001 - the other channel of a multistreamer still counts
             print(f"[match] {e['platform']}/{login}: {type(ex).__name__}: {ex}", file=sys.stderr)
     return out

@@ -118,7 +118,7 @@ def test_own_clips_reads_twitch_and_kick_and_survives_a_dead_channel():
             return "b-" + login
 
         def get_clips(self, bid, start, end, max_clips=500):
-            assert (end - start).days == 7 and max_clips == 100
+            assert (end - start).days == match.CLIP_DAYS and max_clips == 100
             return [{"id": "t1", "url": "u", "title": "x", "view_count": 5, "duration": 30, "created_at": iso(3)}]
 
     class Kc:
@@ -184,3 +184,12 @@ def test_radar_posts_the_matched_moment_first_and_never_twice(con):
     kick[:] = [clip("k-mom", "mom walked in", 900_000, 8.001, source="kick")]
     assert step(Tw([])) == []
     assert len(step(Tw([raw("c-new", "new moment", 500, 2)]))) == 1
+
+
+def test_pool_shows_yesterdays_rising_clip_next_to_the_weeks_big_ones():
+    big = [clip(f"old{i}", f"old {i}", 50_000 - i, 90) for i in range(30)]      # 90 h old, many views
+    fresh = clip("new", "jynxzi hits unreal", 3_000, 5)                         # 5 h old, rising fast
+    out = match.pool(big + [fresh])
+    assert len(out) == 31 and "new" in [c["clip_id"] for c in out]               # 25 by views + the other 6
+    assert [c["view_count"] for c in out] == sorted((c["view_count"] for c in out), reverse=True)
+    assert "new" not in [c["clip_id"] for c in match.pool(big + [fresh], n_views=25, n_fresh=0)]

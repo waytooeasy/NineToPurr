@@ -16,6 +16,8 @@ from datetime import datetime, timedelta, timezone
 MODEL = "claude-haiku-5-5"
 TOP_STREAMERS = 8
 MAX_CLIPS = 40
+CLIP_DAYS = 4           # Shorts are <= 48 h old and clippers post within a day or two of the moment
+POOL_VIEWS, POOL_FRESH = 25, 15
 MAX_SHORTS = 10
 MIN_CONF = 0.8          # VM dry run 2026-10-20: 0.7 let in 'same guest, another moment' pairs
 KEEP_H = 72
@@ -25,7 +27,7 @@ PROMPT = """You match YouTube Shorts made by clip channels to {streamer}'s own s
 SHORTS (popping right now; other channels cut them from {streamer}'s stream):
 {shorts}
 
-STREAM CLIPS ({streamer}'s own Twitch/Kick clips of the last 7 days, most viewed first):
+STREAM CLIPS ({streamer}'s own Twitch/Kick clips of the last 4 days, most viewed first):
 {clips}
 
 For each Short, name the stream clip that shows the same moment, or null. Stream clip titles are typed fast by
@@ -86,6 +88,22 @@ def _index(v, letter):
     return int(str(v).strip().upper().lstrip(letter))
 
 
+def pool(clips, n_views=POOL_VIEWS, n_fresh=POOL_FRESH):
+    """The clips the model sees: the most viewed plus the fastest rising (views/hour) not among them, so
+    yesterday's moment is not hidden by last week's big clips (VM dry run 2026-10-20: Jynxzi's top 40 by
+    views were mostly from one stream 5 days before his popping Shorts). Most viewed first."""
+    by_views = sorted(clips, key=lambda c: -int(c.get("view_count") or 0))
+    out = by_views[:n_views]
+    seen = {c["clip_id"] for c in out}
+    for c in sorted(clips, key=lambda c: -float(c.get("views_per_hour") or 0)):
+        if len(out) >= n_views + n_fresh:
+            break
+        if c["clip_id"] not in seen:
+            seen.add(c["clip_id"])
+            out.append(c)
+    return sorted(out, key=lambda c: -int(c.get("view_count") or 0))
+
+
 def match_streamer(name, shorts, clips, ask=anthropic_ask, min_conf=MIN_CONF):
     """[(short, clip, confidence)] for the popping Shorts that show one of the stream clips."""
     shorts, clips = list(shorts)[:MAX_SHORTS], list(clips)[:MAX_CLIPS]
@@ -139,7 +157,7 @@ def run(con, market, streamers, clips_for, now=None, ask=anthropic_ask):
         if not shorts:
             continue
         try:
-            clips = sorted(clips_for(name), key=lambda c: -int(c.get("view_count") or 0))
+            clips = pool(clips_for(name))
             ms = match_streamer(name, shorts, clips, ask)
         except Exception as e:  # noqa: BLE001 - one streamer must not stop the rest
             log(f"{name}: {type(e).__name__}: {e}")
