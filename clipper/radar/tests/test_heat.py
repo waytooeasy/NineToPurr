@@ -163,3 +163,12 @@ def test_top_clips_hooks():
                                                          {"platform": "twitch", "id": "kaicenat"}]}},
                               {"Kai Cenat": 1})
     assert doc["ids"]["kaicenat"] == "Kai Cenat"
+
+
+def test_kick_views_count_only_clips_radar_may_use():
+    class Kc:
+        def get_clips(self, slug, window, max_pages=1):
+            return [{"view_count": 900, "created_at": "2026-10-16T06:00:00Z", "is_mature": True},
+                    {"view_count": 40, "created_at": "2026-10-16T07:00:00Z", "privacy": "public"},
+                    {"view_count": 70, "created_at": "2026-10-12T07:00:00Z", "privacy": "private"}]
+    assert heat.kick_views(Kc(), "iceposeidon", NOW) == (40, 40)
