@@ -68,3 +68,65 @@ def test_report_lists_views_per_short():
     text = metrics.report(con)
     assert text.startswith("📈 3 Shorts · 1,234 views")
     assert "valkyrae: 1,234 views (" in text and "processing" in text
+
+
+# --- owner analytics (D53) ---------------------------------------------------------------------------
+
+class FakeQuery:
+    def __init__(self, svc, kw):
+        self.svc, self.kw = svc, kw
+
+    def execute(self):
+        self.svc.calls.append(self.kw)
+        if self.svc.reject_engaged and "engagedViews" in self.kw["metrics"]:
+            raise RuntimeError("400 Unknown identifier (engagedViews) given in field parameters.metrics")
+        cols = self.kw["metrics"].split(",")
+        rows = []
+        for vid in self.kw["filters"].split("==", 1)[1].split(","):
+            vals = {"views": 200, "engagedViews": 122, "averageViewDuration": 14.0, "averageViewPercentage": 72.5,
+                    "likes": 9, "subscribersGained": 1}
+            rows.append([vid] + [vals[c] for c in cols])
+        return {"columnHeaders": [{"name": "video"}] + [{"name": c} for c in cols], "rows": rows}
+
+
+class FakeAnalytics:
+    def __init__(self, reject_engaged=False):
+        self.calls, self.reject_engaged = [], reject_engaged
+
+    def reports(self):
+        return self
+
+    def query(self, **kw):
+        return FakeQuery(self, kw)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture
+def con():
+    return db()
+
+
+M = metrics
+
+
+def test_analytics_rows_and_report(con):
+    svc = FakeAnalytics()
+    n = M.pull_analytics(con, svc, NOW)
+    assert n >= 1 and svc.calls[0]["ids"] == "channel==MINE" and svc.calls[0]["dimensions"] == "video"
+    row = con.execute("SELECT views, engaged_views, avg_view_pct, subs_gained FROM post_analytics LIMIT 1").fetchone()
+    assert tuple(row) == (200, 122, 72.5, 1)
+    assert "stayed 61%" in M.report(con) and "watched 72%" in M.report(con)
+    assert M.run_analytics(con, NOW, service=svc) == "fresh"                      # every 6 h
+
+
+def test_analytics_falls_back_without_engaged_views(con):
+    svc = FakeAnalytics(reject_engaged=True)
+    assert M.pull_analytics(con, svc, NOW) >= 1 and len(svc.calls) == 2
+    assert con.execute("SELECT engaged_views FROM post_analytics LIMIT 1").fetchone()[0] is None
+    assert "watched 72%" in M.report(con) and "stayed" not in M.report(con)
+
+
+def test_no_token_is_a_skip(con, tmp_path):
+    assert M.run_analytics(con, NOW, token_file=str(tmp_path / "none.json")) == "skipped: no analytics token"

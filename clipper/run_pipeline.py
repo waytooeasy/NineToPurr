@@ -332,7 +332,12 @@ def metrics_step(con):
     """Public stats of our own Shorts -> post_metrics (analyst/metrics.py), each at most hourly."""
     sys.path.insert(0, str(HERE / "analyst"))
     import metrics
-    return metrics.run(con, os.environ.get("YOUTUBE_API_KEY"))
+    n = metrics.run(con, os.environ.get("YOUTUBE_API_KEY"))
+    try:  # D53: owner analytics (stay %, watch %) every 6 h when the read-only token exists
+        a = metrics.run_analytics(con)
+    except Exception as e:  # noqa: BLE001 - public stats still count
+        a = f"error: {type(e).__name__}: {str(e)[:120]}"
+    return {"public": n, "analytics": a}
 
 
 def run_pass(con, steps=None):
