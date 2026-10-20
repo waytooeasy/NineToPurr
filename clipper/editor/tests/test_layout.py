@@ -94,3 +94,11 @@ def test_mini_corner_cam_over_a_broadcast_is_full_bleed_not_stack():
     faces = [(408, 948, 30, 35), (407, 948, 31, 36), (414, 954, 25, 30), (408, 959, 27, 33)] * 2
     lay = L.choose_layout(faces, 1920, 1080)
     assert lay["mode"] == "crop" and lay["cx"] == 960
+
+
+def test_tiny_cam_panel_is_never_blown_up():
+    # Lacy 2026-10-20: a 62 px face in a round cam bubble; the found box was 77x68 px -> 14x upscale, blurry.
+    faces = [(80, 60, 50, 62)] * 7
+    assert L.choose_layout(faces, 1920, 1080, cam_box=(71, 56, 148, 124))["mode"] == "crop"
+    assert L.choose_layout(faces, 1920, 1080)["mode"] == "crop"                  # face-sized estimate too small too
+    assert L.choose_layout([(216, 87, 74, 104)] * 6, 1920, 1080, cam_box=(0, 0, 405, 315))["mode"] == "stack"  # xQc
