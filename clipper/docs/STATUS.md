@@ -3,7 +3,7 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-19 20:30 UTC_
+_Last updated: 2026-10-20 00:15 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
@@ -22,6 +22,8 @@ _Last updated: 2026-10-19 20:30 UTC_
 - **Length:** the length viewers chose (the Twitch clip / most-replayed window), trim ≤2 s per end, ≤60 s. Kick clips over 60 s keep their last 60 s.
 - **Look:** full-bleed 9:16 centred on the face, or facecam on top + gameplay below. Captions per today's `style.json` (2026-10-19: ALL CAPS, white, black outline, 3 words, highlight colour rotating cyan/lime/pink per clip). Hook only for 2.5 s. No context-line banner.
 - **Text:** Writer (Haiku 5.5) follows today's format library: short casual titles with emoji, hook templates.
+- **On screen:** plain words only (no emoji), `@Peakz.Recaps` watermark low-centre like NexxoRecaps (D46).
+- **Hashtags:** daily from the top Shorts (`hashtags.json`): streamer tag at the end of the title, popping tags + #shorts in the description (D46).
 
 ## Clips so far
 | Date | Made | Approved | Published | Notes |
