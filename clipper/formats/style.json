@@ -1,31 +1,32 @@
 {
   "updated": "2026-10-20",
   "sample": [
+    "iPjKK-KJ9iU",
+    "bs0XsXVW7vs",
     "WsxRjmuT5ZQ",
     "JUe6rF3kEbE",
     "J8yVbmmSSy8",
-    "GsT90X4whEU",
-    "YMxYa1qwO8g",
     "PdwI12r3kg4",
-    "lNFkK3o3i9g",
-    "WhZxoQx_vf4"
+    "GsT90X4whEU",
+    "YMxYa1qwO8g"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FFD400",
+    "highlight": "#FF0000",
     "outline": "#000000",
-    "words": 1,
+    "words": 2,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FFD400",
-      "#1E90FF"
+      "#FF0000",
+      "#00C8FF",
+      "#FFD700"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions are single bold uppercase words or short phrases, often centered mid-frame, with black background boxes or thick outlines."
+  "notes": "Captions appear in varied styles per clip; most are bold uppercase with black outline and colored emphasis words."
 }
