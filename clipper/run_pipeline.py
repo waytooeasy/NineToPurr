@@ -223,7 +223,8 @@ def radar_step(con, twitch=None, creators=None, cap=DAILY_CAP, allocate=heat_all
     cands = kicksrc.dedupe(cands, alloc["ids"] if alloc else None)  # one moment on Twitch + Kick -> one pick
     top_clips.store(con, cands)
     fresh = [c for c in cands
-             if con.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()[0] is None]
+             if con.execute("SELECT clips_id FROM radar_candidates WHERE clip_id=?", (c["clip_id"],)).fetchone()[0] is None
+             and not top_clips.looks_like_music(c["title"])]   # singing/music: nothing to caption, claim risk
     if alloc:
         fresh = top_clips.apply_allocation(fresh, slots, alloc["ids"])
     return top_clips.register_clips(con, fresh[:want])
@@ -275,7 +276,20 @@ def editor_step(con, model="small", out=None):
         f.write_text(json.dumps(picks))
         clip.main(["--picks", str(f), "--auto", "--model", model,
                    "--out", out or os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")])
+    retire_uncaptionable(con)
     return len(picks)
+
+
+def retire_uncaptionable(con):
+    """A clip with no speech in its window can never be captioned: drop it at once so its daily slot goes to
+    the next moment (it used to retry every 2 h and hold the slot). -> ids retired."""
+    ids = [r[0] for r in con.execute("SELECT id FROM clips WHERE state='captured'"
+                                     " AND last_error LIKE '%no transcript inside the pick%'")]
+    if ids:
+        con.executemany("UPDATE clips SET state='killed', state_changed_at=datetime('now'),"
+                        " last_error='auto: no speech to caption' WHERE id=?", [(i,) for i in ids])
+        con.commit()
+    return ids
 
 
 FORMATS_REF = "origin/trends:clipper/formats/library.md"
