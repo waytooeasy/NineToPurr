@@ -84,6 +84,18 @@ def test_no_emoji_on_screen_but_watermark(tmp_path, monkeypatch):
     assert ",Mark," not in txt and ",Hook," not in txt                             # emoji-only hook dropped
 
 
+def test_streamer_with_own_live_captions_gets_no_second_track(tmp_path):
+    # Sykkuno burns live captions into his stream; ours on top made two caption tracks (2026-10-20).
+    assert "sykkuno" in clip.own_caption_logins()
+    ass = tmp_path / "a.ass"
+    words = [{"s": 1, "e": 1.5, "w": "my"}, {"s": 1.5, "e": 2, "w": "gun"}]
+    clip.build_ass(words, {"start": 0, "end": 10, "hook": "He lost it", "creator": "sykkuno"}, ass)
+    txt = ass.read_text()
+    assert ",Cap," not in txt and ",Hook," in txt and ",Mark," in txt
+    clip.build_ass(words, {"start": 0, "end": 10, "hook": "He lost it", "creator": "xqc"}, ass)
+    assert ",Cap," in ass.read_text()
+
+
 def test_caption_keyword_skips_filler():
     assert clip._key_index(["bro", "what"]) is None
     assert clip._key_index(["just", "ZOOM!"]) == 1
