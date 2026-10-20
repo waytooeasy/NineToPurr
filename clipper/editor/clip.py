@@ -239,14 +239,28 @@ def fonts_dir():
 WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
 
 
-def own_caption_logins(path=None):
-    """Logins/slugs whose streams already burn in live captions (watchlist `own_captions: true`)."""
+def own_caption_logins(path=None, db=None):
+    """Logins/slugs whose streams already burn in live captions: watchlist `own_captions: true` plus what
+    the visual check learned (creator_flags, migration 010)."""
+    import sqlite3
     import yaml
+    out = set()
     try:
         cfg = yaml.safe_load(Path(path or WATCHLIST).read_text()) or {}
-        return {str(e["id"]).lower().lstrip("@") for e in cfg.get("streamers", []) if e.get("own_captions")}
+        out |= {str(e["id"]).lower().lstrip("@") for e in cfg.get("streamers", []) if e.get("own_captions")}
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
-        return set()
+        pass
+    db = db or os.environ.get("CLIPPER_DB", "/opt/clipper/db/clip.db")
+    if os.path.exists(db):
+        try:
+            con = sqlite3.connect(db, timeout=30)
+            try:
+                out |= {str(r[0]).lower() for r in con.execute("SELECT creator FROM creator_flags WHERE own_captions=1")}
+            finally:
+                con.close()
+        except sqlite3.Error:
+            pass
+    return out
 
 
 def watermark():

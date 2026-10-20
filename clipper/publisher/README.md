@@ -65,6 +65,8 @@ Then `sudo systemctl enable --now clipper-approve`. Adjust the paths to match `i
 ### Tests
 `pip install -r clipper/requirements-dev.txt && pytest clipper/publisher` (offline, Telegram mocked).
 
+**Visual check gate (D47):** the bot only sends a `qc_passed` clip after the pipeline's visual check looked at it (`clips.visual_qa` set; `VISUAL_QA=0` = off). A failed check means no auto-post: the message lists the issues and waits for ✅ Post / ❌ Kill.
+
 ## Upload (`upload.py`, built, untested against the real API)
 **Constraints (D21):** uploads have their own quota bucket (~100/day, ~100 units each). Unverified projects may upload public now; confirm with one test upload. If private-only, request the audit and upload by phone meanwhile.
 

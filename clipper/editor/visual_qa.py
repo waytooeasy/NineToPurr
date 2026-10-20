@@ -5,6 +5,8 @@ up to the top panel and a second caption track on Sykkuno's live captions. This 
 rendered file (hook at 1 s, ~45 %, ~80 %) with Claude Haiku (vision) against a fixed checklist.
 
 - pass  -> the clip goes on as before (auto-post)
+- double captions on a streamer not known to caption their stream -> learned (creator_flags), the clip is
+  re-rendered without our captions and checked again (Sykkuno, Valkyrae)
 - fail  -> it waits in Telegram for ✅ Post / ❌ Kill with the issues listed (approvals.needs_tap)
 - error (no key, API down) -> {"ok": null}: the clip goes on; the check never blocks the channel
 Stored as JSON in clips.visual_qa (migration 010); a re-render clears it so the new file is checked.
@@ -123,16 +125,37 @@ def enabled(env=None):
     return str(e.get("VISUAL_QA", "1")).strip().lower() not in ("0", "false", "no", "off")
 
 
+def learn_own_captions(con, creator, clip_id):
+    """Remember that this streamer's stream shows live captions (creator_flags). -> True if new."""
+    if not creator:
+        return False
+    cur = con.execute("INSERT INTO creator_flags (creator, own_captions, note) VALUES (?, 1, ?)"
+                      " ON CONFLICT(creator) DO NOTHING",
+                      (creator.lower(), f"visual check: double captions on clip {clip_id}"))
+    return cur.rowcount == 1
+
+
 def run(con, vision=None, grab=frames):
-    """Check every qc_passed clip that has no result yet. -> {"passed": [ids], "failed": {id: codes}}."""
-    res = {"passed": [], "failed": {}, "unchecked": []}
+    """Check every qc_passed clip that has no result yet. -> {"passed": [ids], "failed": {id: codes},
+    "rerender": [ids]}. Double captions on a streamer we did not know shows live captions: learn it and
+    re-render the clip without ours (one automatic retry; after that it waits for a tap like any failure)."""
+    res = {"passed": [], "failed": {}, "unchecked": [], "rerender": []}
     if not enabled():
         return res
-    rows = con.execute("SELECT id, file_path FROM clips WHERE state='qc_passed' AND visual_qa IS NULL"
-                       " ORDER BY id").fetchall()
-    for cid, path in rows:
+    rows = con.execute("SELECT c.id, c.file_path, r.creator FROM clips c"
+                       " LEFT JOIN radar_candidates r ON r.clips_id = c.id"
+                       " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
+    for cid, path, creator in rows:
         r = check(path, vision, grab) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}
+        codes = {i.get("code") for i in r.get("issues") or []}
+        if r["ok"] is False and "double_captions" in codes and learn_own_captions(con, creator, cid) \
+                and codes == {"double_captions"}:
+            con.execute("UPDATE clips SET state='needs_rerender', state_changed_at=datetime('now'),"
+                        " visual_qa=NULL WHERE id=?", (cid,))
+            con.commit()
+            res["rerender"].append(cid)
+            continue
         con.execute("UPDATE clips SET visual_qa=? WHERE id=? AND visual_qa IS NULL", (json.dumps(r), cid))
         con.commit()
         if r["ok"] is False:

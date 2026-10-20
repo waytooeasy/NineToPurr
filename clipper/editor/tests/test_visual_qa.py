@@ -57,11 +57,12 @@ def test_run_checks_each_qc_passed_clip_once(con, monkeypatch):
         return '{"ok": true}' if len(calls) == 1 else '{"ok": false, "issues": [{"code": "blurry_panel"}]}'
     res = V.run(con, vision=vision, grab=lambda v: [b"a", b"b", b"c"])
     assert res["passed"] == [1] and res["failed"] == {2: ["blurry_panel"]} and calls == [3, 3]
+    assert res["rerender"] == []
     assert json.loads(con.execute("SELECT visual_qa FROM clips WHERE id=2").fetchone()[0])["ok"] is False
-    assert V.run(con, vision=vision, grab=lambda v: [b"a"]) == {"passed": [], "failed": {}, "unchecked": []}
+    assert V.run(con, vision=vision, grab=lambda v: [b"a"]) == {"passed": [], "failed": {}, "unchecked": [], "rerender": []}
     monkeypatch.setenv("VISUAL_QA", "0")
     con.execute("UPDATE clips SET visual_qa=NULL")
-    assert V.run(con, vision=vision) == {"passed": [], "failed": {}, "unchecked": []}   # switched off
+    assert V.run(con, vision=vision) == {"passed": [], "failed": {}, "unchecked": [], "rerender": []}   # off
 
 
 @pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg")
@@ -71,3 +72,28 @@ def test_frames_grabs_three_jpegs(tmp_path):
                     "-pix_fmt", "yuv420p", str(v)], check=True)
     imgs = V.frames(v)
     assert len(imgs) == 3 and all(b[:2] == b"\xff\xd8" for b in imgs)            # JPEG magic
+
+
+def test_double_captions_teach_the_streamer_and_rerender_once(con, monkeypatch, tmp_path):
+    # Valkyrae shows live captions too: found by the check on 2026-10-20, not by hand.
+    monkeypatch.setenv("VISUAL_QA", "1")
+    con.execute("INSERT INTO radar_candidates (clip_id, creator, title, url, view_count, clip_created_at,"
+                " views_per_hour, clips_id) VALUES ('a', 'Valkyrae', '', 'u', 1, '2026-10-20T00:00:00Z', 1, 1)")
+    con.execute("UPDATE clips SET visual_qa='{\"ok\": true}' WHERE id=2")
+    con.commit()
+    dbl = lambda imgs: '{"ok": false, "issues": [{"code": "double_captions", "frame": 2}]}'   # noqa: E731
+    res = V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])
+    assert res["rerender"] == [1]
+    assert con.execute("SELECT state, visual_qa FROM clips WHERE id=1").fetchone() == ("needs_rerender", None)
+    assert con.execute("SELECT creator, own_captions FROM creator_flags").fetchall() == [("valkyrae", 1)]
+    import clip
+    db = tmp_path / "c.db"
+    disk = sqlite3.connect(db)
+    con.backup(disk)
+    disk.close()
+    assert "valkyrae" in clip.own_caption_logins(db=str(db))                   # the Editor now skips ours
+    # after the re-render: still double captions -> no second automatic retry, it waits for a tap
+    con.execute("UPDATE clips SET state='qc_passed' WHERE id=1")
+    con.commit()
+    res = V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])
+    assert res["failed"] == {1: ["double_captions"]} and res["rerender"] == []

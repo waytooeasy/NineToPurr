@@ -38,7 +38,7 @@ streamers:
   - {name: xQc, platform: twitch, id: xqc}
   - {name: xQc, platform: kick, id: xqc}
   - {name: Sykkuno, platform: twitch, id: sykkuno, own_captions: true}   # burns live captions on stream
-  - {name: Valkyrae, platform: twitch, id: valkyrae}
+  - {name: Valkyrae, platform: twitch, id: valkyrae, own_captions: true}   # live captions (visual check, 10-20)
   - {name: Tfue, platform: twitch, id: tfue}
   - {name: TimTheTatman, platform: twitch, id: timthetatman}
   - {name: Summit1g, platform: twitch, id: summit1g}
