@@ -197,6 +197,20 @@ def market_window(pick, w_in, w_out, trim=MAX_TRIM_S):
     return start, end
 
 
+def market_meta(creator):
+    """(streamer name as fans write it, today's popping titles about them) from the Shorts market scan
+    (radar/market.py, D48). ('caseoh_' -> 'CaseOh'.) Without a scan: (creator, [])."""
+    try:
+        root = str(Path(__file__).resolve().parents[1])
+        if root not in sys.path:
+            sys.path.append(root)
+        from radar import market
+        name, titles = market.popping_titles(creator)
+        return name or creator, titles
+    except Exception:  # noqa: BLE001 - the Writer works without market context
+        return creator, []
+
+
 def draft_pick(work, pick, creator, meta=None, clip_id=None):
     """Writer on the transcript inside one Radar pick -> pick with hook/hooks/context_line/title/score.
     `clip_id` = clips.id; tags the llm_usage rows."""
@@ -205,7 +219,10 @@ def draft_pick(work, pick, creator, meta=None, clip_id=None):
              if (m := re.match(r"\[(\d+(?:\.\d+)?)-", ln)) and pick["start"] <= float(m.group(1)) < pick["end"]]
     if not lines:
         raise ValueError("no transcript inside the pick")
-    pl = write_clip("\n".join(lines), creator, meta, clip_id=clip_id)
+    name, popping = market_meta(creator)
+    if popping:
+        meta = {**(meta or {}), "popping_now": popping}
+    pl = write_clip("\n".join(lines), name, meta, clip_id=clip_id)
     start, end = market_window(pick, pl["in"], pl["out"])
     return cap_pick({**pick, "start": start, "end": end, "hook": pl["hooks"][0], "hooks": pl["hooks"],
                      "hook_variant": 0, "context_line": pl["context_line"], "title": pl["title"],

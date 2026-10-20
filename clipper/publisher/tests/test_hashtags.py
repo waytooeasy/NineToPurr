@@ -51,3 +51,15 @@ def test_streamer_for_maps_login_to_watchlist_name(tmp_path):
     assert H.streamer_for(con, 6, wl) == ADIN
     assert H.streamer_for(con, 99, wl) is None
     assert H.streamer_tag({"name": "Stable Ronaldo", "login": "stableronaldo"}, MARKET) == "#stableronaldo"
+
+
+def test_streamer_sub_market_tags_and_cap(tmp_path, monkeypatch):
+    m = tmp_path / "market.json"
+    m.write_text(json.dumps({"streamers": {"Jynxzi": {"hashtags": ["#jynxzi", "#r6", "#rainbowsix"]}}}))
+    monkeypatch.setenv("CLIPPER_MARKET", str(m))
+    assert H.market_tags("Jynxzi") == ["#jynxzi", "#r6", "#rainbowsix"] and H.market_tags("Nobody") == []
+    jyn = {"name": "Jynxzi", "login": "jynxzi", "platform": "twitch"}
+    sn = H.apply(dict(SN, title="Jynxzi hears a real alarm 😭"), "ctx", jyn, dict(MARKET, streamer_tags=H.market_tags("Jynxzi")))
+    assert sn["title"].endswith("#jynxzi")
+    tags = sn["description"].split("\n\n")[1].split()
+    assert tags[:3] == ["#jynxzi", "#r6", "#rainbowsix"] and len(tags) <= H.MAX_DESC_TAGS

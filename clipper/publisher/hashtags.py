@@ -4,7 +4,8 @@ Reads $CLIPPER_HASHTAGS (default /opt/clipper/formats/hashtags.json), written da
 (analyst/hashtag_scout.py) from the top clip channels' Shorts, and applies it the way they do:
 - title: the streamer's tag at the end when most top Shorts carry one ("... 😭 #ishowspeed"), unless the
   Writer already put it there; the title stays <= 100 characters
-- description: the story line, then the streamer's tag + today's popping generic tags (+ #Shorts)
+- description: the story line, then the streamer's tag + the tags popping Shorts about this streamer use
+  (market scan, D48) + today's popping generic tags (+ #Shorts), at most 6
 - tags: streamer name + the market's plain keywords
 Only the clip's own streamer is ever tagged (other streamers' tags would be misleading metadata).
 A Kick clip gets #kick instead of #twitch. No file yet -> today's research default (NexxoRecaps:
@@ -18,6 +19,8 @@ from pathlib import Path
 import yaml
 
 HASHTAGS_FILE = "/opt/clipper/formats/hashtags.json"
+MARKET_FILE = "/opt/clipper/formats/market.json"       # radar/market.py scan (D48): per-streamer hashtags
+MAX_DESC_TAGS = 6
 WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
 DEFAULT = {"title_share": 1.0, "generic": ["#shorts"], "streamers": {}, "keywords": []}
 TITLE_MAX = 100
@@ -37,6 +40,15 @@ def load(path=None):
         return {**DEFAULT, **{k: d[k] for k in DEFAULT if k in d}}
     except (OSError, ValueError, TypeError):
         return dict(DEFAULT)
+
+
+def market_tags(name, path=None):
+    """Hashtags the popping Shorts about this streamer use today (radar/market.py, 2+ channels), or []."""
+    try:
+        d = json.loads(Path(path or os.environ.get("CLIPPER_MARKET", MARKET_FILE)).read_text())
+        return [str(t) for t in (d.get("streamers", {}).get(name) or {}).get("hashtags") or []]
+    except (OSError, ValueError, TypeError, AttributeError):
+        return []
 
 
 def _names(watchlist=None):
@@ -79,6 +91,10 @@ def apply(snippet, context_line, streamer, market):
     """Hashtags on title/description/tags of a videos.insert snippet (returns a new snippet)."""
     sn = dict(snippet)
     own = streamer_tag(streamer, market) if streamer else None
+    sub = list(market.get("streamer_tags") or [])          # this streamer's sub-market (D48)
+    if streamer:
+        mine = [t for t in sub if flat(t) in (flat(streamer["name"]), flat(streamer["login"]))]
+        own = mine[0] if mine else own
     title = sn["title"]
     if own and market.get("title_share", 0) >= 0.5 and flat(own) not in {flat(t) for t in TAG.findall(title)}:
         if len(title) + 1 + len(own) <= TITLE_MAX:
@@ -87,7 +103,7 @@ def apply(snippet, context_line, streamer, market):
     generic = list(market.get("generic") or [])
     if streamer and streamer["platform"] == "kick":
         generic = [g for g in generic if flat(g) != "twitch"] + ["#kick"]
-    line = _uniq(([own] if own else []) + generic + ["#Shorts"])
+    line = _uniq(([own] if own else []) + sub + generic + ["#Shorts"])[:MAX_DESC_TAGS]
     sn["description"] = "\n\n".join([p for p in [(context_line or "").strip(), " ".join(line)] if p])
     kw = ([streamer["name"]] if streamer else []) + list(sn.get("tags") or []) + list(market.get("keywords") or [])
     tags, size = [], 0

@@ -83,3 +83,15 @@ def test_market_section_is_capped(tmp_path):
     f = tmp_path / "big.md"
     f.write_text("x" * (W.MARKET_MAX_CHARS * 2), encoding="utf-8")
     assert len(W.market_section(f)) < W.MARKET_MAX_CHARS + 200
+
+
+def test_title_names_the_streamer_as_fans_write_it_and_never_copies_a_popping_title():
+    import writer as W
+    plan = {"score": 0.7, "in": 0.0, "out": 20.0, "hooks": ["a b", "c d", "e f"], "context_line": "CaseOh trips",
+            "title": "Somebody has to lock CaseOh up 😭🙏", "music_risk": False}
+    assert W.check(plan, "CaseOh", ["Someone needs to lock CaseOh up 😭🙏"]) is plan          # paraphrase is fine
+    with pytest.raises(ValueError, match="paraphrase"):
+        W.check({**plan, "title": "Someone needs to lock CaseOh up 😭🙏"}, "CaseOh", ["Someone needs to lock CaseOh up 😭🙏"])
+    assert W.check({**plan, "title": "Kai Cenat can't wait for Christmas"}, "kaicenat")      # login vs name: flat match
+    with pytest.raises(ValueError, match="name the streamer"):
+        W.check({**plan, "title": "bro fell off"}, "CaseOh")

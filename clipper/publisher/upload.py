@@ -281,7 +281,11 @@ def run_once(con, cfg: Config, uploader, alert, now: datetime | None = None) -> 
             _fail(con, cid, f"file missing: {path}", alert)
             continue
         import hashtags
-        meta = build_metadata(clip, cfg, streamer=hashtags.streamer_for(con, cid), market=hashtags.load())
+        streamer = hashtags.streamer_for(con, cid)
+        market = hashtags.load()
+        if streamer:
+            market = {**market, "streamer_tags": hashtags.market_tags(streamer["name"])}
+        meta = build_metadata(clip, cfg, streamer=streamer, market=market)
         try:
             vid = uploader(path, meta)
         except QuotaExceeded as exc:
