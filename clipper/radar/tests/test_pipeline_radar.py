@@ -252,3 +252,16 @@ def test_refresh_formats_also_copies_todays_hashtags(tmp_path, monkeypatch):
     monkeypatch.setenv("CLIPPER_STYLE", str(tmp_path / "style.json"))
     run_pipeline.refresh_formats(tmp_path / "library.md", repo=tmp_path, runner=FakeGitHashtags())
     assert "#twitch" in hp.read_text()
+
+
+def test_music_titles_are_skipped_and_uncaptionable_clips_free_their_slot(con):
+    assert top_clips.looks_like_music("Caseoh Singing Like An Angel W Vocals😇🎤🎵")
+    assert top_clips.looks_like_music("xQc karaoke night") and top_clips.looks_like_music("🎵🎵")
+    assert not top_clips.looks_like_music("Lacy threatens to leave") and not top_clips.looks_like_music("wrapping up")
+    con.execute("INSERT INTO creators (id, name) VALUES (90, 'caseoh_')")
+    con.execute("INSERT INTO sources (id, creator_id, url) VALUES (90, 90, 'u90')")
+    con.execute("INSERT INTO clips (id, source_id, start_s, end_s, state, last_error, state_changed_at) VALUES"
+                " (90, 90, 0, 35, 'captured', 'no transcript inside the pick', datetime('now'))")
+    con.commit()
+    assert run_pipeline.retire_uncaptionable(con) == [90]
+    assert con.execute("SELECT state, last_error FROM clips WHERE id=90").fetchone()[0] == "killed"

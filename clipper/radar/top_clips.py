@@ -9,6 +9,7 @@ Env: TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, CLIPPER_DB (default /opt/clipper/db
 import argparse
 import json
 import os
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
@@ -90,6 +91,16 @@ def dedupe(clips):
         if not any(_same_moment(c, k) for k in kept):
             kept.append(c)
     return kept
+
+
+MUSIC = re.compile(r"\b(sing|sings|singing|sang|song|songs|karaoke|vocals|rapping|raps|freestyle|dj set|concert|"
+                   r"music|cover)\b|[\U0001F3B5\U0001F3B6\U0001F3A4\U0001F3A7\U0001F3B8\U0001F3B9\U0001F941]", re.I)
+
+
+def looks_like_music(title):
+    """A clip titled like singing/music: no speech to caption and a likely copyright claim (CaseOh "Singing Like
+    An Angel W Vocals", 2026-10-20, blocked a slot)."""
+    return bool(MUSIC.search(str(title or "")))
 
 
 def filter_allowed(creators, allowed=None):
