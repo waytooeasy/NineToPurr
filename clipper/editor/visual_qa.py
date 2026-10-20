@@ -30,14 +30,22 @@ CODES = {
     "no_watermark": "no small '@Peakz.Recaps' handle near the bottom centre",
 }
 PROMPT = (
-    "These are 3 frames (1080x1920) from one finished YouTube Short made by a stream-clip channel. "
-    "Expected look: full-bleed 9:16 video (or a facecam panel on top of gameplay), ONE caption line of "
-    "2-3 heavy words mid-screen, a short hook line near the top in the first frame only, and a small "
-    "semi-transparent '@Peakz.Recaps' handle near the bottom centre. Game UI / HUD text and text that is "
-    "part of the scene (signs, shirts, overlays of the stream) are fine.\n"
-    "Report only clear problems from this list:\n"
-    + "\n".join(f"- {k}: {v}" for k, v in CODES.items())
-    + "\nAnswer with JSON only: {\"ok\": true} or {\"ok\": false, \"issues\": [{\"code\": \"<code>\", "
+    "These are 3 frames (1080x1920) from one finished YouTube Short made by a stream-clip channel.\n"
+    "OUR text on it is exactly: (a) ONE caption line of 2-3 heavy ALL-CAPS words with a thick black outline "
+    "around the middle of the screen, (b) in frame 1 only, a short ALL-CAPS hook line higher up, (c) a small "
+    "semi-transparent '@Peakz.Recaps' handle near the bottom centre.\n"
+    "Check each frame carefully for these problems:\n"
+    "- double_captions: ANY other subtitle-style text that transcribes speech is visible at the same time as "
+    "our caption, e.g. the streamer's own live captions (usually sentence-case or lowercase white text near "
+    "the bottom, sometimes with one coloured word). Report it even if both look clean. Game menus/HUD, chat, "
+    "signs and stream overlays are not captions.\n"
+    "- broken_glyphs: boxes, squares, empty rectangles or garbled symbols inside any of OUR text.\n"
+    "- blurry_panel: a panel or the whole frame is a heavily blown-up, blurry low-resolution crop.\n"
+    "- bad_crop: the main subject (face / action) is cut off or the frame shows mostly nothing.\n"
+    "- text_overlap: two of OUR text blocks overlap each other, or text runs off the screen edge.\n"
+    "- black_bars: black or blurred bars / letterboxing.\n"
+    "- no_watermark: the '@Peakz.Recaps' handle is missing.\n"
+    "Answer with JSON only: {\"ok\": true} or {\"ok\": false, \"issues\": [{\"code\": \"<code>\", "
     "\"frame\": <1-3>, \"note\": \"<6 words max>\"}]}"
 )
 
