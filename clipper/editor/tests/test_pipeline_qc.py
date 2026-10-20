@@ -102,10 +102,10 @@ def test_qc_blocks_duplicate_file(env, tmp_path):
 
 
 def test_qc_daily_cap_and_next_day(env, tmp_path):
-    ids = [add_clip(env, i, path=mp4(tmp_path, f"{i}.mp4", bytes([i]))) for i in range(1, 8)]
+    ids = [add_clip(env, i, path=mp4(tmp_path, f"{i}.mp4", bytes([i]))) for i in range(1, qc.DAILY_CAP + 3)]
     res = qc.run(env, probe=lambda p: 20.0)
-    assert len(res["passed"]) == 5 and set(res["failed"]) == set(ids[5:])
-    assert "daily cap 5" in row(env, ids[5])["last_error"]
+    assert len(res["passed"]) == qc.DAILY_CAP and set(res["failed"]) == set(ids[qc.DAILY_CAP:])
+    assert f"daily cap {qc.DAILY_CAP}" in row(env, ids[qc.DAILY_CAP])["last_error"]
     env.execute("UPDATE clips SET qc_passed_at=datetime('now','-1 day')")  # yesterday's don't count
     env.commit()
     assert len(qc.run(env, probe=lambda p: 20.0)["passed"]) == 2
@@ -225,7 +225,7 @@ def test_capture_failure_marks_only_that_clip(env, tmp_path):
 
 
 def test_radar_respects_daily_cap(env):
-    for i in range(5):
+    for i in range(qc.DAILY_CAP):
         add_clip(env, i, state="captured")
     assert run_pipeline.radar_step(env, FakeTwitch(), ["kaicenat"], **OFFLINE) == []
 

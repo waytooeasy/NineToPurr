@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 MAX_S = 60.0
-DAILY_CAP = 5
+DAILY_CAP = 6   # D52: the most active top clippers post ~6/day (2026-10-20)
 DEFAULT_DB = "/opt/clipper/db/clip.db"
 
 

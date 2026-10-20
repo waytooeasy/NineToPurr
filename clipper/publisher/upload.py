@@ -36,7 +36,7 @@ class Config:
     tz: str = "America/Asuncion"
     window_start: str = "19:00"
     window_end: str = "02:00"        # earlier than start = crosses midnight
-    max_per_day: int = 5             # D8
+    max_per_day: int = 6             # D8, D52
     min_gap_hours: float = 2.0
     category_id: str = "20"          # Gaming
     privacy: str = "public"
