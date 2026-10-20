@@ -4,8 +4,8 @@
 # Kick = channel slug from kick.com/<slug> (D45). An unknown login/slug is logged and skipped.
 # own_captions: true = the stream already shows live captions; the Editor adds no captions of its own
 # (two caption tracks on one Short, Sykkuno 2026-10-20). Hook + watermark stay.
-# daily_cap = Shorts slots per day (D33: 5 for two weeks, then HQ raises it).
-daily_cap: 5
+# daily_cap = Shorts slots per day (D52: 6, like the most active top clippers; paced one every 4 h).
+daily_cap: 6
 max_per_streamer: 2
 explore_days: 3
 explore_top_n: 15

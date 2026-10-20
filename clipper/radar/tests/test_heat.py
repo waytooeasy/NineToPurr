@@ -87,7 +87,7 @@ def test_no_exploration_candidate_uses_slot_proportionally():
 
 def test_load_watchlist_real_config():
     cfg = heat.load_watchlist()
-    assert cfg["cap"] == 5 and 28 <= len(cfg["streamers"]) <= 40
+    assert cfg["cap"] == 6 and 28 <= len(cfg["streamers"]) <= 40
     assert cfg["streamers"]["Adin Ross"] == [{"platform": "kick", "id": "adinross"}]   # Kick on (D45)
     assert {e["platform"] for e in cfg["streamers"]["xQc"]} == {"twitch", "kick"}
     assert {e["platform"] for e in cfg["streamers"]["IShowSpeed"]} == {"twitch", "youtube"}
