@@ -14,17 +14,17 @@
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#E8E822",
+    "highlight": "#FFD700",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
     "highlights": [
-      "#E8E822",
-      "#E8272B",
-      "#3A9BFF",
-      "#FFD700"
+      "#FFD700",
+      "#FF3B3B",
+      "#33A8FF",
+      "#A6FF00"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Bold uppercase captions, 1-3 words, colored emphasis words, dark outline, mostly centered."
+  "notes": "Bold uppercase captions with dark outline; highlight colours vary per word (yellow, red, blue, green)."
 }
