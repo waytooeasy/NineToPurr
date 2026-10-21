@@ -136,3 +136,36 @@ def test_match_score_sees_wrong_captions_and_wrong_pictures(tmp_path):
     assert ok["picture"] == 100 and ok["captions"] == 100
     assert bad_cap["captions"] < 20 and bad_cap["picture"] == 100
     assert 40 <= bad_pic["picture"] <= 60 and bad_pic["bad"] and bad_pic["bad"][0][2] == "picture"
+
+
+def test_caption_states_become_events_with_word_reveals():
+    segs = [(0, 12), (12, 30), (30, 45), (50, 60)]
+    texts = [[["YOU"]], [["YOU", "THINK"]], [["BOZO"]], [["BOZO"]]]
+    evs = style.state_events(segs, texts, 30, 0.5)
+    assert [(e["start"], e["end"]) for e in evs] == [(0.0, 1.0), (1.0, 1.5), (1.667, 2.0)]
+    assert [(w["w"], w["t"]) for w in evs[0]["words"]] == [("YOU", 0.0), ("THINK", 0.4)]
+
+
+def test_solid_box_padding_is_measured():
+    th = np.full((400, 600, 3), 180, np.uint8)
+    th[150:250, 100:500] = 5                     # their black box
+    th[180:220, 140:460] = 255                   # the text inside it
+    px, py = style.box_pad(th, (140, 460, 180, 220))
+    assert abs(px - 40) <= 3 and abs(py - 30) <= 3
+    assert style.box_pad(np.full((400, 600, 3), 180, np.uint8), (140, 460, 180, 220)) is None
+
+
+def test_box_is_drawn_around_the_words_shown(tmp_path):
+    st = {"family": "Anton", "fs": 150, "spacing": 0, "outline": 0, "line_h": 80, "x": 0.5, "y": 0.5, "dy": 10,
+          "box_pad": [20, 18], "anim": {"kind": "none"}, "colours": [["#FFFFFF", "#FFFFFF"]],
+          "llm": {"box": {"present": True, "colour": "#000000", "opacity": 1}}}
+    evs = [{"start": 0, "end": 1, "lines": [2], "words": [{"w": "A", "c": "#FFFFFF", "t": 0},
+                                                         {"w": "BB", "c": "#FFFFFF", "t": 0.5}]}]
+    txt = Path(caps.write_ass_style(evs, tmp_path / "b.ass", 1080, 1920, st,
+                                    width=lambda s: 50 * len(s))).read_text()
+    boxes = [ln for ln in txt.splitlines() if "\\p1" in ln]
+    assert len(boxes) == 2
+    assert "m 495 902 l 585 902 585 1018 495 1018" in boxes[0]          # "A": 50 + 2*20 wide, 80 + 2*18 high
+    assert "m 420 902 l 660 902" in boxes[1]                              # "A BB": 200 + 40 wide
+    main = [ln for ln in txt.splitlines() if ln.startswith("Dialogue: 2,")][0]
+    assert "\\pos(540,950)" in main                                      # letters' centre at y, minus libass offset

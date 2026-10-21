@@ -394,7 +394,7 @@ def style_header(out_w, out_h, st):
     outline = float(st.get("outline") or 0) if ol.get("present", True) else 0.0
     oc = ass_colour(_rgb_hex(ol.get("colour"), "#000000"))
     border_style, back = 1, "&H00000000"
-    if box.get("present"):
+    if box.get("present") and not st.get("box_pad"):    # measured boxes are drawn exactly (write_ass_style)
         border_style = 3
         back = f"&H{int(round((1 - float(box.get('opacity', 1))) * 255)):02X}{ass_colour(_rgb_hex(box.get('colour'), '#000000'))[2:-1]}"
         oc = f"&H{int(round((1 - float(box.get('opacity', 1))) * 255)):02X}{ass_colour(_rgb_hex(box.get('colour'), '#000000'))[2:-1]}"
@@ -411,7 +411,46 @@ def style_header(out_w, out_h, st):
             "5,80,80,0,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
 
-def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None):
+def _libass_width(st):
+    """text -> libass width at the style's font, size and spacing (cached; style.libass_width)."""
+    from . import style as S
+    entry = (st["family"], st.get("bold", 0), st.get("italic", 0))
+    cache = {}
+
+    def w(text):
+        if text not in cache:
+            cache[text] = S.libass_width(entry, text, st["fs"], st.get("spacing") or 0)
+        return cache[text]
+    return w
+
+
+def _box_lines(ev, x, cy, pad, lh, box, width, upper):
+    """Their solid box, drawn per reveal state around the words shown so far (measured padding)."""
+    col = ass_colour(_rgb_hex(box.get("colour"), "#000000"))
+    alpha = _ass_alpha(box.get("opacity", 0.85))
+    words = [(w["w"].upper() if upper else w["w"]) for w in ev["words"]]
+    times = [max(ev["start"], w["t"]) for w in ev["words"]] + [ev["end"]]
+    shape = ev.get("lines") or [len(words)]
+    out = []
+    for i in range(len(words)):
+        t0, t1 = times[i], times[i + 1] if i + 1 < len(words) else ev["end"]
+        if t1 - t0 <= 0.001:
+            continue
+        shown, k, rows = words[:i + 1], 0, []
+        for n in shape:
+            if k >= len(shown):
+                break
+            rows.append(" ".join(shown[k:k + n]))
+            k += n
+        bw = max(width(r) for r in rows) + 2 * pad[0]
+        bh = len(rows) * lh + (len(rows) - 1) * 0.3 * lh + 2 * pad[1]
+        x0, y0 = x - bw / 2, cy - bh / 2
+        out.append(f"Dialogue: 0,{ts(t0)},{ts(t1)},C,,0,0,0,,{{\\an7\\pos(0,0)\\bord0\\shad0\\c{col}\\alpha{alpha}\\p1}}"
+                   f"m {x0:.0f} {y0:.0f} l {x0 + bw:.0f} {y0:.0f} {x0 + bw:.0f} {y0 + bh:.0f} {x0:.0f} {y0 + bh:.0f}{{\\p0}}")
+    return out
+
+
+def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None, width=None):
     """ASS of the caption events in THEIR measured style (style.build): font, size, spacing, colours per word,
     position, outline, shadow, glow, box and how words appear."""
     from pathlib import Path
@@ -423,11 +462,19 @@ def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None):
     if mark and dur:
         lines.append(f"Dialogue: 4,{ts(0)},{ts(dur)},Mark,,0,0,0,,{{\\an5\\pos({out_w / 2:.0f},{0.849 * out_h:.0f})}}{mark}")
     sh, gl = llm.get("shadow") or {}, llm.get("glow") or {}
+    box = llm.get("box") or {}
+    pad = st.get("box_pad") if box.get("present") else None
+    if pad:
+        gl = {}            # a glow around a solid box is the box's own edge
+    width = width or _libass_width(st)
     outline = float(st.get("outline") or 0)
     for k, ev in enumerate(evs):
         cols = (st.get("colours") or [])[k] if k < len(st.get("colours") or []) else [w["c"] for w in ev["words"]]
-        y = (st.get("y") or ev.get("y", 0.5)) * out_h
+        cy = (st.get("y") or ev.get("y", 0.5)) * out_h
+        y = cy - float(st.get("dy") or 0)
         s0, s1 = ts(ev["start"]), ts(ev["end"])
+        if pad:
+            lines += _box_lines(ev, x, cy, pad, lh, box, width, llm.get("case") == "upper")
         if gl.get("present"):
             gb = max(1.0, float(gl.get("size", 0.25)) * lh)
             lines.append(f"Dialogue: 0,{s0},{s1},C,,0,0,0,,{{\\an5\\pos({x:.0f},{y:.0f})\\bord{outline + gb:.1f}"

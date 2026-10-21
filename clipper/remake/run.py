@@ -14,6 +14,8 @@ import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import numpy as np
+
 from . import amap, caps, look, match, render, source, style, title, vmap
 from . import common as C
 
@@ -147,15 +149,19 @@ def _stage(work, name, fn):
     return out
 
 
-def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None):
+def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision):
     """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
     study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}."""
     OW, OH, fps, nfr = vm["out_w"], vm["out_h"], vm["fps"], vm["nfr"]
     base = work / "base.mp4"
     if not base.exists():
         render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
-    st = _stage(work, "style", lambda: style.build(short_path, base, cp["events"], fps, OW, OH, vision_style))
-    evs = cp["events"]
+    # their caption states, frame-exact from the pixels (a new word / caption / no caption), one OCR per state
+    y0 = float(np.median([e["y"] for e in cp["events"]])) if cp["events"] else 0.5
+    pe = _stage(work, "pixcaps", lambda: {"events": style.pixel_events(short_path, base, fps, nfr, (OW, OH), y0,
+                                                                         vision)})
+    evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
+    st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
     if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
         evs = [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cols)]}
                for e, cols in zip(evs, st["colours"])]
@@ -226,7 +232,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
                                                      bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
-        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style)
+        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style, vision)
         shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))

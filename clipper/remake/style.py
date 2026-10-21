@@ -301,10 +301,34 @@ def measure_event(th, base, ev):
         x0, x1 = xs.min(), xs.max() + 1
     out["cy"] = float((y0 + y1) / 2 / th.shape[0])
     out["cx"] = float((x0 + x1) / 2 / th.shape[1])
+    out["box_pad"] = box_pad(th, (x0, x1, y0, y1))
     cap = [ln["r1"] - ln["r0"] for ln in out["lines"]] or [lines[0][1] - lines[0][0]]
     out["line_h"] = float(np.median(cap))
     out["outline"] = outline_px(fill, dark, out["line_h"])
     return out
+
+
+def box_pad(th, text_box, dark_v=60, share=0.7):
+    """(pad_x, pad_y) in px of a solid dark box behind the text, or None: from the text's edges, how far rows /
+    columns stay dark (their box covers the picture, so its pixels are uniformly dark)."""
+    x0, x1, y0, y1 = [int(v) for v in text_box]
+    H, W = th.shape[:2]
+    h = max(1, y1 - y0)
+    dark = th.max(2) < dark_v
+    def run(lines):
+        n = 0
+        for ln in lines:
+            if ln.size == 0 or ln.mean() < share:
+                break
+            n += 1
+        return n
+    left = run([dark[y0:y1, x] for x in range(x0 - 2, max(-1, x0 - 2 * h), -1)])
+    right = run([dark[y0:y1, x] for x in range(x1 + 1, min(W, x1 + 2 * h))])
+    top = run([dark[y, x0:x1] for y in range(y0 - 2, max(-1, y0 - 2 * h), -1)])
+    bot = run([dark[y, x0:x1] for y in range(y1 + 1, min(H, y1 + 2 * h))])
+    if min(left, right, top, bot) < 0.08 * h:
+        return None
+    return (float((left + right) / 2 + 2), float((top + bot) / 2 + 2))
 
 
 def outline_px(fill, dark, line_h):
@@ -374,6 +398,12 @@ def animation(short_path, base_path, evs, fps, size, n_events=6, look_frames=14)
 # ---------------- libass size ----------------
 def libass_width(entry, text, fs, spacing, fonts_dir=None):
     """Width in px of `text` as libass renders it with this font, size and spacing."""
+    b = libass_bbox(entry, text, fs, spacing, fonts_dir)
+    return float(b[1] - b[0]) if b else 0.0
+
+
+def libass_bbox(entry, text, fs, spacing, fonts_dir=None):
+    """(x0, x1, y0, y1) of the ink of `text` drawn with \\an5 at the canvas centre (W/2, H/2), or None."""
     W, H = 4000, int(fs * 3)
     with tempfile.TemporaryDirectory() as d:
         ass = Path(d) / "w.ass"
@@ -390,8 +420,10 @@ def libass_width(entry, text, fs, spacing, fonts_dir=None):
                               "-vf", f"ass={ass}:fontsdir={fonts_dir or C.fonts_dir()}", "-frames:v", "1",
                               "-pix_fmt", "gray", "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
     a = np.frombuffer(raw, np.uint8).reshape(H, W) > 128
-    xs = np.where(a.any(0))[0]
-    return float(xs.max() - xs.min() + 1) if len(xs) else 0.0
+    xs, ys = np.where(a.any(0))[0], np.where(a.any(1))[0]
+    if not len(xs):
+        return None
+    return (float(xs.min() - W / 2), float(xs.max() + 1 - W / 2), float(ys.min() - H / 2), float(ys.max() + 1 - H / 2))
 
 
 # ---------------- Sonnet: what pixels can't say easily ----------------
@@ -494,6 +526,9 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
                 fss.append(100 * (ln["x1"] - ln["x0"]) / w100)
     fs = float(np.median(fss)) if fss else None
     good = [m for m in ms if m]
+    pads = [m["box_pad"] for m in good if m.get("box_pad")]
+    box = [float(np.median([p[0] for p in pads])), float(np.median([p[1] for p in pads]))] \
+        if len(pads) >= max(2, 0.4 * len(good)) else None
     line_h = float(np.median([m["line_h"] for m in good]))
     outline = float(np.median([m["outline"] for m in good]))
     cy = float(np.median([m["cy"] for m in good]))
@@ -508,7 +543,14 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
             r0, r1 = max(0, int(top - line_h)), min(out_h, int(bot + line_h))
             crops.append(m["frame"][r0:r1])
     looks = ask_style(crops, line_h, outline, vision) if crops else {}
+    dy = 0.0
+    if fs:   # \\an5 centres the line box; their measured centre is the letters' centre
+        bb = libass_bbox(entry, "HELLO", fs, track * fs, fonts_dir)
+        dy = (bb[2] + bb[3]) / 2 if bb else 0.0
+    if box and looks.get("box") is not None:
+        looks["box"]["present"] = True
     st = {"ok": fs is not None, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3],
+          "box_pad": box, "dy": dy,
           "font_score": round(score, 3), "track": track, "fs": fs, "spacing": None if fs is None else track * fs,
           "outline": outline, "line_h": line_h, "x": cx, "y": cy, "anim": anim, "colours": colours,
           "llm": looks, "alternatives": [(round(s, 3), e[0], e[2], t) for s, e, t in ranked[1:4]]}
@@ -534,3 +576,112 @@ def with_font(st, alt_index, fonts_dir=None):
     fs = st["fs"] * scale if (st.get("fs") and scale) else st.get("fs")
     return {**st, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3], "track": tr, "fs": fs,
             "spacing": None if fs is None else tr * fs}
+
+
+# ---------------- caption states from their pixels (exact timing) ----------------
+SEG_W = 540
+SEG_IOU = 0.6
+OCR_PROMPT = ("Each image is a crop of one YouTube Short frame around its big burned-in caption. For each image, in "
+              "order, read the caption exactly as shown (keep punctuation, $, *asterisks*, case). Return JSON only: a "
+              "list with one object per image: {{\"lines\": [[\"WORD\", ...], ...]}} (lines top to bottom, words "
+              "left to right); an image without a caption: {{\"lines\": []}}. There are {n} images.")
+
+
+def caption_states(short_path, base_path, fps, nfr, size, y, band=0.2, chunk=120):
+    """[(n0, n1)] frame ranges in which their caption shows the same text (a new word, a new caption or no caption
+    starts a new range), found on |their - base| fill masks at SEG_W wide."""
+    W0, H0 = size
+    w, h = SEG_W, int(round(SEG_W * H0 / W0 / 2) * 2)
+    k3 = np.ones((3, 3), np.uint8)
+    segs, cur, prev = [], None, None
+    for k in range(0, nfr, chunk):
+        a = C.read_frames(short_path, k, min(chunk, nfr - k), fps, (w, h))
+        b = C.read_frames(base_path, k, min(chunk, nfr - k), fps, (w, h))
+        for i in range(min(len(a), len(b))):
+            n = k + i
+            _, fill, _ = caption_masks(a[i], b[i], y, band)
+            m = cv2.dilate(fill.astype(np.uint8), k3) > 0 if fill.sum() >= 40 else None
+            if m is None:
+                if cur is not None:
+                    segs.append((cur, n))
+                    cur = None
+            elif cur is None:
+                cur = n
+            else:
+                inter, union = (m & prev).sum(), (m | prev).sum()
+                if union and inter / union < SEG_IOU:
+                    segs.append((cur, n))
+                    cur = n
+            prev = m
+    if cur is not None:
+        segs.append((cur, nfr))
+    return [(a, b) for a, b in segs if b - a >= 2]
+
+
+def read_states(short_path, segs, fps, size, y, vision, band=0.2, batch=12):
+    """Text lines of each caption state (one frame 70 % of the way in, cropped to the caption rows)."""
+    W0, H0 = size
+    r0, r1 = max(0, int((y - band) * H0)), min(H0, int((y + band) * H0))
+    imgs = []
+    for a, b in segs:
+        f = frame(short_path, a + int(0.7 * (b - a)), fps, size)
+        crop = f[r0:r1] if f is not None else np.zeros((r1 - r0, W0, 3), np.uint8)
+        crop = cv2.resize(crop, (720, int(720 * crop.shape[0] / crop.shape[1])))
+        imgs.append(cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 90])[1].tobytes())
+    out = []
+    for k in range(0, len(imgs), batch):
+        part = imgs[k:k + batch]
+        items = None
+        for _ in range(3):
+            txt = vision(part, OCR_PROMPT.format(n=len(part)))
+            mm = re.search(r"\[.*\]", txt or "", re.S)
+            try:
+                items = json.loads(mm.group(0)) if mm else None
+            except ValueError:
+                items = None
+            if isinstance(items, list) and len(items) == len(part):
+                break
+            items = None
+        for it in items or [{}] * len(part):
+            lines = [[str(wd).strip() for wd in ln if str(wd).strip()] for ln in (it or {}).get("lines") or []
+                     if isinstance(ln, list)]
+            out.append([ln for ln in lines if ln])
+    return out
+
+
+def _key(w):
+    return re.sub(r"[^A-Z0-9$]", "", str(w).upper())
+
+
+def state_events(segs, texts, fps, y):
+    """Caption events from the states: a state whose words continue the previous state's (right after it) adds
+    its new words to that event at its first frame; anything else starts a new event."""
+    evs = []
+    for (a, b), lines in zip(segs, texts):
+        words = [w for ln in lines for w in ln]
+        if not words:
+            continue
+        p = evs[-1] if evs else None
+        pk = [_key(w["w"]) for w in p["words"]] if p else []
+        nk = [_key(w) for w in words]
+        if p and abs(p["end"] - a / fps) < 1.5 / fps and nk[:len(pk)] == pk and len(nk) >= len(pk):
+            p["words"] += [{"w": w, "c": DEFAULT_WHITE, "t": round(a / fps, 3)} for w in words[len(pk):]]
+            p["end"], p["lines"] = round(b / fps, 3), [len(ln) for ln in lines]
+            continue
+        if p and abs(p["end"] - a / fps) < 1.5 / fps and nk == pk:
+            p["end"] = round(b / fps, 3)
+            continue
+        evs.append({"start": round(a / fps, 3), "end": round(b / fps, 3), "y": y, "lines": [len(ln) for ln in lines],
+                    "words": [{"w": w, "c": DEFAULT_WHITE, "t": round(a / fps, 3)} for w in words]})
+    return evs
+
+
+def pixel_events(short_path, base_path, fps, nfr, size, y, vision):
+    segs = caption_states(short_path, base_path, fps, nfr, size, y)
+    if not segs:
+        return []
+    texts = read_states(short_path, segs, fps, size, y, vision)
+    evs = state_events(segs, texts, fps, y)
+    C.log(f"captions from pixels: {len(segs)} states -> {len(evs)} events, "
+          f"{sum(len(e['words']) for e in evs)} words")
+    return evs
