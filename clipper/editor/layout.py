@@ -575,9 +575,10 @@ def content_box(video, start, end, W, H, grab=grey_frames):
 
 def detect_layout(video, start, end, cut=0.0, prefer=None):
     """`cut`: bottom share of the source to drop (a stream's own burned-in caption band). `prefer`: how the
-    market frames this streamer or how the matched clipper framed this moment ("full" / "fit" / "stack"):
-    a face crop becomes the clipper's wide shot for "fit"; for "full" (the market's full-bleed) the chat is
-    blurred out instead of moved to a panel; None keeps our own choice (chat panel when there is chat)."""
+    clippers frame this moment or streamer ("full" / "fit" / "stack", clip.layout_hint, D56): a face crop
+    becomes the clipper's wide shot for "fit"; otherwise the chat spot is blurred out of a full-bleed crop (the
+    clippers' full-bleed Shorts show no chat). "stack" needs a facecam: without one the crop stays. The chat
+    panel ("chat") is only used if a clipper's Short is read that way."""
     try:
         W, H = probe_size(video)
     except Exception:  # noqa: BLE001 - unreadable/odd file: let ffmpeg centre-crop with expressions
@@ -594,7 +595,7 @@ def detect_layout(video, start, end, cut=0.0, prefer=None):
         lay["mode"] = "fit"
     elif lay["mode"] == "crop" and lay.get("follow"):
         chat = find_chat(video, start, end, W, H)
-        if prefer is None:
+        if prefer == "chat":
             lay = chat_layout(lay, chat)
         elif chat:
             lay["hide"] = list(chat)

@@ -471,8 +471,10 @@ def draws_captions(pick):
 
 
 def layout_hint(con, radar_clip_id, creator):
-    """How to frame this clip like the market: the matched clipper Short's layout (that exact moment), else how
-    the top clippers frame this streamer (styles.json), else None (our own choice)."""
+    """How the clippers frame this clip (D56, Lucas 2026-10-21: "always follow the structure of the clipper"):
+    the matched clipper Short of this moment, else one of the same scene, else how the top clippers frame this
+    streamer, else how most top clippers frame streamers. Never our own invention: "full" when nothing is known
+    (the 2026-10-19 format research)."""
     same = same_moment(con, radar_clip_id) or {}
     if same.get("layout"):
         return same["layout"]
@@ -486,9 +488,9 @@ def layout_hint(con, radar_clip_id, creator):
             pass
     try:
         import style as S
-        return S.market_layout(creator)
+        return S.market_layout(creator) or S.market_layout_any() or "full"
     except Exception:  # noqa: BLE001
-        return None
+        return "full"
 
 
 def ensure_layout(video, pick):

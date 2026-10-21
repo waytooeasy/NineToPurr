@@ -100,3 +100,12 @@ def test_market_layout_per_streamer(tmp_path):
     sp.write_text(json.dumps({"streamers": {"Stable Ronaldo": {"logins": ["stableronaldo"], "layout": "full",
                                                                "caption": {}}}}))
     assert S.market_layout("stableronaldo", sp) == "full" and S.market_layout("xqc", sp) is None
+
+
+def test_market_layout_across_streamers(tmp_path):
+    import json
+    import style as S
+    sp = tmp_path / "styles.json"
+    sp.write_text(json.dumps({"streamers": {"A": {"layout": "fit"}, "B": {"layout": "stack"}, "C": {"layout": "fit"},
+                                            "D": {}}}))
+    assert S.market_layout_any(sp) == "fit" and S.market_layout_any(tmp_path / "none.json") is None

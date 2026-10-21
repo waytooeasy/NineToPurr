@@ -103,6 +103,16 @@ def market_layout(creator, sp=None):
     return (streamer_raw(creator, sp) or {}).get("layout")
 
 
+def market_layout_any(sp=None):
+    """The layout most of the top clippers use across the streamers the style scout read, or None."""
+    try:
+        d = json.loads(Path(sp or styles_path()).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    lays = [e.get("layout") for e in (d.get("streamers") or {}).values() if e.get("layout")]
+    return max(sorted(set(lays)), key=lays.count) if lays else None
+
+
 def load(p=None, creator=None, sp=None):
     """Global market style (style.json), with this creator's streamer style (styles.json) laid over it."""
     try:

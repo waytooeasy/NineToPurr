@@ -261,3 +261,8 @@ def test_layout_hint_copies_the_matched_clipper_then_the_market(monkeypatch):
     monkeypatch.setattr(style, "market_layout", lambda creator, sp=None: "full")
     assert clip.layout_hint(None, "m", "stableronaldo") == "fit"           # that exact moment's clipper
     assert clip.layout_hint(None, "x", "stableronaldo") == "full"          # how the market frames him
+    monkeypatch.setattr(style, "market_layout", lambda creator, sp=None: None)
+    monkeypatch.setattr(style, "market_layout_any", lambda sp=None: "stack")
+    assert clip.layout_hint(None, "x", "newstreamer") == "stack"           # how most clippers frame streamers
+    monkeypatch.setattr(style, "market_layout_any", lambda sp=None: None)
+    assert clip.layout_hint(None, "x", "newstreamer") == "full"            # never our own invention
