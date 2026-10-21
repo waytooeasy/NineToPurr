@@ -164,6 +164,23 @@ def events(rows, step=1 / OCR_FPS):
     return [e for e in evs if e["end"] - e["start"] >= 0.15]
 
 
+def merge_continuations(evs, gap=0.2):
+    """'I GOT YOU' then 'I GOT YOU YOUR FLOWERS' (or a misread last word) right after: one caption still revealing."""
+    out = []
+    for e in evs:
+        p = out[-1] if out else None
+        if p and e["start"] - p["end"] <= gap:
+            k = 0
+            while k < min(len(p["words"]), len(e["words"])) and _same(p["words"][k]["w"], e["words"][k]["w"]):
+                k += 1
+            if k >= 2 and k >= len(p["words"]) - 1:
+                words = p["words"][:k] + [dict(w, t=max(w["t"], e["start"])) for w in e["words"][k:]]
+                out[-1] = {**p, "end": e["end"], "words": words, "lines": e["lines"] if len(e["words"]) >= len(p["words"]) else p["lines"]}
+                continue
+        out.append(e)
+    return out
+
+
 def one_position(evs):
     """Clippers keep one caption position per Short; OCR heights are noisy: use their median for every event."""
     ys = [e["y"] for e in evs if isinstance(e.get("y"), (int, float))]
@@ -301,7 +318,7 @@ def write_ass(evs, path, out_w, out_h, fs=None, fsp=None, mark=None, dur=None):
 
 def build(short_path, dur, aspect, path, out_w, out_h, vision=anthropic_vision, mark=None, bands=None, fps=None):
     rows = ocr(short_path, dur, aspect, vision)
-    evs = one_position(events(rows))
+    evs = one_position(merge_continuations(events(rows)))
     if bands and fps:
         evs = refine_times(evs, bands, fps, int(round(dur * fps)))
     write_ass(evs, path, out_w, out_h, mark=mark, dur=dur)

@@ -193,6 +193,19 @@ def test_caption_events_reveal_words_and_split_captions():
     assert b["lines"] == [2, 1] and b["words"][0]["c"] == "#FFFFFF"
 
 
+def test_continued_caption_is_one_event():
+    W_ = "#FFFFFF"
+    evs = [{"start": 21.45, "end": 21.85, "y": 0.5, "lines": [3], "words": [
+               {"w": "I", "c": W_, "t": 21.45}, {"w": "GOT", "c": W_, "t": 21.45}, {"w": "YOU", "c": W_, "t": 21.65}]},
+           {"start": 21.85, "end": 22.75, "y": 0.5, "lines": [4, 1], "words": [
+               {"w": "I", "c": W_, "t": 21.85}, {"w": "GOT", "c": W_, "t": 21.85}, {"w": "YOU", "c": W_, "t": 21.85},
+               {"w": "YOUR", "c": W_, "t": 21.85}, {"w": "FLOWERS", "c": "#7CFC6A", "t": 21.95}]},
+           {"start": 24.8, "end": 26.0, "y": 0.5, "lines": [1], "words": [{"w": "ALRIGHT", "c": W_, "t": 24.8}]}]
+    out = caps.merge_continuations(evs)
+    assert len(out) == 2 and [w["w"] for w in out[0]["words"]][-1] == "FLOWERS"
+    assert out[0]["words"][2]["t"] == 21.65 and out[0]["end"] == 22.75 and out[0]["lines"] == [4, 1]
+
+
 def test_ass_has_layers_reveals_line_breaks_and_handle(tmp_path):
     ev = {"start": 1.0, "end": 2.0, "y": 0.5, "lines": [2, 1],
           "words": [{"w": "TO", "c": "#FFFFFF", "t": 1.0}, {"w": "THE", "c": "#FFFFFF", "t": 1.2},
