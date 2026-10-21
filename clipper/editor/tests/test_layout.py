@@ -197,3 +197,34 @@ def test_chatstack_filtergraph_renders(tmp_path):
                            "stream=width,height:format=duration", "-of", "csv=p=0", str(out)],
                           capture_output=True, text=True).stdout.split()
     assert dims[0] == "1080,1920" and abs(float(dims[-1]) - 2) < 0.2
+
+
+class _R:
+    def __init__(self, err):
+        self.stderr = err
+
+
+def test_black_borders_are_measured_with_cropdetect():
+    # Jynxzi 2026-10-21: a black stats bar on top and a player bar at the bottom of the source
+    run = lambda cmd, **kw: _R("[Parsed_cropdetect_0] x1:0 crop=1920:944:0:80\n... crop=1920:940:0:80\n")  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, run=run) == (0, 80, 1920, 940)
+    thin = lambda cmd, **kw: _R("crop=1920:1072:0:4")  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, run=thin) is None                      # 4 px: nothing to trim
+    dark = lambda cmd, **kw: _R("crop=1920:500:0:300")  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, run=dark) is None                      # implausible: a dark scene
+    assert L.content_box("v", 0, 10, 1920, 1080, run=lambda c, **k: _R("")) is None
+    assert L.content_box("v", 0, 10, 1920, 1080, run=lambda c, **k: 1 / 0) is None
+
+
+def test_no_panel_shows_the_black_borders():
+    stack = {"mode": "stack", "cam": [0, 600, 420, 300], "cam_h": 768, "W": 1920, "H": 1080,
+             "content": [0, 80, 1920, 940]}
+    fg = L.filtergraph(stack)
+    assert ":80,scale=1080:1152" in fg                                                   # gameplay starts under the bar
+    assert "crop=420:300:0:600" in fg                                                    # cam inside: unchanged
+    assert L.fit_box((0, 900, 420, 300), 0, 80, 1920, 940) == (0, 720, 420, 300)         # moved up into the picture
+    assert L.fit_box((0, 0, 2000, 1000), 0, 80, 1920, 940)[2:] == (1880, 940)            # shrunk, same shape
+    crop = {"mode": "crop", "cx": 100, "W": 1920, "H": 1080, "content": [100, 80, 1700, 940]}
+    assert L.filtergraph(crop).startswith("[0:v]crop=528:940:100:80,")                     # x and y inside it
+    moving = {**crop, "path": [[0, 300], [2, 1700]]}
+    assert "\\,100\\,1271):80," in L.filtergraph(moving)                                  # x clamped to the content
