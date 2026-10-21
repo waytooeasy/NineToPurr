@@ -182,14 +182,22 @@ def caption_masks(th, base, y, band=0.2):
     v = th.max(2)
     fill = d & (v >= FILL_V)
     dark = d & (v < DARK_V)
-    fill = cv2.morphologyEx(fill.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8)) > 0
+    fill = cv2.morphologyEx(fill.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(fill, connectivity=8)
+    if n > 1:              # specks (sharpness / grain differences in the picture) are not letters
+        big = np.percentile(stats[1:, cv2.CC_STAT_HEIGHT], 90)
+        keep = np.zeros(n, bool)
+        keep[1:] = (stats[1:, cv2.CC_STAT_AREA] >= 25) & (stats[1:, cv2.CC_STAT_HEIGHT] >= 0.35 * big)
+        fill = keep[lab]
+    else:
+        fill = fill > 0
     return d, fill, dark
 
 
 def lines_of(fill, min_rows=6):
     """Row ranges of text lines in the fill mask (horizontal projection), biggest blocks only."""
     prof = fill.sum(1)
-    on = prof > max(2, 0.02 * prof.max()) if prof.max() else prof > 0
+    on = prof > max(2, 0.12 * prof.max()) if prof.max() else prof > 0
     runs, s = [], None
     for i, o in enumerate(list(on) + [False]):
         if o and s is None:
@@ -202,6 +210,26 @@ def lines_of(fill, min_rows=6):
         return []
     big = max(b - a for a, b in runs)
     return [r for r in runs if r[1] - r[0] >= 0.5 * big]
+
+
+def main_block(line_mask, gap=1.5):
+    """The line's text: the biggest run of columns with ink, gaps under gap * line height bridged."""
+    h = line_mask.shape[0]
+    cols = line_mask.sum(0) >= max(2, 0.06 * h)
+    xs = np.where(cols)[0]
+    if not len(xs):
+        return line_mask
+    runs, s, last = [], xs[0], xs[0]
+    for x in xs[1:]:
+        if x - last > gap * h:
+            runs.append((s, last + 1))
+            s = x
+        last = x
+    runs.append((s, last + 1))
+    a, b = max(runs, key=lambda r: line_mask[:, r[0]:r[1]].sum())
+    out = np.zeros_like(line_mask)
+    out[:, a:b] = line_mask[:, a:b]
+    return out
 
 
 def words_of(line_mask, n_words):
@@ -252,7 +280,7 @@ def measure_event(th, base, ev):
     if len(lines) == len(shape):
         i = 0
         for (r0, r1), n in zip(lines, shape):
-            lm = fill[r0:r1]
+            lm = main_block(fill[r0:r1])
             cols = words_of(lm, n)
             text = " ".join(w["w"] for w in words[i:i + n])
             xs = np.where(lm.any(0))[0]
@@ -264,10 +292,15 @@ def measure_event(th, base, ev):
                     if len(px) > 20:
                         out["colours"][i + k] = hex_of(np.median(px.reshape(-1, 3), 0))
             i += n
-    fy = np.where(fill.any(1))[0]
-    fx = np.where(fill.any(0))[0]
-    out["cy"] = float((fy.min() + fy.max() + 1) / 2 / th.shape[0])
-    out["cx"] = float((fx.min() + fx.max() + 1) / 2 / th.shape[1])
+    if out["lines"]:
+        y0, y1 = min(ln["r0"] for ln in out["lines"]), max(ln["r1"] for ln in out["lines"])
+        x0, x1 = min(ln["x0"] for ln in out["lines"]), max(ln["x1"] for ln in out["lines"])
+    else:
+        y0, y1 = lines[0][0], lines[-1][1]
+        xs = np.where(main_block(fill[y0:y1]).any(0))[0]
+        x0, x1 = xs.min(), xs.max() + 1
+    out["cy"] = float((y0 + y1) / 2 / th.shape[0])
+    out["cx"] = float((x0 + x1) / 2 / th.shape[1])
     cap = [ln["r1"] - ln["r0"] for ln in out["lines"]] or [lines[0][1] - lines[0][0]]
     out["line_h"] = float(np.median(cap))
     out["outline"] = outline_px(fill, dark, out["line_h"])
