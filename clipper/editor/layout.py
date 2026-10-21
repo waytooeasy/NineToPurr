@@ -5,6 +5,10 @@
            median face showed a white shirt and hands for most of Stable Ronaldo's fry clip (2026-10-21).
            A stream that burns its own captions at the bottom gets that band cut away (`cut`) so a moving cut
            never shows half a caption line; the Editor then draws ours, like the market's IRL Shorts.
+- "chatstack": the same following crop on top and the stream's own chat overlay below it as a readable panel
+           (Lucas 2026-10-21: "U can't even see the chat"; a 9:16 cut showed a cut-off strip of it). The chat
+           box is found by Claude Haiku on two frames (both looks must agree); its spot in the picture is
+           blurred so no half chat shows up there. No chat overlay -> plain crop.
 - "stack": facecam on top, gameplay below, both full width (gaming with a corner facecam).
 No blurred letterbox bars: none of the top channels use them.
 
@@ -14,6 +18,7 @@ No OpenCV, no model, no faces or any error -> centred crop.
 """
 import json
 import os
+import re
 import subprocess
 from statistics import median
 
@@ -34,6 +39,15 @@ DEADBAND = 0.04             # target moves smaller than this share of the width 
 PAIR_FIT = 0.9              # two faces are framed together when they span <= 90 % of the crop width
 MIN_FACE_SHARE = 0.35       # a face counts for framing when its area is >= 35 % of the frame's biggest
 OWN_CAPTION_CUT = 0.14      # bottom share of the source cut when the stream burns its captions there
+CHAT_PANEL_MAX = 640        # chatstack: tallest chat panel (older lines above that are trimmed)
+CHAT_PANEL_MIN = 140        # a thinner panel is unreadable: plain crop instead
+CHAT_PAD = 0.015            # padding around the found chat box, share of the frame
+CHAT_MAX_AREA = 0.35        # a "chat box" bigger than this share of the frame is a misread
+CHAT_PROMPT = (
+    "This is one frame of a livestream. Is a live chat overlay (usernames with their messages, often with badges or "
+    "emotes, one per line) burned into the picture? Answer with JSON only: {\"chat\": true, \"box\": [x0, y0, x1, "
+    "y1]} where the box covers ALL chat lines, as fractions of the image width and height (0-1), or {\"chat\": false}."
+)
 CLUSTER = 0.08              # detections within 8 % of the frame width are the same face
 MODEL = "/opt/clipper/models/face_detection_yunet_2023mar.onnx"
 
@@ -140,9 +154,9 @@ def _even(v):
     return int(v) // 2 * 2
 
 
-def crop_w(W, H, cut=0.0):
-    """Width of the 9:16 window (source pixels) over the kept height."""
-    return min(W, H * (1 - cut) * OUT_W / OUT_H)
+def crop_w(W, H, cut=0.0, out_h=OUT_H):
+    """Width of the window (source pixels) for an OUT_W x out_h panel over the kept height."""
+    return min(W, H * (1 - cut) * OUT_W / out_h)
 
 
 def target_cx(faces, cw):
@@ -227,19 +241,37 @@ def filtergraph(layout):
     if not W or not H or layout.get("cx") is None:
         return f"[0:v]crop=w=min(iw\\,ih*{OUT_W}/{OUT_H}):h=ih,scale={OUT_W}:{OUT_H},setsar=1[v]"
     cut = layout.get("cut") or 0.0
-    cw = crop_w(W, H, cut)
-    ch = min(H * (1 - cut), cw * OUT_H / OUT_W)
+    chat = layout.get("chat") if layout["mode"] == "chatstack" else None
+    ph = OUT_H - layout["chat_h"] if chat else OUT_H           # picture panel height
+    cw = crop_w(W, H, cut, ph)
+    ch = min(H * (1 - cut), cw * ph / OUT_W)
     if len(layout.get("path") or []) > 1:
         x = x_expr(layout["path"], cw, W).replace(",", "\\,")   # escaped like the centre-crop fallback
     else:
         x = _even(min(max(layout["cx"] - cw / 2, 0), W - cw))
-    return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{OUT_H},setsar=1[v]"
+    if not chat:
+        return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{OUT_H},setsar=1[v]"
+    x0, y0, x1, y1 = chat
+    bw, bh = _even(x1 - x0), _even(y1 - y0)
+    r = max(2, min(20, min(bw, bh) // 4))
+    return (f"[0:v]split=3[s0][s1][s2];"
+            f"[s1]crop={bw}:{bh}:{x0}:{y0},boxblur={r}:2[hide];"            # no half chat in the picture
+            f"[s0][hide]overlay={x0}:{y0}[clean];"
+            f"[clean]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{ph},setsar=1[pic];"
+            f"[s2]crop={bw}:{bh}:{x0}:{y0},scale={OUT_W}:{layout['chat_h']},setsar=1[chat];"
+            f"[pic][chat]vstack=inputs=2[v]")
 
 
 def caption_y(layout):
     """Where captions sit (ASS \\pos y, 1920 tall): on the seam for stack, a bit below centre for crop."""
     lay = layout or {}
     return lay.get("cam_h", CAM_H) if lay.get("mode") == "stack" else 1080
+
+
+def picture_bottom(layout):
+    """Lowest y (output px) of the picture: above the chat panel in chatstack, else the frame bottom."""
+    lay = layout or {}
+    return OUT_H - lay["chat_h"] if lay.get("mode") == "chatstack" and lay.get("chat_h") else OUT_H
 
 
 def sample_faces(video, start, end, samples=SAMPLES, model=None):
@@ -326,11 +358,89 @@ def track_faces(video, start, end, fps=TRACK_FPS, model=None):
     return out
 
 
+def _box(r):
+    b = (r or {}).get("box")
+    if not (isinstance(b, (list, tuple)) and len(b) == 4):
+        return None
+    try:
+        x0, y0, x1, y1 = (float(v) for v in b)
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+        return None
+    return x0, y0, x1, y1
+
+
+def chat_box_from_replies(replies, W, H):
+    """Two independent looks -> one padded pixel box (x0, y0, x1, y1) when both see chat in about the same
+    place (overlap >= 40 % of the union), else None. Boxes near a frame edge snap to it."""
+    boxes = [_box(r) for r in replies if r and r.get("chat")]
+    if len(replies) < 2 or len(boxes) < len(replies) or None in boxes:
+        return None
+    a, b = boxes[0], boxes[1]
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    u = [min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3])]
+    area_u = (u[2] - u[0]) * (u[3] - u[1])
+    if area_u <= 0 or ix / area_u < 0.4:
+        return None
+    u = [max(0.0, u[0] - CHAT_PAD), max(0.0, u[1] - CHAT_PAD), min(1.0, u[2] + CHAT_PAD), min(1.0, u[3] + CHAT_PAD)]
+    u = [0.0 if u[0] < 0.03 else u[0], 0.0 if u[1] < 0.03 else u[1],
+         1.0 if u[2] > 0.97 else u[2], 1.0 if u[3] > 0.97 else u[3]]
+    if (u[2] - u[0]) * (u[3] - u[1]) > CHAT_MAX_AREA or u[2] - u[0] > 0.5:
+        return None
+    return tuple(_even(round(v * s)) for v, s in zip(u, (W, H, W, H)))
+
+
+def chat_layout(lay, box):
+    """Crop layout -> chatstack: the picture on top, the chat box below at full width. A tall box keeps its
+    newest (bottom) lines; a panel thinner than CHAT_PANEL_MIN is unreadable -> the plain crop stays."""
+    if not box or lay.get("mode") != "crop":
+        return lay
+    x0, y0, x1, y1 = box
+    bw, bh = x1 - x0, y1 - y0
+    h = OUT_W * bh / bw
+    if h > CHAT_PANEL_MAX:                      # keep the newest lines
+        y0 = _even(round(y1 - bw * CHAT_PANEL_MAX / OUT_W))
+        h = CHAT_PANEL_MAX
+    if h < CHAT_PANEL_MIN:
+        return lay
+    return {**lay, "mode": "chatstack", "chat": [x0, y0, x1, y1], "chat_h": _even(h)}
+
+
+def grab_frames(video, times, width=960):
+    """JPEG bytes of the frames at `times` (s), scaled to `width`."""
+    out = []
+    for t in times:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", f"scale={width}:-2", "-f", "image2", "-c:v", "mjpeg", "-q:v", "3", "-"],
+                           capture_output=True, check=True)
+        out.append(r.stdout)
+    return out
+
+
+def find_chat(video, start, end, W, H, ask=None, grab=grab_frames):
+    """The stream's chat overlay box (pixels) from two looks (Claude Haiku vision), or None. Never raises."""
+    try:
+        if ask is None:
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                return None
+            import visual_qa
+            ask = lambda img: visual_qa.anthropic_vision([img], CHAT_PROMPT)  # noqa: E731
+        span = max(end - start, 0.1)
+        replies = []
+        for img in grab(video, [start + span * 0.3, start + span * 0.7]):
+            m = re.search(r"\{.*\}", ask(img) or "", re.S)
+            replies.append(json.loads(m.group(0)) if m else None)
+        return chat_box_from_replies(replies, W, H)
+    except Exception:  # noqa: BLE001 - no chat panel is always fine
+        return None
+
+
 def follow(lay, video, start, end, track=track_faces):
     """Add the moving-camera path to a face crop (layout["path"] = [[t, cx], ...])."""
-    if lay.get("mode") != "crop" or not lay.get("follow"):
+    if lay.get("mode") not in ("crop", "chatstack") or not lay.get("follow"):
         return lay
-    cw = crop_w(lay["W"], lay["H"], lay.get("cut") or 0.0)
+    cw = crop_w(lay["W"], lay["H"], lay.get("cut") or 0.0, OUT_H - (lay.get("chat_h") or 0))
     pts = [(t, target_cx(f, cw)) for t, f in track(video, start, end)]
     if not any(x is not None for _, x in pts):
         return lay
@@ -350,6 +460,8 @@ def detect_layout(video, start, end, cut=0.0):
     lay = choose_layout(faces, W, H)
     if lay["mode"] == "crop" and cut:
         lay["cut"] = cut
+    if lay["mode"] == "crop" and lay.get("follow"):
+        lay = chat_layout(lay, find_chat(video, start, end, W, H))
     try:
         lay = follow(lay, video, start, end)
     except Exception:  # noqa: BLE001 - keep the static face crop

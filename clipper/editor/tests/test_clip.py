@@ -241,3 +241,13 @@ def test_captions_stop_at_sentence_ends_and_drop_full_stops():
     assert [clip.bare(t) for t in ["two.", "it?", "Lemonade,", "U.S.", "wait...", "\"no.\""]] == \
         ["two", "it?", "Lemonade", "U.S", "wait", "\"no\""]
     assert "TWO" in clip.caption_text(["two."]) and "." not in clip.caption_text(["two."]).split("}")[-1]
+
+
+def test_chatstack_keeps_our_text_above_the_chat_panel(tmp_path):
+    ass = tmp_path / "a.ass"
+    words = [{"s": 1, "e": 1.5, "w": "my"}, {"s": 1.5, "e": 2, "w": "gun"}]
+    lay = {"mode": "chatstack", "chat_h": 640, "cx": 1, "W": 2, "H": 2}       # picture ends at 1280
+    clip.build_ass(words, {"start": 0, "end": 10, "hook": "He lost it", "creator": "xqc", "layout": lay}, ass,
+                   st={**__import__("style").DEFAULT, "position": "lower"})
+    txt = ass.read_text()
+    assert "\\pos(540,1140)" in txt and "\\pos(540,1230)" in txt          # captions and handle above it

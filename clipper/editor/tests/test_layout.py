@@ -140,3 +140,34 @@ def test_follow_adds_the_path_only_to_face_crops():
     assert "path" not in L.follow(L.choose_layout([], 1920, 1080), "v", 0, 1, track)   # no face: centre crop
     stack = L.choose_layout([(1700, 80, 90, 90)] * 5, 1920, 1080)
     assert L.follow(stack, "v", 0, 1, track) is stack
+
+
+def test_chat_box_needs_two_agreeing_looks_and_a_sane_size():
+    ron = [{"chat": True, "box": [0.70, 0.0, 1.0, 0.22]}, {"chat": True, "box": [0.69, 0.01, 0.99, 0.24]}]
+    assert L.chat_box_from_replies(ron, 1920, 1080) == (1296, 0, 1920, 274)      # padded, snapped to the edge
+    assert L.chat_box_from_replies([ron[0], {"chat": True, "box": [0.0, 0.6, 0.3, 0.9]}], 1920, 1080) is None
+    assert L.chat_box_from_replies([ron[0], {"chat": False}], 1920, 1080) is None
+    assert L.chat_box_from_replies([ron[0]], 1920, 1080) is None                     # one look is not enough
+    big = {"chat": True, "box": [0.1, 0.1, 0.9, 0.9]}
+    assert L.chat_box_from_replies([big, big], 1920, 1080) is None                   # a misread
+    assert L.chat_box_from_replies([{"chat": True, "box": "top right"}] * 2, 1920, 1080) is None
+
+
+def test_chatstack_puts_the_chat_under_the_picture_without_bars():
+    crop = {"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "follow": True}
+    lay = L.chat_layout(crop, (1296, 0, 1920, 274))
+    assert lay["mode"] == "chatstack" and lay["chat_h"] == 474 and L.picture_bottom(lay) == 1446
+    tall = L.chat_layout(crop, (1500, 0, 1920, 1000))                              # keep the newest 640 px
+    assert tall["chat_h"] == 640 and tall["chat"][1:] == [750, 1920, 1000]
+    assert L.chat_layout(crop, (0, 0, 1920, 200)) is crop                           # too thin to read
+    fg = L.filtergraph(lay)
+    assert fg.startswith("[0:v]split=3") and "boxblur" in fg and f"scale=1080:1446" in fg and "vstack" in fg
+    assert L.picture_bottom(crop) == 1920
+
+
+def test_find_chat_asks_twice_and_never_raises():
+    seen = []
+    ask = lambda img: seen.append(img) or '{"chat": true, "box": [0.7, 0, 1, 0.22]}'   # noqa: E731
+    box = L.find_chat("v", 0, 10, 1920, 1080, ask=ask, grab=lambda v, ts: [b"a", b"b"])
+    assert box == (1314, 0, 1920, 254) and seen == [b"a", b"b"]
+    assert L.find_chat("v", 0, 10, 1920, 1080, ask=lambda i: 1 / 0, grab=lambda v, ts: [b"a", b"b"]) is None

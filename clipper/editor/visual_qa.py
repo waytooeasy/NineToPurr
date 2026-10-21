@@ -84,6 +84,9 @@ def prompt_for(expected=None):
              "text": "as a title line that stays in every frame",
              "none": "in frame 1 only"}.get(header, "in frame 1 only")
     own = f"OUR hook/title text on this clip is \"{hook}\", shown {where}. " if hook else ""
+    if expected.get("chat_panel"):
+        own += ("The lower part of this clip is a panel showing the stream's own chat (usernames and messages): "
+                "that is intended, not captions; our handle sits just above it. ")
     if expected.get("own_captions"):
         own += ("This clip has NO caption line of ours: the speech captions you see are the streamer's own live "
                 "captions, which is fine; report double_captions only if two different caption tracks show at once. ")
@@ -176,6 +179,13 @@ def learn_own_captions(con, creator, clip_id):
     return cur.rowcount == 1
 
 
+def render_info(path):
+    try:
+        return json.loads(open(os.path.splitext(str(path))[0] + ".json", encoding="utf-8").read())
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
 def drew_captions(path, con, creator):
     """Did the Editor burn our caption track into this file? The render info next to it says (clip.py
     write_render_info); older renders: not for a streamer with their own captions."""
@@ -213,7 +223,8 @@ def run(con, vision=None, grab=frames):
                        " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
     for cid, path, creator, hook in rows:
         theirs = not drew_captions(path, con, creator)     # no track of ours: captions on screen are theirs
-        expected = {"hook": hook, "header": _header_for(creator), "own_captions": theirs}
+        expected = {"hook": hook, "header": _header_for(creator), "own_captions": theirs,
+                    "chat_panel": render_info(path).get("mode") == "chatstack"}
         r = check(path, vision, grab, expected) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}
         if theirs and r["ok"] is False:          # we drew no captions: what's on screen is theirs, not double

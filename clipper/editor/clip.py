@@ -388,7 +388,7 @@ def build_ass(words, pick, path, chunk=None, st=None):
     shows live captions (watchlist `own_captions` or learned) gets no second caption track, unless the
     layout cut their caption band away (full-bleed crop, `layout["cut"]`): then ours, like the market."""
     import style as S
-    from layout import caption_y
+    from layout import caption_y, picture_bottom
     st = dict(st or S.load(creator=pick.get("creator")))   # this streamer's market look when known (D49)
     st["highlight"] = S.highlight_for(st, pick.get("hook") or pick.get("start"))
     chunk = chunk or st["words"]
@@ -406,6 +406,9 @@ def build_ass(words, pick, path, chunk=None, st=None):
     else:
         y = seam if stack else S.POSITIONS[st["position"]]
         hook_y = 1180 if stack else 380  # stack: in the gameplay, clear of the seam captions
+    bottom = picture_bottom(lay)         # chatstack: the chat panel starts here; keep our text above it
+    y = min(y, bottom - 140)
+    mark_y = min(WATERMARK_Y, bottom - 50)
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -435,7 +438,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(hook, st['case']))}")
     if watermark():
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(dur)},Mark,,0,0,0,,"
-                  f"{{\\pos(540,{WATERMARK_Y})}}{esc(S.onscreen(watermark()))}")
+                  f"{{\\pos(540,{mark_y})}}{esc(S.onscreen(watermark()))}")
     pos = f"{{\\pos(540,{y})}}"
     if not draws_captions(pick):
         Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")   # theirs are on screen already
@@ -464,7 +467,7 @@ def has_own_captions(pick):
 def draws_captions(pick):
     """Our caption track goes on unless the stream shows its own captions and they stay on screen (stack)."""
     lay = pick.get("layout") or {}
-    return not has_own_captions(pick) or bool(lay.get("mode") == "crop" and lay.get("cut"))
+    return not has_own_captions(pick) or bool(lay.get("mode") in ("crop", "chatstack") and lay.get("cut"))
 
 
 def ensure_layout(video, pick):

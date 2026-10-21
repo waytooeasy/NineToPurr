@@ -142,3 +142,7 @@ def test_double_captions_count_when_we_drew_a_track_over_a_captioned_stream(con,
     con.execute("UPDATE clips SET visual_qa=NULL WHERE id=1")
     con.commit()
     assert V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])["passed"] == [1]
+
+
+def test_prompt_knows_the_chat_panel_is_ours():
+    assert "panel showing the stream's own chat" in V.prompt_for({"hook": "h", "chat_panel": True})
