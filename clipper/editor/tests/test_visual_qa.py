@@ -124,3 +124,21 @@ def test_a_failure_needs_a_second_look_to_count():
                     '{"ok": false, "issues": [{"code": "double_captions"}]}'])
     r = V.check("x.mp4", vision=lambda imgs: next(replies), grab=lambda v: [b"a"] * 3)
     assert r["ok"] is False and [i["code"] for i in r["issues"]] == ["double_captions"]
+
+
+def test_double_captions_count_when_we_drew_a_track_over_a_captioned_stream(con, monkeypatch, tmp_path):
+    # crop mode cuts the stream's caption band and draws ours: if theirs still show, it is double
+    monkeypatch.setenv("VISUAL_QA", "1")
+    con.execute("INSERT INTO radar_candidates (clip_id, creator, title, url, view_count, clip_created_at,"
+                " views_per_hour, clips_id) VALUES ('a', 'stableronaldo', '', 'u', 1, '2026-10-20T00:00:00Z', 1, 1)")
+    con.execute("INSERT INTO creator_flags (creator, own_captions, note) VALUES ('stableronaldo', 1, 'x')")
+    con.execute("UPDATE clips SET visual_qa='{\"ok\": true}' WHERE id=2")
+    con.commit()
+    mp4 = con.execute("SELECT file_path FROM clips WHERE id=1").fetchone()[0]
+    Path(mp4).with_suffix(".json").write_text('{"our_captions": true, "mode": "crop", "cut": 0.14}')
+    dbl = lambda imgs: '{"ok": false, "issues": [{"code": "double_captions", "frame": 2}]}'   # noqa: E731
+    assert V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])["failed"] == {1: ["double_captions"]}
+    Path(mp4).with_suffix(".json").write_text('{"our_captions": false, "mode": "stack"}')
+    con.execute("UPDATE clips SET visual_qa=NULL WHERE id=1")
+    con.commit()
+    assert V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])["passed"] == [1]

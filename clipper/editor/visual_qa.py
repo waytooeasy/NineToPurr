@@ -176,6 +176,15 @@ def learn_own_captions(con, creator, clip_id):
     return cur.rowcount == 1
 
 
+def drew_captions(path, con, creator):
+    """Did the Editor burn our caption track into this file? The render info next to it says (clip.py
+    write_render_info); older renders: not for a streamer with their own captions."""
+    try:
+        return bool(json.loads(open(os.path.splitext(str(path))[0] + ".json", encoding="utf-8").read())["our_captions"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return not has_own_captions(con, creator)
+
+
 def has_own_captions(con, creator):
     """True when the Editor draws no captions for this creator (their stream shows live captions)."""
     if not creator:
@@ -203,7 +212,7 @@ def run(con, vision=None, grab=frames):
                        " LEFT JOIN radar_candidates r ON r.clips_id = c.id"
                        " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
     for cid, path, creator, hook in rows:
-        theirs = has_own_captions(con, creator)
+        theirs = not drew_captions(path, con, creator)     # no track of ours: captions on screen are theirs
         expected = {"hook": hook, "header": _header_for(creator), "own_captions": theirs}
         r = check(path, vision, grab, expected) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}

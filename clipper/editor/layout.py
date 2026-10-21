@@ -1,6 +1,10 @@
 """9:16 layout like the top clip channels (format research, 2026-10-19: NexxoRecaps, StreamBellz).
 
-- "crop":  full-bleed 9:16 cut of the source, centred on the streamer's face (IRL / just chatting).
+- "crop":  full-bleed 9:16 cut of the source that follows the people in it like a camera operator: both main
+           faces when they fit, else the biggest, panning smoothly (IRL / just chatting). A static cut on the
+           median face showed a white shirt and hands for most of Stable Ronaldo's fry clip (2026-10-21).
+           A stream that burns its own captions at the bottom gets that band cut away (`cut`) so a moving cut
+           never shows half a caption line; the Editor then draws ours, like the market's IRL Shorts.
 - "stack": facecam on top, gameplay below, both full width (gaming with a corner facecam).
 No blurred letterbox bars: none of the top channels use them.
 
@@ -24,6 +28,12 @@ MIN_CAM_W = 0.18            # a facecam panel cut from less than this share of t
 FACECAM_MIN_H = 0.045       # a corner face smaller than this is a mini cam over an event/IRL broadcast
                             # (Adin's 33 px cam, 2026-10-19): blown up it is mush, so full-bleed the shot
 SAMPLES = 8
+TRACK_FPS = 2.0             # face samples per second for the moving crop
+PAN_MAX = 0.25              # pan speed limit, share of the frame width per second
+DEADBAND = 0.04             # target moves smaller than this share of the width don't move the camera
+PAIR_FIT = 0.9              # two faces are framed together when they span <= 90 % of the crop width
+MIN_FACE_SHARE = 0.35       # a face counts for framing when its area is >= 35 % of the frame's biggest
+OWN_CAPTION_CUT = 0.14      # bottom share of the source cut when the stream burns its captions there
 CLUSTER = 0.08              # detections within 8 % of the frame width are the same face
 MODEL = "/opt/clipper/models/face_detection_yunet_2023mar.onnx"
 
@@ -48,7 +58,7 @@ def choose_layout(faces, W, H, cam_box=None):
     fw = median(w for x, y, w, h in faces)
     corner = (cx < W * FACECAM_EDGE or cx > W * (1 - FACECAM_EDGE)) and fh < H * FACECAM_MAX_H
     if not corner:
-        return {"mode": "crop", "cx": cx, "W": W, "H": H}
+        return {"mode": "crop", "cx": cx, "W": W, "H": H, "follow": True}
     if fh < H * FACECAM_MIN_H:
         return {"mode": "crop", "cx": W / 2, "W": W, "H": H}
     if cam_box:
@@ -130,6 +140,76 @@ def _even(v):
     return int(v) // 2 * 2
 
 
+def crop_w(W, H, cut=0.0):
+    """Width of the 9:16 window (source pixels) over the kept height."""
+    return min(W, H * (1 - cut) * OUT_W / OUT_H)
+
+
+def target_cx(faces, cw):
+    """Where the crop centre should be for one frame: the two main faces together when they fit in the
+    window, else the biggest face. None when no face is seen."""
+    if not faces:
+        return None
+    faces = sorted(faces, key=lambda f: -f[2] * f[3])
+    top = faces[0][2] * faces[0][3]
+    big = [f for f in faces if f[2] * f[3] >= MIN_FACE_SHARE * top][:2]
+    if len(big) == 2:
+        x0, x1 = min(f[0] for f in big), max(f[0] + f[2] for f in big)
+        if x1 - x0 <= PAIR_FIT * cw:
+            return (x0 + x1) / 2
+    return big[0][0] + big[0][2] / 2
+
+
+def smooth_path(points, W, cw, pan=PAN_MAX, dead=DEADBAND):
+    """[(t, target or None)] -> camera path [(t, cx)]: gaps hold the last target, a median of 3 drops one-frame
+    jumps, small moves inside the deadband are ignored (no jitter) and the pan speed is limited (no jump cuts).
+    Clamped so the window stays inside the frame."""
+    if not points:
+        return []
+    xs = [x for _, x in points]
+    last = next((x for x in xs if x is not None), W / 2)
+    filled = []
+    for x in xs:
+        last = x if x is not None else last
+        filled.append(last)
+    med = [median(filled[max(0, i - 1):i + 2]) for i in range(len(filled))]
+    lo, hi = cw / 2, W - cw / 2
+    cur, prev_t, out = min(max(med[0], lo), hi), points[0][0], []
+    for (t, _), x in zip(points, med):
+        x = min(max(x, lo), hi)
+        if abs(x - cur) > dead * W:
+            step = pan * W * max(t - prev_t, 0)
+            cur += max(-step, min(step, x - cur))
+        out.append((t, cur))
+        prev_t = t
+    return out
+
+
+def keyframes(path, eps=1.0):
+    """Only the points where the camera changes speed (the rest are on straight lines between them)."""
+    if len(path) <= 2:
+        return list(path)
+    keep = [path[0]]
+    for a, b, c in zip(path, path[1:], path[2:]):
+        s1 = (b[1] - a[1]) / max(b[0] - a[0], 1e-6)
+        s2 = (c[1] - b[1]) / max(c[0] - b[0], 1e-6)
+        if abs(s1 - s2) > eps:
+            keep.append(b)
+    keep.append(path[-1])
+    return keep
+
+
+def x_expr(path, cw, W):
+    """ffmpeg crop x over time (t = seconds from the clip start), piecewise linear through the keyframes:
+    x0 + sum(dx_i * clip((t - t_i) / dt_i, 0, 1)). A flat sum, so long paths don't nest."""
+    pts = [(t, cx - cw / 2) for t, cx in keyframes(path)]
+    e = f"{pts[0][1]:.1f}"
+    for (t0, x0), (t1, x1) in zip(pts, pts[1:]):
+        if abs(x1 - x0) >= 0.5 and t1 > t0:
+            e += f"{x1 - x0:+.1f}*clip((t-{t0:.2f})/{t1 - t0:.3f},0,1)"
+    return f"clip({e},0,{W - cw:.0f})"
+
+
 def filtergraph(layout):
     """ffmpeg filter_complex prefix producing [v] at 1080x1920 from [0:v]."""
     W, H = layout["W"], layout["H"]
@@ -146,9 +226,14 @@ def filtergraph(layout):
                 f"[top][bot]vstack=inputs=2[v]")
     if not W or not H or layout.get("cx") is None:
         return f"[0:v]crop=w=min(iw\\,ih*{OUT_W}/{OUT_H}):h=ih,scale={OUT_W}:{OUT_H},setsar=1[v]"
-    cw = min(W, H * OUT_W / OUT_H)
-    x = min(max(layout["cx"] - cw / 2, 0), W - cw)
-    return f"[0:v]crop={_even(cw)}:{_even(min(H, cw * OUT_H / OUT_W))}:{_even(x)}:0,scale={OUT_W}:{OUT_H},setsar=1[v]"
+    cut = layout.get("cut") or 0.0
+    cw = crop_w(W, H, cut)
+    ch = min(H * (1 - cut), cw * OUT_H / OUT_W)
+    if len(layout.get("path") or []) > 1:
+        x = x_expr(layout["path"], cw, W).replace(",", "\\,")   # escaped like the centre-crop fallback
+    else:
+        x = _even(min(max(layout["cx"] - cw / 2, 0), W - cw))
+    return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{OUT_H},setsar=1[v]"
 
 
 def caption_y(layout):
@@ -213,7 +298,47 @@ def edge_profiles(video, start, end, face, samples=SAMPLES):
     return (None, None) if col is None else (col.tolist(), row.tolist())
 
 
-def detect_layout(video, start, end):
+def track_faces(video, start, end, fps=TRACK_FPS, model=None):
+    """[(t, faces)] every 1/fps s from start to end; t from the clip start, faces = [(x, y, w, h)] source px."""
+    os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
+    model = model or os.environ.get("CLIPPER_FACE_MODEL", MODEL)
+    if not os.path.exists(model):
+        return []
+    import cv2  # lazy: optional dependency
+    cap = cv2.VideoCapture(str(video))
+    out, det = [], None
+    try:
+        n = max(2, int((end - start) * fps) + 1)
+        for i in range(n):
+            t = min(end - start, i / fps)
+            cap.set(cv2.CAP_PROP_POS_MSEC, (start + t) * 1000)
+            ok, frame = cap.read()
+            if not ok:
+                continue
+            sc = 640 / frame.shape[1]
+            small = cv2.resize(frame, None, fx=sc, fy=sc)
+            if det is None:
+                det = cv2.FaceDetectorYN.create(model, "", (small.shape[1], small.shape[0]), 0.6)
+            _, found = det.detect(small)
+            out.append((t, [tuple(int(v / sc) for v in f[:4]) for f in (found if found is not None else [])]))
+    finally:
+        cap.release()
+    return out
+
+
+def follow(lay, video, start, end, track=track_faces):
+    """Add the moving-camera path to a face crop (layout["path"] = [[t, cx], ...])."""
+    if lay.get("mode") != "crop" or not lay.get("follow"):
+        return lay
+    cw = crop_w(lay["W"], lay["H"], lay.get("cut") or 0.0)
+    pts = [(t, target_cx(f, cw)) for t, f in track(video, start, end)]
+    if not any(x is not None for _, x in pts):
+        return lay
+    return {**lay, "path": [[round(t, 2), round(x, 1)] for t, x in smooth_path(pts, lay["W"], cw)]}
+
+
+def detect_layout(video, start, end, cut=0.0):
+    """`cut`: bottom share of the source to drop in crop mode (a stream's own burned-in caption band)."""
     try:
         W, H = probe_size(video)
     except Exception:  # noqa: BLE001 - unreadable/odd file: let ffmpeg centre-crop with expressions
@@ -223,6 +348,12 @@ def detect_layout(video, start, end):
     except Exception:  # noqa: BLE001 - no OpenCV / unreadable frames: centred crop
         faces = []
     lay = choose_layout(faces, W, H)
+    if lay["mode"] == "crop" and cut:
+        lay["cut"] = cut
+    try:
+        lay = follow(lay, video, start, end)
+    except Exception:  # noqa: BLE001 - keep the static face crop
+        pass
     if lay["mode"] == "stack":
         try:
             dom = dominant(faces, W)

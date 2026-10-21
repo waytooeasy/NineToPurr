@@ -366,7 +366,8 @@ def build_ass(words, pick, path, chunk=None, st=None):
     yellow). Pop-in, heavy font, seam position for stack layouts. Hook only for the first 2.5 s.
     No context-line banner: none of the top channels show one. No emoji on screen (style.onscreen);
     the channel handle sits low-centre like the top channels' watermark. A streamer whose stream already
-    shows live captions (watchlist `own_captions`) gets no second caption track."""
+    shows live captions (watchlist `own_captions` or learned) gets no second caption track, unless the
+    layout cut their caption band away (full-bleed crop, `layout["cut"]`): then ours, like the market."""
     import style as S
     from layout import caption_y
     st = dict(st or S.load(creator=pick.get("creator")))   # this streamer's market look when known (D49)
@@ -417,7 +418,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(dur)},Mark,,0,0,0,,"
                   f"{{\\pos(540,{WATERMARK_Y})}}{esc(S.onscreen(watermark()))}")
     pos = f"{{\\pos(540,{y})}}"
-    if str(pick.get("creator") or "").lower().lstrip("@") in own_caption_logins():
+    if not draws_captions(pick):
         Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")   # theirs are on screen already
         return
     if pick.get("es_words"):
@@ -437,11 +438,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
 
 
+def has_own_captions(pick):
+    return str(pick.get("creator") or "").lower().lstrip("@") in own_caption_logins()
+
+
+def draws_captions(pick):
+    """Our caption track goes on unless the stream shows its own captions and they stay on screen (stack)."""
+    lay = pick.get("layout") or {}
+    return not has_own_captions(pick) or bool(lay.get("mode") == "crop" and lay.get("cut"))
+
+
 def ensure_layout(video, pick):
-    """Pick the 9:16 layout once per clip (face-centred crop or facecam-over-gameplay stack)."""
+    """Pick the 9:16 layout once per clip (face-following crop or facecam-over-gameplay stack). A stream with
+    its own burned-in captions loses that bottom band in crop mode (half a caption line in a moving cut)."""
     if not pick.get("layout"):
-        from layout import detect_layout
-        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"])}
+        from layout import OWN_CAPTION_CUT, detect_layout
+        cut = OWN_CAPTION_CUT if has_own_captions(pick) else 0.0
+        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"], cut=cut)}
     return pick
 
 
@@ -481,6 +494,19 @@ def render(video, pick, ass, out):
     run(["ffmpeg", "-y", "-ss", str(pick["start"]), "-t", f"{pick['end'] - pick['start']:.3f}", "-i", str(video),
          "-filter_complex", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
          "-c:a", "aac", "-b:a", "160k", "-r", "30", "-movflags", "+faststart", str(out)])
+    write_render_info(out, pick, ass)
+
+
+def render_info_path(mp4):
+    return Path(mp4).with_suffix(".json")
+
+
+def write_render_info(out, pick, ass):
+    """What went into this file, for the visual check: did we burn a caption track, which layout."""
+    lay = pick.get("layout") or {}
+    ours = bool(re.search(r"^Dialogue: 0,[^,]*,[^,]*,Cap,", Path(ass).read_text(encoding="utf-8"), re.M))
+    render_info_path(out).write_text(json.dumps({"our_captions": ours, "mode": lay.get("mode"),
+                                                 "cut": lay.get("cut") or 0, "moving": len(lay.get("path") or []) > 1}))
 
 
 def log(row, path="clips_log.csv"):

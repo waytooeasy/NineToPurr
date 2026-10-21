@@ -102,3 +102,41 @@ def test_tiny_cam_panel_is_never_blown_up():
     assert L.choose_layout(faces, 1920, 1080, cam_box=(71, 56, 148, 124))["mode"] == "crop"
     assert L.choose_layout(faces, 1920, 1080)["mode"] == "crop"                  # face-sized estimate too small too
     assert L.choose_layout([(216, 87, 74, 104)] * 6, 1920, 1080, cam_box=(0, 0, 405, 315))["mode"] == "stack"  # xQc
+
+
+def test_two_people_who_fit_are_framed_together_else_the_biggest():
+    cw = L.crop_w(1920, 1080)                                                   # ~607 px window
+    assert L.target_cx([(700, 300, 150, 150), (950, 320, 140, 140)], cw) == (700 + 1090) / 2
+    assert L.target_cx([(200, 300, 150, 150), (1500, 320, 220, 220)], cw) == 1610  # too far apart: biggest
+    assert L.target_cx([(1500, 320, 220, 220), (300, 300, 60, 60)], cw) == 1610    # a small background face
+    assert L.target_cx([], cw) is None
+
+
+def test_camera_path_holds_small_moves_pans_at_limited_speed_and_stays_in_frame():
+    W, cw = 1920, L.crop_w(1920, 1080)
+    pts = [(t / 2, 600) for t in range(4)] + [(2.0 + t / 2, 1700) for t in range(8)] + [(6.0, None)]
+    path = L.smooth_path(pts, W, cw)
+    xs = [x for _, x in path]
+    assert xs[0] == 600 and xs[-1] == xs[-2]                                     # no face: hold the last place
+    steps = [b - a for a, b in zip(xs, xs[1:])]
+    assert max(steps) <= L.PAN_MAX * W * 0.5 + 1e-6                              # <= 480 px/s at 2 samples/s
+    assert xs[-1] <= W - cw / 2 + 1e-6                                           # never past the edge
+    jitter = L.smooth_path([(t / 2, 900 + (30 if t % 2 else -30)) for t in range(10)], W, cw)
+    assert len({round(x) for _, x in jitter}) == 1                               # inside the deadband: still
+
+
+def test_moving_crop_is_one_flat_ffmpeg_expression_with_the_caption_band_cut():
+    lay = {"mode": "crop", "cx": 960, "W": 1920, "H": 1080, "cut": L.OWN_CAPTION_CUT,
+           "path": [[0, 400], [1, 400], [3, 1500], [6, 1500]]}
+    fg = L.filtergraph(lay)
+    assert fg.startswith("[0:v]crop=522:928:clip(") and "\\,0\\,1)" in fg       # band cut, commas escaped
+    assert L.keyframes([(0, 100), (1, 200), (2, 300), (3, 300)]) == [(0, 100), (2, 300), (3, 300)]  # straight runs
+
+
+def test_follow_adds_the_path_only_to_face_crops():
+    track = lambda v, s, e: [(0.0, [(300, 300, 260, 260)]), (0.5, [(320, 300, 260, 260)])]  # noqa: E731
+    crop = L.choose_layout([(300, 300, 260, 260)] * 4, 1920, 1080)              # IRL: a big face
+    assert crop["mode"] == "crop" and L.follow(crop, "v", 0, 1, track)["path"][0] == [0.0, 440.0]
+    assert "path" not in L.follow(L.choose_layout([], 1920, 1080), "v", 0, 1, track)   # no face: centre crop
+    stack = L.choose_layout([(1700, 80, 90, 90)] * 5, 1920, 1080)
+    assert L.follow(stack, "v", 0, 1, track) is stack
