@@ -14,7 +14,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import amap, caps, look, render, source, title, vmap
+from . import amap, caps, look, match, render, source, style, title, vmap
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
@@ -25,6 +25,7 @@ MIN_VPH = 1500            # views/hour to count as popping
 MAX_ATTEMPTS = 2
 PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
+CAPTIONS_GOOD = 92.0      # caption match (%) that ends the search for a better caption look
 MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
 LOCK = "/opt/clipper/remake.lock"
 
@@ -146,7 +147,48 @@ def _stage(work, name, fn):
     return out
 
 
-def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False):
+def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None):
+    """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
+    study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}."""
+    OW, OH, fps, nfr = vm["out_w"], vm["out_h"], vm["fps"], vm["nfr"]
+    base = work / "base.mp4"
+    if not base.exists():
+        render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
+    st = _stage(work, "style", lambda: style.build(short_path, base, cp["events"], fps, OW, OH, vision_style))
+    evs = cp["events"]
+    if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
+        evs = [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cols)]}
+               for e, cols in zip(evs, st["colours"])]
+    def score(k, name, s_):
+        ass = work / f"cap_{k}.ass"
+        if s_ is not None:
+            caps.write_ass_style(evs, ass, OW, OH, s_, mark=mark, dur=sp["dur"])
+        else:
+            caps.write_ass(evs, ass, OW, OH, mark=mark, dur=sp["dur"])
+        cand = match.burn(base, ass, work / f"cand_{k}.mp4")
+        m = match.score(short_path, cand, evs, fps, nfr, OW, OH, y=st.get("y"), line_h=st.get("line_h"), base=base)
+        m.pop("per_frame", None)
+        C.log(f"captions '{name}': {match.summary(m)}")
+        return {"path": cand, "match": m, "name": name}
+
+    first = [(f"measured: {st['family']}", st)] if st.get("ok") else []
+    rest = [(f"next font: {alt['family']}", alt) for alt in (style.with_font(st, i) for i in range(2)) if alt] \
+        if st.get("ok") else []
+    rest.append(("study look", None))
+    tried, best = [], None
+    for k, (name, s_) in enumerate(first + rest):
+        if best and best["match"]["captions"] >= CAPTIONS_GOOD:
+            break
+        r = score(k, name, s_)
+        tried.append({"name": name, **{x: r["match"][x] for x in ("picture", "captions", "overall")}})
+        if best is None or r["match"]["captions"] > best["match"]["captions"]:
+            best = r
+    best["tried"] = tried
+    return best
+
+
+def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False,
+               vision_style=None):
     """Rebuild one clipper Short. Returns our clip id; raises Unsupported / other errors (status recorded)."""
     sid = s["id"]
     work = C.workdir(sid)
@@ -182,17 +224,17 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         cp = _stage(work, "caps", lambda: caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass",
                                                      vm["out_w"], vm["out_h"], vision, mark=mark,
                                                      bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
-        if not Path(cp["ass"]).exists():
-            caps.write_ass(cp["events"], cp["ass"], vm["out_w"], vm["out_h"], mark=mark, dur=sp["dur"])
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
-        render.render({"vmap": vm, "amap": am, "look": lk, "ass": cp["ass"]}, out, work)
+        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style)
+        shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
         except Exception as e:  # noqa: BLE001 - the remake itself is fine without it
             C.log(f"side by side failed: {e}")
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
-                                                        "moving": False}))
+                                                        "moving": False, "match": best["match"],
+                                                        "caption_look": best["name"]}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
         names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
         ours = title.make(s.get("title", ""), found.get("owner") or found["login"], said, ask, names=names)
@@ -200,7 +242,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},
                                          "overlay_frames": len(lk.get("overlay", {}).get("alpha", {})),
-                                         "captions": cp["events"], "title": ours})
+                                         "captions": cp["events"], "title": ours, "match": best["match"],
+                                         "caption_look": best["name"], "tried": best["tried"]})
         clip_id = register(con, s, found, am, vm, cp, out, ours)
         _status(con, s, "done", clip_id=clip_id)
         C.log(f"{sid}: done -> clip {clip_id} '{ours}'")

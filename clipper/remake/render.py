@@ -95,6 +95,13 @@ def apply_look(img, lut, sharpen=None):
     return img
 
 
+def apply_mat(img, m):
+    """Their per-frame colour effect (look.frame_transform): 3x4 BGR transform."""
+    if m is None:
+        return img
+    return cv2.transform(img.astype(np.float32), np.asarray(m, np.float32).reshape(3, 4)).clip(0, 255).astype(np.uint8)
+
+
 def apply_overlay(img, alpha, color):
     if alpha <= 0:
         return img
@@ -173,7 +180,7 @@ def write_wav(path, audio, sr=48000):
 
 
 # ---------------- render ----------------
-def render(spec, out_path, work):
+def render(spec, out_path, work, crf=17):
     """spec: {'vmap', 'amap', 'look', 'ass'} -> mp4 at the Short's aspect and fps, OW wide."""
     vm, look = spec["vmap"], spec["look"]
     work = Path(work)
@@ -183,11 +190,12 @@ def render(spec, out_path, work):
     lut = lut128(look["poly"]) if look.get("poly") else None
     alpha = {int(k): v for k, v in look.get("overlay", {}).get("alpha", {}).items()}
     color = look.get("overlay", {}).get("color", [0, 0, 255])
+    mats = {int(k): v for k, v in look.get("overlay", {}).get("mats", {}).items()}
     vf = f"ass={spec['ass']}:fontsdir={C.fonts_dir()}" if spec.get("ass") else "null"
     tmp = Path(out_path).with_suffix(".tmp.mp4")
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{OW}x{OH}",
                             "-r", f"{fps:g}", "-i", "-", "-i", str(wav), "-vf", vf, "-c:v", "libx264", "-preset", "medium",
-                            "-crf", "17", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                            "-crf", str(crf), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest",
                             "-movflags", "+faststart", str(tmp)], stdin=subprocess.PIPE)
     readers = {}
     try:
@@ -198,7 +206,11 @@ def render(spec, out_path, work):
             if rd is None:
                 rd = readers[shot["sec"]] = C.FrameReader(sec["file"], sec["fps"], (sec["w"], sec["h"]))
             img = compose(rd.get(sec_frame_index(vm, shot, n)), vm, shot, n)
-            img = apply_overlay(apply_look(img, lut, look.get("sharpen")), alpha.get(n, 0.0), color)
+            img = apply_look(img, lut, look.get("sharpen"))
+            if n in mats:      # their exact colour effect on this frame (replaces the single-colour wash)
+                img = apply_mat(img, mats[n])
+            else:
+                img = apply_overlay(img, alpha.get(n, 0.0), color)
             enc.stdin.write(img.tobytes())
     finally:
         for rd in readers.values():
