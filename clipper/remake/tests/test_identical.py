@@ -195,3 +195,20 @@ def test_alignment_recovers_their_framing_from_pixels():
     A = align._blank(align._gray(render.compose(sec, vm, true, 0, (W, h))), h)
     (k, cx, cy), _ = align.align_frame(A, sec, vm, off, 0, h)
     assert abs(k - 0.5) < 0.0015 and abs(cx - 960) < 1.5 and abs(cy - 540) < 1.5
+
+
+def test_tuning_moves_the_caption_look_towards_theirs():
+    from remake import tune
+    evs = [{"start": 0, "end": 1, "y": 0.5, "lines": [2], "words": [{"w": "A", "c": "#FFFFFF", "t": 0},
+                                                                  {"w": "B", "c": "#FFFFFF", "t": 0.9}]},
+           {"start": 1.2, "end": 1.3, "y": 0.5, "lines": [1], "words": [{"w": "C", "c": "#FFFFFF", "t": 1.2}]}]
+    ms = tune.moments(evs, 30)
+    assert ms == [(0, 21, 1)]                         # 0.7 s in: only "A" is up; the 0.1 s caption is skipped
+    sev, sst = tune.sample_events(evs, ms, {"colours": [["#FFFFFF", "#00FF00"]], "pos": [[0.4, 0.6]]})
+    assert sev[0]["start"] == 0 and sev[0]["end"] == 1 and [w["w"] for w in sev[0]["words"]] == ["A"]
+    assert sev[0]["lines"] == [1] and sst["colours"] == [["#FFFFFF"]] and sst["pos"] == [[0.4, 0.6]]
+    target = {"fs": 106.0, "dy": 4.0, "x": 0.504}
+    score = lambda s: abs(s["fs"] - target["fs"]) / 50 + abs(s["dy"] - target["dy"]) / 40 + abs(s["x"] - target["x"]) * 5  # noqa: E731
+    best, err = tune.tune({"fs": 100.0, "track": 0.0, "spacing": 0.0, "dy": 0.0, "x": 0.5, "line_h": 60, "llm": {}},
+                          score, rounds=2)
+    assert abs(best["fs"] - 106) < 2 and abs(best["dy"] - 4) < 0.5 and abs(best["x"] - 0.504) < 1e-6 and err < 0.05

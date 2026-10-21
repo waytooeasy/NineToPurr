@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import align, amap, caps, look, match, render, source, style, title, vmap
+from . import align, amap, caps, look, match, render, source, style, title, tune, vmap
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
@@ -162,6 +162,11 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
                                                                          vision)})
     evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
     st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
+    if st.get("ok"):         # fitted on their pixels: size, spacing, position, box, font
+        def fit():
+            s, e = tune.tune(st, tune.Scorer(short_path, base, evs, st, fps, (OW, OH), work=work))
+            return {**s, "tune_err": e}
+        st = _stage(work, "style_tuned", fit)
     if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
         evs = [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cols)]}
                for e, cols in zip(evs, st["colours"])]
@@ -182,8 +187,8 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         return {"path": cand, "match": m, "name": name}
 
     first = [(f"measured: {st['family']}", st)] if st.get("ok") else []
-    rest = [(f"next font: {alt['family']}", alt) for alt in (style.with_font(st, i) for i in range(2)) if alt] \
-        if st.get("ok") else []
+    rest = [(f"next font: {alt['family']}", alt) for alt in (style.with_font(st, i) for i in range(2)) if alt
+            and alt["family"] != st["family"]] if st.get("ok") else []
     rest.append(("study look", None))
     tried, best = [], None
     for k, (name, s_) in enumerate(first + rest):
