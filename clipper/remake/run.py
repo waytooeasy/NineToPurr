@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import amap, caps, look, match, render, source, style, title, vmap
+from . import align, amap, caps, look, match, render, source, style, title, vmap
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
@@ -222,6 +222,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             raise Unsupported(f"only {vm['mapped']}/{vm['nfr']} frames found in the stream")
         if any(sh["layout"] == "other" for sh in vm["shots"]):
             raise Unsupported("layout not supported yet (stack / overlay)")
+        vm = _stage(work, "vmap_aligned", lambda: align.refine(short_path, vm))   # their framing, frame by frame
         secs = found["sections"]
         a = min(secs[g["sec"]]["vod_s"] + g["t0"] + g["off"] for g in am["segments"])
         b = max(secs[g["sec"]]["vod_s"] + g["t1"] + g["off"] for g in am["segments"])
@@ -277,7 +278,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             for p in work.iterdir():
                 if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
                     p.unlink(missing_ok=True)
-            for name in ("found", "amap", "vmap"):   # they point at the deleted media
+            for name in ("found", "amap", "vmap", "vmap_aligned"):   # they point at the deleted media
                 (work / f"{name}.json").unlink(missing_ok=True)
 
 

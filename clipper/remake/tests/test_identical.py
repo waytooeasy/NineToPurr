@@ -182,3 +182,16 @@ def test_video_is_resynced_when_the_audio_map_puts_it_a_frame_off():
     fixed = vmap.resync(out, th, 0, sec, 0)
     assert [m for _, _, m, _, _ in fixed] == list(range(1, 21))
     assert vmap.resync(out, sec[:20], 0, sec, 0) == out
+
+
+def test_alignment_recovers_their_framing_from_pixels():
+    from remake import align
+    rng = np.random.default_rng(4)
+    sec = cv2.GaussianBlur(rng.integers(0, 255, (1080, 1920, 3), dtype=np.uint8), (0, 0), 4)
+    vm = {"out_w": 1080, "out_h": 1920, "sections": [{"w": 1920, "h": 1080}]}
+    true = {"layout": "full", "sec": 0, "path": {"0": [0.5, 960.0, 540.0]}}
+    off = {"layout": "full", "sec": 0, "path": {"0": [0.505, 966.0, 535.0]}}      # a few px off, like a smoothed path
+    W, h = align.W, int(round(align.W * 1920 / 1080 / 2) * 2)
+    A = align._blank(align._gray(render.compose(sec, vm, true, 0, (W, h))), h)
+    (k, cx, cy), _ = align.align_frame(A, sec, vm, off, 0, h)
+    assert abs(k - 0.5) < 0.0015 and abs(cx - 960) < 1.5 and abs(cy - 540) < 1.5
