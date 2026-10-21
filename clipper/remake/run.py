@@ -167,7 +167,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         sp = C.probe(short_path)
         mark = os.environ.get("CLIPPER_WATERMARK", "@Peakz.Recaps").strip() or None
         cp = _stage(work, "caps", lambda: caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass",
-                                                     vm["out_w"], vm["out_h"], vision, mark=mark))
+                                                     vm["out_w"], vm["out_h"], vision, mark=mark,
+                                                     bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
         if not Path(cp["ass"]).exists():
             caps.write_ass(cp["events"], cp["ass"], vm["out_w"], vm["out_h"], mark=mark, dur=sp["dur"])
         out = Path(out_dir) / f"remake_{sid}.mp4"
@@ -180,6 +181,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         C.save_json(work / "spec.json", {"short": s, "found": {k: v for k, v in found.items() if k != "hits"},
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},
+                                         "overlay_frames": len(lk.get("overlay", {}).get("alpha", {})),
                                          "captions": cp["events"], "title": ours})
         clip_id = register(con, s, found, am, vm, cp, out, ours)
         _status(con, s, "done", clip_id=clip_id)

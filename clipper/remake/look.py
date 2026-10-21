@@ -101,6 +101,7 @@ def overlays(short_path, vm, W, width=270):
     OW, OH = vm["out_w"], vm["out_h"]
     w, h = width, int(round(width * OH / OW / 2) * 2)
     alpha, colour, cols = {}, {}, []
+    bands = {}                       # n -> mean |their - ours| in 16 horizontal bands (captions show up here)
     for shot in vm["shots"]:
         n0, n1 = shot["n0"], shot["n1"]
         th = C.read_frames(short_path, n0, n1 - n0, vm["fps"], (w, h))
@@ -115,6 +116,8 @@ def overlays(short_path, vm, W, width=270):
             ours = R.apply_look(R.compose(sf[j], vm, shot, n, (w, h)), lut).astype(np.float32)
             a = cv2.GaussianBlur(th[i].astype(np.float32), (0, 0), 2)
             b = cv2.GaussianBlur(ours, (0, 0), 2)
+            diff = np.abs(a - b).mean(axis=2)
+            bands[n] = [round(float(diff[int(j * h / 16):int((j + 1) * h / 16)].mean()), 2) for j in range(16)]
             m = np.ones((h, w), bool)
             m[int(CAP_BAND[0] * h):int(CAP_BAND[1] * h)] = False
             d, o = (a - b)[m].reshape(-1, 3), b[m].reshape(-1, 3)
@@ -131,7 +134,7 @@ def overlays(short_path, vm, W, width=270):
                 colour[n] = c
                 cols.append(c)
     if not cols:
-        return {"alpha": {}, "color": [0, 0, 255]}
+        return {"alpha": {}, "color": [0, 0, 255], "bands": {str(n): v for n, v in bands.items()}}
     # a wash is a short, strong, saturated colour event (red flash on the punch line); a grade mismatch on one
     # shot is weak, long and grey-ish: keep only runs that look like the former
     runs, cur = [], []
@@ -151,10 +154,12 @@ def overlays(short_path, vm, W, width=270):
                 and float(c.max() - c.min()) >= SAT_MIN and float(np.median(rc.std(0))) <= 60):
             keep.update({n: alpha[n] for n in r})
             keep_cols.append(c)
+    bd = {str(n): v for n, v in bands.items()}
     if not keep:
-        return {"alpha": {}, "color": [0, 0, 255]}
+        return {"alpha": {}, "color": [0, 0, 255], "bands": bd}
     col = np.median(np.array(keep_cols), 0)
-    return {"alpha": {str(n): a for n, a in keep.items()}, "color": [float(np.clip(x, 0, 255)) for x in col]}
+    return {"alpha": {str(n): a for n, a in keep.items()}, "color": [float(np.clip(x, 0, 255)) for x in col],
+            "bands": bd}
 
 
 def build(short_path, vm, samples=36):

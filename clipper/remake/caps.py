@@ -164,6 +164,53 @@ def events(rows, step=1 / OCR_FPS):
     return [e for e in evs if e["end"] - e["start"] >= 0.15]
 
 
+def one_position(evs):
+    """Clippers keep one caption position per Short; OCR heights are noisy: use their median for every event."""
+    ys = [e["y"] for e in evs if isinstance(e.get("y"), (int, float))]
+    if ys:
+        y = float(np.clip(np.median(ys), 0.12, 0.88))
+        for e in evs:
+            e["y"] = y
+    return evs
+
+
+def refine_times(evs, bands, fps, nfr, back_s=1.0, fwd_s=0.5):
+    """Start/end of each caption from the pixels: the caption band differs from our caption-free frame while a
+    caption is on screen (OCR at 10 fps misses or delays some)."""
+    if not evs or not bands:
+        return evs
+    y = evs[0]["y"]
+    j = int(np.clip(y * 16, 1, 14))
+    E = np.array([np.mean(bands.get(str(n), [0] * 16)[j - 1:j + 2]) if str(n) in bands else np.nan
+                  for n in range(nfr)])
+    if np.all(np.isnan(E)):
+        return evs
+    on = [E[int(e["start"] * fps):int(e["end"] * fps)] for e in evs]
+    on_lvl = np.nanmedian(np.concatenate(on)) if on else np.nan
+    off_lvl = np.nanpercentile(E, 10)
+    if not on_lvl > off_lvl * 1.3:
+        return evs
+    th = off_lvl + 0.4 * (on_lvl - off_lvl)
+    lit = np.nan_to_num(E, nan=0) > th
+    for i, e in enumerate(evs):
+        lo = int((evs[i - 1]["end"] if i else 0) * fps)
+        hi = int((evs[i + 1]["start"] if i + 1 < len(evs) else nfr / fps) * fps)
+        a, b = int(e["start"] * fps), max(int(e["start"] * fps) + 1, int(e["end"] * fps))
+        while a - 1 >= max(lo, int((e["start"] - back_s) * fps)) and lit[a - 1]:
+            a -= 1
+        while b < min(hi, int((e["end"] + fwd_s) * fps), nfr) and lit[b]:
+            b += 1
+        new_start = a / fps
+        if new_start < e["start"]:
+            first = e["words"][0]["t"]
+            for w in e["words"]:
+                w["t"] = round(new_start + (w["t"] - first) if w["t"] <= first + 1e-9 else max(w["t"], new_start), 3)
+        e["start"], e["end"] = round(min(new_start, e["start"]), 3), round(max(b / fps, e["end"]), 3)
+        for w in e["words"]:
+            w["t"] = max(w["t"], e["start"])
+    return evs
+
+
 def ass_colour(hex_rgb):
     h = _hex(hex_rgb)
     return f"&H{h[5:7]}{h[3:5]}{h[1:3]}&"
@@ -252,9 +299,11 @@ def write_ass(evs, path, out_w, out_h, fs=None, fsp=None, mark=None, dur=None):
     return path
 
 
-def build(short_path, dur, aspect, path, out_w, out_h, vision=anthropic_vision, mark=None):
+def build(short_path, dur, aspect, path, out_w, out_h, vision=anthropic_vision, mark=None, bands=None, fps=None):
     rows = ocr(short_path, dur, aspect, vision)
-    evs = events(rows)
+    evs = one_position(events(rows))
+    if bands and fps:
+        evs = refine_times(evs, bands, fps, int(round(dur * fps)))
     write_ass(evs, path, out_w, out_h, mark=mark, dur=dur)
     C.log(f"captions: {len(evs)} events, {sum(len(e['words']) for e in evs)} words")
     return {"rows": rows, "events": evs, "ass": str(path)}

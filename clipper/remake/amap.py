@@ -60,6 +60,9 @@ def segments(rows, dur, tol=0.03):
     segs = [s for i, s in enumerate(segs) if len(s["offs"]) > 1 or len(segs) == 1
             or not (0 < i < len(segs) - 1 and segs[i - 1]["sec"] == segs[i + 1]["sec"]
                     and abs(np.median(segs[i - 1]["offs"]) - np.median(segs[i + 1]["offs"])) <= tol)]
+    # fewer than 3 windows (< 0.4 s of agreeing audio) is a stray match: in a remake it would be an audio glitch
+    if len(segs) > 1:
+        segs = [s for s in segs if len(s["offs"]) >= 3] or segs
     merged = []
     for s in segs:
         if merged and merged[-1]["sec"] == s["sec"] and abs(np.median(merged[-1]["offs"]) - np.median(s["offs"])) <= tol:
@@ -138,38 +141,49 @@ def switches(short48, secs48, segs, sr=FINE_SR, span=0.3):
     return segs
 
 
+BOOM_DBFS = -24.0      # sub-150 Hz residual level (dBFS rms) of a bass hit: the study's booms sat at -10..-15
+BOOM_MIN_S = 0.4
+
+
+def _lowpass(x, sr, fc=150.0):
+    X = np.fft.rfft(x)
+    X[np.fft.rfftfreq(len(x), 1 / sr) > fc] = 0
+    return np.fft.irfft(X, len(x)).astype(np.float32)
+
+
 def extras(short48, secs48, segs, sr=FINE_SR, frame=0.05):
-    """Sound that is not the stream: bass booms (re-made with our own) and a music bed (left out)."""
+    """Sound that is not the stream: bass hits (re-made with our own boom) and a music bed (left out)."""
     res = np.zeros_like(short48)
     for s in segs:
         i0, i1 = int(s["t0"] * sr), min(int(s["t1"] * sr), len(short48))
         if i1 > i0:
             res[i0:i1] = short48[i0:i1] - s.get("gain", 1) * _at(secs48[s["sec"]], s["off"], s["t0"], i1 - i0, sr)
     F = int(frame * sr)
-    booms, music_frames, n = [], 0, 0
-    run = None
-    win = np.hanning(F)
-    f = np.fft.rfftfreq(F, 1 / sr)
-    lo, mid = f < 150, (f >= 150) & (f < 4000)
+    rlo, ylo = _lowpass(res, sr), _lowpass(short48, sr)
+    booms, run = [], None
     for i in range(0, len(res) - F, F):
-        R = np.abs(np.fft.rfft(res[i:i + F] * win)) ** 2
-        Y = np.abs(np.fft.rfft(short48[i:i + F] * win)) ** 2
-        lo_db = 10 * np.log10(R[lo].sum() / F + 1e-12)
-        is_boom = lo_db > -18 and R[lo].sum() > 0.5 * Y[lo].sum()
-        if is_boom:
-            run = run or {"t": i / sr, "dur": 0.0, "db": lo_db}
+        e_r = float(np.mean(rlo[i:i + F] ** 2))
+        db = 10 * np.log10(e_r + 1e-12)
+        if db > BOOM_DBFS and e_r > 0.5 * float(np.mean(ylo[i:i + F] ** 2)):
+            run = run or {"t": i / sr, "dur": 0.0, "db": db}
             run["dur"] += frame
-            run["db"] = max(run["db"], lo_db)
-        elif run:
-            if run["dur"] >= 0.1:
+            run["db"] = max(run["db"], db)
+        else:
+            if run and run["dur"] >= BOOM_MIN_S:
                 booms.append(run)
             run = None
-        n += 1
-        if R[mid].sum() > 0.3 * Y[mid].sum() and 10 * np.log10(R[mid].sum() / F + 1e-12) > -45:
-            music_frames += 1
-    if run and run["dur"] >= 0.1:
+    if run and run["dur"] >= BOOM_MIN_S:
         booms.append(run)
-    return {"booms": booms, "music_share": music_frames / max(n, 1)}
+    # music bed: share of frames where non-stream sound carries much of the 150 Hz - 4 kHz band
+    hi_r = res - rlo
+    hi_y = short48 - ylo
+    n = m = 0
+    for i in range(0, len(res) - F, F):
+        n += 1
+        er, ey = float(np.mean(hi_r[i:i + F] ** 2)), float(np.mean(hi_y[i:i + F] ** 2))
+        if er > 0.3 * ey and 10 * np.log10(er + 1e-12) > -45:
+            m += 1
+    return {"booms": booms, "music_share": m / max(n, 1)}
 
 
 def build(short_path, section_files):

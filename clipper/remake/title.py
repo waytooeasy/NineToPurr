@@ -8,10 +8,10 @@ TOO_CLOSE = 0.8
 
 PROMPT = """You write YouTube Shorts titles for a streamer-clips channel.
 A clipper's Short of this moment is popping right now. Their title: "{title}"
-Streamer(s): {streamer}. What happens (their captions): {captions}
+The streamer this channel files it under: {streamer}. What happens (their captions): {captions}
 
-Write OUR title for the same clip: the same moment and the same hook, naming the streamer(s) the way viewers know
-them, at most {max_len} characters, English, same tone. If they use emojis, use at most two. Do NOT copy their
+Write OUR title for the same clip: the same moment and the same hook, with the people named exactly as their title
+names them (nicknames included; never add a name their title does not use), at most {max_len} characters, English, same tone. If they use emojis, use at most two. Do NOT copy their
 wording: reorder, swap words, say it your own way. No hashtags, no quotes, nothing the clip does not show.
 {extra}Reply with the title only."""
 
