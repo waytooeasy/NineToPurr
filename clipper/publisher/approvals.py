@@ -50,6 +50,10 @@ def creator_of(con, clip_id: int):
 def same_moment_of(con, clip_id: int):
     """The popping clipper Short this clip is the same moment as (radar/match.py, D54): {title, vph} or None."""
     try:
+        # a remake (D58): the clipper Short it rebuilds. Shown in Telegram only, never in the YouTube description
+        r = con.execute("SELECT title, vph FROM remakes WHERE clip_id = ?", (clip_id,)).fetchone()
+        if r:
+            return {"title": r[0], "vph": r[1]}
         r = con.execute("SELECT m.short_title, m.short_vph FROM moment_matches m JOIN radar_candidates r"
                         " ON r.clip_id = m.clip_id WHERE r.clips_id = ? ORDER BY m.short_vph DESC LIMIT 1",
                         (clip_id,)).fetchone()
