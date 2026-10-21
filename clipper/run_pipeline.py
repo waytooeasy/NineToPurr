@@ -159,8 +159,9 @@ def market_step(now=None, key=None, con=None):
     return f"scanned {len(data['streamers'])} streamers"
 
 
-def styles_step(now=None, vision=None, grab=None):
-    """Per-streamer market look (editor/streamer_style.py, D49): after a new market scan, at most daily."""
+def styles_step(now=None, vision=None, grab=None, con=None):
+    """Per-streamer market look and layout (editor/streamer_style.py, D49, D56): after a new market scan, at most
+    daily; the streamers with the most demand plus every streamer Radar posts (`match_streamers`, needs `con`)."""
     import streamer_style
     from radar import market
     m = market.load(now=now)
@@ -172,6 +173,11 @@ def styles_step(now=None, vision=None, grab=None):
         return "skipped: no ANTHROPIC_API_KEY"
     logins = {n: [e["id"].lower().lstrip("@") for e in es] for n, es in heat.load_watchlist()["streamers"].items()}
     kw = {k: v for k, v in (("vision", vision), ("grab", grab)) if v}
+    if con is not None:
+        try:
+            kw["also"] = match_streamers(con, m, heat.load_watchlist()["streamers"])
+        except Exception:  # noqa: BLE001 - the demand ranking alone still works
+            traceback.print_exc()
     doc = streamer_style.run(m, logins, now=now, **kw)
     return f"styled {len(doc['streamers'])} streamers"
 
@@ -516,7 +522,7 @@ def run_pass(con, steps=None):
         "formats": refresh_formats,
         "metrics": lambda: metrics_step(con),
         "market": lambda: market_step(con=con),   # daily + 6-h refresh: what's popping on Shorts (D48, D54)
-        "styles": styles_step,                 # daily: each streamer's popping look (D49)
+        "styles": lambda: styles_step(con=con),   # daily: each streamer's popping look and layout (D49, D56)
         "match": lambda: match_step(con),      # per market scan: the clippers' popping moments (D54)
         "radar": lambda: radar_step(con, pace=True),
         "capture": lambda: capture_step(con),
