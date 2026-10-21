@@ -395,20 +395,23 @@ def measure_event(th, base, ev):
         x0, x1 = xs.min(), xs.max() + 1
     out["cy"] = float((y0 + y1) / 2 / th.shape[0])
     out["cx"] = float((x0 + x1) / 2 / th.shape[1])
-    out["box_pad"] = box_pad(th, (x0, x1, y0, y1))
+    out["box_pad"] = box_pad(th, (x0, x1, y0, y1), base)
     cap = [ln["r1"] - ln["r0"] for ln in out["lines"]] or [lines[0][1] - lines[0][0]]
     out["line_h"] = float(np.median(cap))
     out["outline"] = outline_px(fill, dark, out["line_h"])
     return out
 
 
-def box_pad(th, text_box, dark_v=60, share=0.7):
+def box_pad(th, text_box, base=None, dark_v=60, share=0.6, differ=25):
     """(pad_x, pad_y) in px of a solid dark box behind the text, or None: from the text's edges, how far rows /
-    columns stay dark (their box covers the picture, so its pixels are uniformly dark)."""
+    columns stay dark AND (when our caption-free frame `base` is given) differ from the picture there (dark hair
+    or a dark room next to their box is not box)."""
     x0, x1, y0, y1 = [int(v) for v in text_box]
     H, W = th.shape[:2]
     h = max(1, y1 - y0)
-    dark = th.max(2) < dark_v
+    box = th.max(2) < dark_v
+    if base is not None:
+        box &= np.abs(th.astype(np.int16) - base.astype(np.int16)).max(2) > differ
     def run(lines):
         n = 0
         for ln in lines:
@@ -416,10 +419,10 @@ def box_pad(th, text_box, dark_v=60, share=0.7):
                 break
             n += 1
         return n
-    left = run([dark[y0:y1, x] for x in range(x0 - 2, max(-1, x0 - 2 * h), -1)])
-    right = run([dark[y0:y1, x] for x in range(x1 + 1, min(W, x1 + 2 * h))])
-    top = run([dark[y, x0:x1] for y in range(y0 - 2, max(-1, y0 - 2 * h), -1)])
-    bot = run([dark[y, x0:x1] for y in range(y1 + 1, min(H, y1 + 2 * h))])
+    left = run([box[y0:y1, x] for x in range(x0 - 2, max(-1, x0 - 2 * h), -1)])
+    right = run([box[y0:y1, x] for x in range(x1 + 1, min(W, x1 + 2 * h))])
+    top = run([box[y, x0:x1] for y in range(y0 - 2, max(-1, y0 - 2 * h), -1)])
+    bot = run([box[y, x0:x1] for y in range(y1 + 1, min(H, y1 + 2 * h))])
     if min(left, right, top, bot) < 0.08 * h:
         return None
     return (float((left + right) / 2 + 2), float((top + bot) / 2 + 2))
@@ -647,7 +650,9 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
                 fss.append(100 * (ln["x1"] - ln["x0"]) / w100)
     fs = float(np.median(fss)) if fss else None
     good = [m for m in ms if m]
-    pads = [m["box_pad"] for m in good if m.get("box_pad")]
+    lh0 = float(np.median([m["line_h"] for m in good]))
+    pads = [m["box_pad"] for m in good if m.get("box_pad")
+            and m["box_pad"][0] <= 1.2 * lh0 and m["box_pad"][1] <= 0.8 * lh0]
     box = [float(np.median([p[0] for p in pads])), float(np.median([p[1] for p in pads]))] \
         if len(pads) >= max(2, 0.4 * len(good)) else None
     line_h = float(np.median([m["line_h"] for m in good]))
