@@ -60,3 +60,10 @@ def test_no_clear_majority_keeps_yesterdays_look(tmp_path):
                  grab=lambda ids: [i.encode() for i in ids][:5], now=NOW, top=2)
     assert doc["streamers"]["Jynxzi"]["caption"]["font"] == "condensed"          # split today -> yesterday's
     assert doc["streamers"]["CaseOh"]["caption"]["header"] == "white_box"        # no read today -> kept
+
+
+def test_layout_majority_over_all_images():
+    import streamer_style as SS
+    per = [{"captions": True, "layout": "fit"}, {"captions": False, "layout": "fit"}, {"captions": True, "layout": "full"}]
+    assert SS.aggregate(per)["layout"] == "fit"
+    assert "layout" not in SS.aggregate([{"layout": "fit"}, {"layout": "full"}])          # no clear majority

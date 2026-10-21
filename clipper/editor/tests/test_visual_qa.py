@@ -146,3 +146,15 @@ def test_double_captions_count_when_we_drew_a_track_over_a_captioned_stream(con,
 
 def test_prompt_knows_the_chat_panel_is_ours():
     assert "panel showing the stream's own chat" in V.prompt_for({"hook": "h", "chat_panel": True})
+
+
+def test_blurred_fill_of_a_fit_clip_is_not_black_bars(con, monkeypatch):
+    monkeypatch.setenv("VISUAL_QA", "1")
+    con.execute("UPDATE clips SET visual_qa='{\"ok\": true}' WHERE id=2")
+    con.commit()
+    mp4 = con.execute("SELECT file_path FROM clips WHERE id=1").fetchone()[0]
+    Path(mp4).with_suffix(".json").write_text('{"our_captions": true, "mode": "fit"}')
+    bars = lambda imgs: '{"ok": false, "issues": [{"code": "black_bars", "frame": 1}]}'   # noqa: E731
+    res = V.run(con, vision=bars, grab=lambda v: [b"a", b"b", b"c"])
+    assert res["passed"] == [1]
+    assert "blurred copy of the same video" in V.prompt_for({"hook": "h", "fit": True})

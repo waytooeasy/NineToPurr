@@ -248,3 +248,40 @@ def test_stack_gameplay_leaves_out_the_streams_caption_band():
     gh = 952 * (1 - L.OWN_CAPTION_CUT)                                           # 818.7 px of gameplay height
     fg = L.filtergraph(stack)
     assert f"crop={L._even(gh * 1080 / 1152)}:{L._even(gh)}:" in fg and ":80,scale=1080:1152" in fg
+
+
+def test_fit_is_the_clippers_wide_shot_over_a_blurred_copy():
+    fit = {"mode": "fit", "cx": 1300, "W": 1920, "H": 1080, "follow": True, "cut": L.OWN_CAPTION_CUT}
+    assert L.panel_h(fit) == L.FIT_H and L.panel_h({"mode": "chatstack", "chat_h": 400}) == 1520
+    fg = L.filtergraph(fit)
+    cw = L.crop_w(1920, 1080, L.OWN_CAPTION_CUT, L.FIT_H)                      # ~1115 px: both people fit
+    assert f"crop={L._even(cw)}:928:" in fg and "scale=1080:900" in fg and "boxblur" in fg
+    assert fg.endswith(f"overlay=0:{(1920 - L.FIT_H) // 2}[v]")
+    track = lambda v, s, e: [(0.0, [(700, 300, 150, 150), (1500, 320, 140, 140)])]   # noqa: E731
+    assert L.follow(fit, "v", 0, 1, track)["path"][0][1] == (700 + 1640) / 2          # both in the wide shot
+
+
+def test_full_bleed_like_the_market_blurs_the_chat_spot_instead_of_a_panel():
+    crop = {"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "hide": [1258, 0, 1920, 232]}
+    fg = L.filtergraph(crop)
+    assert fg.startswith("[0:v]split=2[s0][s1];") and "alphamerge" in fg and fg.endswith("scale=1080:1920,setsar=1[v]")
+    assert "vstack" not in fg
+
+
+def test_fit_and_hide_render(tmp_path):
+    import shutil
+    import subprocess
+    import pytest
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    src = tmp_path / "s.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=1920x1080:rate=30:duration=2",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    for i, lay in enumerate([{"mode": "fit", "cx": 1300, "W": 1920, "H": 1080, "path": [[0, 900], [2, 1300]]},
+                             {"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "hide": [1258, 0, 1920, 232]}]):
+        out = tmp_path / f"o{i}.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-filter_complex", L.filtergraph(lay),
+                        "-map", "[v]", str(out)], check=True)
+        dims = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                               "stream=width,height", "-of", "csv=p=0", str(out)], capture_output=True, text=True)
+        assert dims.stdout.strip() == "1080,1920"

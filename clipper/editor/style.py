@@ -98,6 +98,11 @@ def streamer_raw(creator, sp=None):
     return None
 
 
+def market_layout(creator, sp=None):
+    """How the top clippers frame this streamer right now (styles.json "layout": full / fit / stack), or None."""
+    return (streamer_raw(creator, sp) or {}).get("layout")
+
+
 def load(p=None, creator=None, sp=None):
     """Global market style (style.json), with this creator's streamer style (styles.json) laid over it."""
     try:

@@ -9,6 +9,7 @@ clipper Short's views/hour), the Writer paraphrases that clipper's title with sy
 and cuts to that Short's length. Runs once per market scan/refresh, for the streamers Radar posts.
 """
 import json
+import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
@@ -42,6 +43,14 @@ The clip must be made before the Short was posted ("?" = unknown time: judge by 
 within hours or a day or two of the moment. Titles that say nothing ("lol", "W", "om", emotes, the stream
 title) never match.
 Answer with JSON only: [{{"short": "S0", "clip": "C3" or null, "match": "same" | "related"}}]"""
+
+
+LAYOUT_PROMPT = (
+    "This is the thumbnail of a YouTube Short cut from a livestream. Which layout does it use? \"full\": the video "
+    "fills the whole vertical frame; \"fit\": a wider video panel across the middle with blurred or plain bars "
+    "above and below; \"stack\": two stacked panels (e.g. a face cam over the game or screen). Answer with JSON "
+    "only: {\"layout\": \"full\" | \"fit\" | \"stack\"}"
+)
 
 
 def log(msg):
@@ -136,22 +145,41 @@ def match_streamer(name, shorts, clips, ask=anthropic_ask, min_conf=MIN_CONF):
     return out
 
 
+def thumb_layout(short_id, look=None, fetch=None):
+    """The layout of a Short from its thumbnail (public image, never the video): full / fit / stack, or None."""
+    try:
+        if look is None:
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                return None
+            import visual_qa  # editor/ is on sys.path in the pipeline
+            look = lambda b: visual_qa.anthropic_vision([b], LAYOUT_PROMPT)  # noqa: E731
+        if fetch is None:
+            import urllib.request
+            fetch = lambda sid: urllib.request.urlopen(f"https://i.ytimg.com/vi/{sid}/oar2.jpg", timeout=15).read()  # noqa: E731
+        img = fetch(short_id)
+        m = re.search(r"\{.*\}", look(img) or "", re.S)
+        v = json.loads(m.group(0)).get("layout") if m else None
+        return v if v in ("full", "fit", "stack") else None
+    except Exception:  # noqa: BLE001 - our own layout choice is the fallback
+        return None
+
+
 def due(con, since):
     """True when no match run happened since `since` (aware datetime of the newest market data)."""
     last = con.execute("SELECT MAX(ran_at) FROM match_runs").fetchone()[0]
     return not last or _ts(last) < since
 
 
-def store(con, name, matches, now):
+def store(con, name, matches, now, layouts=None):
     with con:
         for s, c, conf in matches:
             con.execute("INSERT OR REPLACE INTO moment_matches (short_id, streamer, clip_id, confidence, short_title,"
-                        " short_vph, short_dur, candidate_json, matched_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                        " short_vph, short_dur, candidate_json, matched_at, layout) VALUES (?,?,?,?,?,?,?,?,?,?)",
                         (s["id"], name, c["clip_id"], conf, s.get("title"), s.get("vph"), s.get("dur"),
-                         json.dumps(c, ensure_ascii=False), now.strftime(DB_TS)))
+                         json.dumps(c, ensure_ascii=False), now.strftime(DB_TS), (layouts or {}).get(s["id"])))
 
 
-def run(con, market, streamers, clips_for, now=None, ask=anthropic_ask):
+def run(con, market, streamers, clips_for, now=None, ask=anthropic_ask, layout_of=thumb_layout):
     """Match the popping English Shorts of `streamers` ([name]) to their own clips (`clips_for(name)` ->
     Radar candidates). One failing streamer is logged and skipped."""
     now = now or datetime.now(timezone.utc)
@@ -167,7 +195,7 @@ def run(con, market, streamers, clips_for, now=None, ask=anthropic_ask):
             log(f"{name}: {type(e).__name__}: {e}")
             continue
         tried += 1
-        store(con, name, ms, now)
+        store(con, name, ms, now, {s["id"]: layout_of(s["id"]) for s, _, _ in ms})
         found += len(ms)
     with con:
         con.execute("INSERT INTO match_runs (ran_at) VALUES (?)", (now.strftime(DB_TS),))
@@ -180,23 +208,61 @@ def candidates(con, now=None, keep_h=KEEP_H):
     """Radar candidates of the matched moments, each with `match` = {short_id, title, dur, vph} of the most
     popping clipper Short that shows it (one entry per stream clip)."""
     now = now or datetime.now(timezone.utc)
-    rows = con.execute("SELECT short_id, short_title, short_vph, short_dur, candidate_json FROM moment_matches"
+    rows = con.execute("SELECT short_id, short_title, short_vph, short_dur, candidate_json, layout FROM moment_matches"
                        " WHERE matched_at >= ? ORDER BY short_vph DESC",
                        ((now - timedelta(hours=keep_h)).strftime(DB_TS),)).fetchall()
     out = {}
-    for sid, title, vph, dur, cj in rows:
+    for sid, title, vph, dur, cj, lay in rows:
         c = json.loads(cj)
         if c["clip_id"] not in out:
-            c["match"] = {"short_id": sid, "title": title, "dur": dur, "vph": float(vph or 0)}
+            c["match"] = {"short_id": sid, "title": title, "dur": dur, "vph": float(vph or 0), "layout": lay}
             out[c["clip_id"]] = c
     return list(out.values())
 
 
-def for_clip(con, clip_id):
-    """The most popping clipper Short this Radar clip matched: {title, dur, vph}, or None."""
+def fill_layouts(con, layout_of=thumb_layout, limit=5):
+    """Classify matched Shorts that have no layout yet (matched before migration 014, or a failed look); a look
+    that fails twice is stored as 'unknown' so it isn't retried every pass. Returns how many were filled."""
     try:
-        r = con.execute("SELECT short_title, short_dur, short_vph FROM moment_matches WHERE clip_id = ?"
+        rows = con.execute("SELECT short_id, layout FROM moment_matches WHERE layout IS NULL OR layout = 'retry'"
+                           " LIMIT ?", (limit,)).fetchall()
+    except Exception:  # noqa: BLE001 - table/column missing on an old DB
+        return 0
+    n = 0
+    with con:
+        for sid, prev in rows:
+            lay = layout_of(sid) or ("unknown" if prev == "retry" else "retry")
+            con.execute("UPDATE moment_matches SET layout=? WHERE short_id=?", (lay, sid))
+            n += lay in ("full", "fit", "stack")
+    return n
+
+
+def nearby_layout(con, clip_id, window_s=600):
+    """Layout of the most popping matched clipper Short whose clip is from the same stream within `window_s`
+    of this clip: the clipper framed that scene (Ron's fry clip sits 32 s from the matched 'Jason asks Ron
+    out' clip, and the clipper's Short shows the fry too)."""
+    try:
+        r = con.execute("SELECT video_id, vod_offset FROM radar_candidates WHERE clip_id=?", (clip_id,)).fetchone()
+        rows = con.execute("SELECT candidate_json, layout, short_vph FROM moment_matches"
+                           " WHERE layout IN ('full', 'fit', 'stack') ORDER BY short_vph DESC").fetchall()
+    except Exception:  # noqa: BLE001
+        return None
+    if not r or not r[0] or r[1] is None:
+        return None
+    for cj, lay, _ in rows:
+        c = json.loads(cj)
+        if str(c.get("video_id")) == str(r[0]) and c.get("vod_offset") is not None \
+                and abs(float(c["vod_offset"]) - float(r[1])) <= window_s:
+            return lay
+    return None
+
+
+def for_clip(con, clip_id):
+    """The most popping clipper Short this Radar clip matched: {title, dur, vph, layout}, or None."""
+    try:
+        r = con.execute("SELECT short_title, short_dur, short_vph, layout FROM moment_matches WHERE clip_id = ?"
                         " ORDER BY short_vph DESC LIMIT 1", (clip_id,)).fetchone()
     except Exception:  # noqa: BLE001 - table missing on an old DB
         return None
-    return {"title": r[0], "dur": r[1], "vph": r[2]} if r else None
+    return {"title": r[0], "dur": r[1], "vph": r[2], "layout": r[3] if r[3] in ("full", "fit", "stack") else None} \
+        if r else None

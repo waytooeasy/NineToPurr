@@ -51,6 +51,7 @@ def rerender_one(con, row, model="small", out_dir=None):
     mp4.parent.mkdir(parents=True, exist_ok=True)
     tmp = mp4.with_name(mp4.stem + ".rr.mp4")
     ass = work / f"{mp4.stem}.rr.ass"
+    pick["layout_hint"] = clip.layout_hint(con, row["radar_id"], pick.get("creator"))
     pick = clip.ensure_layout(source, pick)
     clip.build_ass(words, pick, ass)
     clip.render(source, pick, ass, tmp)

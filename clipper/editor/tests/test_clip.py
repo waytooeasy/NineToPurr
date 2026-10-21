@@ -207,9 +207,10 @@ def test_same_moment_lookup_needs_a_db_and_a_match(tmp_path):
     con = sqlite3.connect(":memory:")
     assert clip.same_moment(con, "c1") is None                      # no table yet: no crash
     con.execute("CREATE TABLE moment_matches (short_id, streamer, clip_id, confidence, short_title, short_vph,"
-                " short_dur, candidate_json, matched_at)")
-    con.execute("INSERT INTO moment_matches VALUES ('s', 'Jynxzi', 'c1', 0.9, 'T', 900, 21, '{}', '2026-10-20 10:00:00')")
-    assert clip.same_moment(con, "c1") == {"title": "T", "dur": 21, "vph": 900}
+                " short_dur, candidate_json, matched_at, layout)")
+    con.execute("INSERT INTO moment_matches VALUES ('s', 'Jynxzi', 'c1', 0.9, 'T', 900, 21, '{}', '2026-10-20 10:00:00',"
+                " 'stack')")
+    assert clip.same_moment(con, "c1") == {"title": "T", "dur": 21, "vph": 900, "layout": "stack"}
 
 
 def test_own_captions_are_cut_away_in_crop_mode_and_ours_go_on(tmp_path, monkeypatch):
@@ -222,7 +223,7 @@ def test_own_captions_are_cut_away_in_crop_mode_and_ours_go_on(tmp_path, monkeyp
     assert clip.draws_captions({**ron, "creator": "xqc", "layout": {"mode": "stack"}})
     seen = {}
     import layout
-    monkeypatch.setattr(layout, "detect_layout", lambda v, s, e, cut=0.0: seen.setdefault("cut", cut) and
+    monkeypatch.setattr(layout, "detect_layout", lambda v, s, e, cut=0.0, prefer=None: seen.setdefault("cut", cut) and
                         {"mode": "crop", "cx": 1, "W": 2, "H": 2, "cut": cut})
     assert clip.ensure_layout("v.mp4", ron)["layout"]["cut"] == layout.OWN_CAPTION_CUT
     words = [{"s": 1, "e": 1.5, "w": "my"}, {"s": 1.5, "e": 2, "w": "gun"}]
@@ -252,3 +253,11 @@ def test_chatstack_keeps_our_text_above_the_chat_panel(tmp_path):
                    st={**__import__("style").DEFAULT, "position": "lower"})
     txt = ass.read_text()
     assert "\\pos(540,1140)" in txt and "\\pos(540,1230)" in txt          # captions and handle above it
+
+
+def test_layout_hint_copies_the_matched_clipper_then_the_market(monkeypatch):
+    import style
+    monkeypatch.setattr(clip, "same_moment", lambda con, cid: {"title": "t", "layout": "fit"} if cid == "m" else None)
+    monkeypatch.setattr(style, "market_layout", lambda creator, sp=None: "full")
+    assert clip.layout_hint(None, "m", "stableronaldo") == "fit"           # that exact moment's clipper
+    assert clip.layout_hint(None, "x", "stableronaldo") == "full"          # how the market frames him

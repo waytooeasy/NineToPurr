@@ -222,6 +222,8 @@ def match_step(con, now=None, ask=None, clips_for=None):
     m = market.load(now=now)
     if not m:
         return "skipped: no market scan"
+    if ask is None and os.environ.get("ANTHROPIC_API_KEY"):
+        match.fill_layouts(con)          # layouts of matched Shorts not classified yet (cheap, a few per pass)
     if not match.due(con, market.fresh_at(m)):
         return "fresh"
     if ask is None and not os.environ.get("ANTHROPIC_API_KEY"):
