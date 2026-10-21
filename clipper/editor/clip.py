@@ -470,6 +470,29 @@ def draws_captions(pick):
     return not has_own_captions(pick) or bool(lay.get("cut"))
 
 
+def layout_hint(con, radar_clip_id, creator):
+    """How the clippers frame this clip (D56, Lucas 2026-10-21: "always follow the structure of the clipper"):
+    the matched clipper Short of this moment, else one of the same scene, else how the top clippers frame this
+    streamer, else how most top clippers frame streamers. Never our own invention: "full" when nothing is known
+    (the 2026-10-19 format research)."""
+    same = same_moment(con, radar_clip_id) or {}
+    if same.get("layout"):
+        return same["layout"]
+    if con is not None and radar_clip_id:
+        try:
+            from radar import match
+            near = match.nearby_layout(con, radar_clip_id)   # the clipper's framing of the same scene
+            if near:
+                return near
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        import style as S
+        return S.market_layout(creator) or S.market_layout_any() or "full"
+    except Exception:  # noqa: BLE001
+        return "full"
+
+
 def ensure_layout(video, pick):
     """Pick the 9:16 layout once per clip (face-following crop or facecam-over-gameplay stack). A stream with
     its own burned-in captions loses that bottom band (half a caption line in a 9:16 cut, or under the Shorts
@@ -477,7 +500,8 @@ def ensure_layout(video, pick):
     if not pick.get("layout"):
         from layout import OWN_CAPTION_CUT, detect_layout
         cut = OWN_CAPTION_CUT if has_own_captions(pick) else 0.0
-        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"], cut=cut)}
+        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"], cut=cut,
+                                                prefer=pick.get("layout_hint"))}
     return pick
 
 
@@ -572,6 +596,7 @@ def render_picks(src, picks, a, out, con=None, slug=None):
 
     for i, p in enumerate(picks, 1):
         row = clip_row(con, p)
+        p = {**p, "layout_hint": layout_hint(con, p.get("clip_id"), p.get("creator"))}
         try:
             if a.auto and p.get("source_url") and "hook" not in p:
                 p = draft_pick(work, p, a.creator or p.get("creator", ""), {**meta, "clip_id": p.get("clip_id")},

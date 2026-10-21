@@ -6,6 +6,10 @@
            A stream that burns its own captions at the bottom gets that band cut away (`cut`, every layout) so
            a 9:16 cut never shows half a caption line and nothing sits under the Shorts UI at the bottom; the
            Editor then draws ours (seam or centre), like the market's Shorts.
+- "fit":   the clipper's wide shot: a 1080x900 panel (about 6:5 of the source, following the people) across the
+           middle, a blurred copy of the video above and below; the stream's chat stays where it is. Used when the
+           market frames the streamer this way, or the matched clipper Short of this moment does (Ron's fry clip,
+           2026-10-21: the clipper showed both people, the food and the chat; our 9:16 cut showed one face).
 - "chatstack": the same following crop on top and the stream's own chat overlay below it as a readable panel
            (Lucas 2026-10-21: "U can't even see the chat"; a 9:16 cut showed a cut-off strip of it). The chat
            box is found by Claude Haiku on two frames (both looks must agree); its spot in the picture is
@@ -47,6 +51,7 @@ BORDER_MIN = 0.015          # a black border thinner than this share of the fram
 CONTENT_MIN = 0.7           # never trim a side to less than 70 % (a dark scene can fool cropdetect)
 BLACK = 24                  # a row/column whose median luma stays below this in every frame is border
 SMALL_W, SMALL_H = 480, 270 # border search works on downscaled grey frames
+FIT_H = 900                 # fit: height of the middle panel (the clipper's measured 904 px on 1920)
 CHAT_PANEL_MAX = 640        # chatstack: tallest chat panel (older lines above that are trimmed)
 CHAT_PANEL_MIN = 140        # a thinner panel is unreadable: plain crop instead
 CHAT_PAD = 0.015            # padding around the found chat box, share of the frame
@@ -268,29 +273,32 @@ def filtergraph(layout):
     if not W or not H or layout.get("cx") is None:
         return f"[0:v]crop=w=min(iw\\,ih*{OUT_W}/{OUT_H}):h=ih,scale={OUT_W}:{OUT_H},setsar=1[v]"
     cut = layout.get("cut") or 0.0
-    chat = layout.get("chat") if layout["mode"] == "chatstack" else None
-    ph = OUT_H - layout["chat_h"] if chat else OUT_H           # picture panel height
+    mode = layout["mode"]
+    ph = panel_h(layout)
     ox, oy, CW, CH = content(layout)
+    GH = CH * (1 - cut)
     cw = crop_w(CW, CH, cut, ph)
-    ch = min(CH * (1 - cut), cw * ph / OUT_W)
+    ch = min(GH, cw * ph / OUT_W)
     if len(layout.get("path") or []) > 1:
         x = x_expr(layout["path"], cw, ox, ox + CW - cw).replace(",", "\\,")   # escaped like the fallback
     else:
         x = _even(min(max(layout["cx"] - cw / 2, ox), ox + CW - cw))
     y = _even(oy)
-    if not chat:
-        return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:{y},scale={OUT_W}:{OUT_H},setsar=1[v]"
-    x0, y0, x1, y1 = chat
-    bw, bh = _even(x1 - x0), _even(y1 - y0)
-    r = max(2, min(20, min(bw, bh) // 4))
-    return (f"[0:v]split=3[s0][s1][s2];"
-            f"[s1]crop={bw}:{bh}:{x0}:{y0},boxblur={r}:2[bl];"               # no half chat in the picture...
-            f"color=c=black:s={bw}x{bh}:r=30:d=0.04,format=gray,geq=lum='{feather(chat, W, H)}',"
-            f"loop=loop=-1:size=1[m];[bl][m]alphamerge[hide];"                # ...and no hard edge where it ends
-            f"[s0][hide]overlay={x0}:{y0}:shortest=1[clean];"
-            f"[clean]crop={_even(cw)}:{_even(ch)}:{x}:{y},scale={OUT_W}:{ph},setsar=1[pic];"
-            f"[s2]crop={bw}:{bh}:{x0}:{y0},scale={OUT_W}:{layout['chat_h']},setsar=1[chat];"
-            f"[pic][chat]vstack=inputs=2[v]")
+    pic = f"crop={_even(cw)}:{_even(ch)}:{x}:{y},scale={OUT_W}:{ph},setsar=1"
+    if mode == "fit":                       # the clipper's wide shot over a blurred copy of the video
+        bw = min(CW, GH * OUT_W / OUT_H)
+        return (f"[0:v]split=2[b][f];"
+                f"[b]crop={_even(bw)}:{_even(GH)}:{_even(ox + (CW - bw) / 2)}:{y},scale=270:480,boxblur=10:2,"
+                f"scale={OUT_W}:{OUT_H},setsar=1[bg];"
+                f"[f]{pic}[fg];[bg][fg]overlay=0:{(OUT_H - ph) // 2}[v]")
+    if mode == "chatstack":                 # picture on top (no half chat in it), the chat panel below
+        x0, y0, x1, y1 = layout["chat"]
+        return (_hide(layout["chat"], W, H, copies=3) + f"[clean]{pic}[pic];"
+                f"[s2]crop={_even(x1 - x0)}:{_even(y1 - y0)}:{x0}:{y0},scale={OUT_W}:{layout['chat_h']},setsar=1[chat];"
+                f"[pic][chat]vstack=inputs=2[v]")
+    if layout.get("hide"):                  # full-bleed like the market: the chat spot blurred, no half chat
+        return _hide(layout["hide"], W, H) + f"[clean]{pic}[v]"
+    return f"[0:v]{pic}[v]"
 
 
 def caption_y(layout):
@@ -311,6 +319,30 @@ def feather(box, W, H, f=40):
     for t in terms[1:]:
         e = f"min({e}\\,{t}/{f})"
     return f"255*clip({e}\\,0\\,1)"
+
+
+def panel_h(layout):
+    """Output height of the moving picture panel: fit's middle panel, chatstack's top panel, or the full frame."""
+    lay = layout or {}
+    if lay.get("mode") == "fit":
+        return FIT_H
+    if lay.get("mode") == "chatstack" and lay.get("chat_h"):
+        return OUT_H - lay["chat_h"]
+    return OUT_H
+
+
+def _hide(box, W, H, copies=2):
+    """Filter steps that blur `box` (the chat spot) in [0:v] with a soft edge -> [clean]; `copies` > 2 also
+    leaves untouched copies as [s2], [s3]..."""
+    x0, y0, x1, y1 = box
+    bw, bh = _even(x1 - x0), _even(y1 - y0)
+    r = max(2, min(20, min(bw, bh) // 4))
+    labels = "".join(f"[s{i}]" for i in range(copies))
+    return (f"[0:v]split={copies}{labels};"
+            f"[s1]crop={bw}:{bh}:{x0}:{y0},boxblur={r}:2[bl];"
+            f"color=c=black:s={bw}x{bh}:r=30:d=0.04,format=gray,geq=lum='{feather(box, W, H)}',"
+            f"loop=loop=-1:size=1[m];[bl][m]alphamerge[hide];"
+            f"[s0][hide]overlay={x0}:{y0}:shortest=1[clean];")
 
 
 def picture_bottom(layout):
@@ -483,10 +515,10 @@ def find_chat(video, start, end, W, H, ask=None, grab=grab_frames):
 
 def follow(lay, video, start, end, track=track_faces):
     """Add the moving-camera path to a face crop (layout["path"] = [[t, cx], ...])."""
-    if lay.get("mode") not in ("crop", "chatstack") or not lay.get("follow"):
+    if lay.get("mode") not in ("crop", "chatstack", "fit") or not lay.get("follow"):
         return lay
     ox, oy, CW, CH = content(lay)
-    cw = crop_w(CW, CH, lay.get("cut") or 0.0, OUT_H - (lay.get("chat_h") or 0))
+    cw = crop_w(CW, CH, lay.get("cut") or 0.0, panel_h(lay))
     pts = [(t, target_cx(f, cw)) for t, f in track(video, start, end)]
     if not any(x is not None for _, x in pts):
         return lay
@@ -541,8 +573,12 @@ def content_box(video, start, end, W, H, grab=grey_frames):
     return x0, y0, w, h
 
 
-def detect_layout(video, start, end, cut=0.0):
-    """`cut`: bottom share of the source to drop in crop mode (a stream's own burned-in caption band)."""
+def detect_layout(video, start, end, cut=0.0, prefer=None):
+    """`cut`: bottom share of the source to drop (a stream's own burned-in caption band). `prefer`: how the
+    clippers frame this moment or streamer ("full" / "fit" / "stack", clip.layout_hint, D56): a face crop
+    becomes the clipper's wide shot for "fit"; otherwise the chat spot is blurred out of a full-bleed crop (the
+    clippers' full-bleed Shorts show no chat). "stack" needs a facecam: without one the crop stays. The chat
+    panel ("chat") is only used if a clipper's Short is read that way."""
     try:
         W, H = probe_size(video)
     except Exception:  # noqa: BLE001 - unreadable/odd file: let ffmpeg centre-crop with expressions
@@ -555,8 +591,14 @@ def detect_layout(video, start, end, cut=0.0):
     box = content_box(video, start, end, W, H)
     extra = {**({"content": list(box)} if box else {}), **({"cut": cut} if cut else {})}
     lay = {**lay, **extra}
-    if lay["mode"] == "crop" and lay.get("follow"):
-        lay = chat_layout(lay, find_chat(video, start, end, W, H))
+    if lay["mode"] == "crop" and prefer == "fit":
+        lay["mode"] = "fit"
+    elif lay["mode"] == "crop" and lay.get("follow"):
+        chat = find_chat(video, start, end, W, H)
+        if prefer == "chat":
+            lay = chat_layout(lay, chat)
+        elif chat:
+            lay["hide"] = list(chat)
     try:
         lay = follow(lay, video, start, end)
     except Exception:  # noqa: BLE001 - keep the static face crop

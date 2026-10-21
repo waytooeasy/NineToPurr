@@ -22,6 +22,7 @@ MODEL = "claude-haiku-5-5"
 TOP_STREAMERS = 10
 IMAGES = 8
 MIN_SEEN = 3
+LAYOUTS = ("full", "fit", "stack")   # how the market frames this streamer (Editor: layout.detect_layout prefer)
 MAX_AGE_H = 24
 PROMPT = (
     "These are thumbnails (frames) of today's most popular YouTube Shorts about ONE streamer, made by different "
@@ -31,7 +32,9 @@ PROMPT = (
     "\"other\", \"case\": \"upper\"|\"lower\"|\"title\"|\"as_spoken\", \"fill\": \"#RRGGBB\", "
     "\"highlight\": \"#RRGGBB\" or null (no caption word in another colour), \"words\": <words in the caption "
     "line>, \"position\": \"upper\"|\"middle\"|\"lower\", \"header\": \"white_box\" (a title line in a white box) "
-    "| \"text\" (a title line without a box, separate from the captions) | \"none\"}]"
+    "| \"text\" (a title line without a box, separate from the captions) | \"none\", \"layout\": \"full\" (the "
+    "video fills the whole vertical frame) | \"fit\" (a wider video panel across the middle with blurred or plain bars "
+    "above and below) | \"stack\" (two stacked panels, e.g. a face cam over the game or screen)}]"
 )
 
 
@@ -112,6 +115,9 @@ def aggregate(per_image):
     words = sorted(int(x["words"]) for x in cap if str(x.get("words", "")).isdigit())
     if words:
         out["words"] = words[len(words) // 2]
+    lay = _majority([x.get("layout") for x in per_image])           # over ALL images, like the header
+    if lay in LAYOUTS:
+        out["layout"] = lay
     head = _majority([x.get("header", "none") for x in per_image], 0.0)
     out["header"] = head if head in ("white_box", "text") and [x.get("header") for x in per_image].count(head) \
         * 2 > len(per_image) else "none"
@@ -160,6 +166,9 @@ def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, t
         for k, v in old.items():
             cap.setdefault(k, v)
         out[name] = {"logins": sorted(logins.get(name, [])), "caption": cap, "images": len(imgs), "seen": d["seen"]}
+        lay = d.get("layout") or (prev.get(name) or {}).get("layout")
+        if lay:
+            out[name]["layout"] = lay
     doc = {"updated": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "market": market.get("updated", ""), "streamers": out}
     p = Path(out_path or path())
     p.parent.mkdir(parents=True, exist_ok=True)

@@ -76,7 +76,8 @@ def test_run_stores_matches_and_candidates_rank_by_the_shorts_views(con):
     cands = match.candidates(con, NOW)
     assert [(c["clip_id"], c["match"]["title"]) for c in cands] == [
         ("c-mom", "Jynxzi's Mom Walks In On Stream 😭"), ("c-ace", "Jynxzi Rages At Teammate")]
-    assert match.for_clip(con, "c-mom") == {"title": "Jynxzi's Mom Walks In On Stream 😭", "dur": 22, "vph": 9000}
+    assert match.for_clip(con, "c-mom") == {"title": "Jynxzi's Mom Walks In On Stream 😭", "dur": 22, "vph": 9000,
+                                            "layout": None}
     assert match.for_clip(con, "c-merch") is None
     assert match.candidates(con, NOW + timedelta(hours=match.KEEP_H + 1)) == []      # old matches expire
 
@@ -228,3 +229,30 @@ def test_neighbouring_clips_are_not_one_moment_and_the_matched_clip_is_posted(co
     assert [c["clip_id"] for c in out] == ["ask", "fry"] and "match" not in out[1]
     twin = {**fry, "clip_id": "twin", "vod_offset": 2875}                      # a near copy of the matched clip
     assert [c["clip_id"] for c in run_pipeline.same_moments_first(con, [twin, fry], NOW)] == ["ask", "fry"]
+
+
+def test_the_matched_clippers_layout_is_read_from_the_thumbnail_and_kept(con):
+    looks = {"s0": '{"layout": "fit"}', "s1": "no idea"}
+    assert match.thumb_layout("s0", look=lambda b: looks["s0"], fetch=lambda sid: b"jpg") == "fit"
+    assert match.thumb_layout("s1", look=lambda b: looks["s1"], fetch=lambda sid: b"jpg") is None
+    assert match.thumb_layout("s0", look=lambda b: 1 / 0, fetch=lambda sid: b"jpg") is None
+    match.run(con, MARKET, ["Jynxzi"], lambda n: CLIPS, NOW, reply(("S0", "C0", 0.9)),
+              layout_of=lambda sid: "fit" if sid == "s0" else None)
+    assert match.for_clip(con, "c-mom")["layout"] == "fit"
+    assert match.candidates(con, NOW)[0]["match"]["layout"] == "fit"
+
+
+def test_layouts_are_filled_later_and_shared_with_clips_of_the_same_scene(con):
+    ask = clip("ask", "Jason asks Ron out", 169, 37, creator="stableronaldo", dur=60, video="2904593598", offset=2872)
+    m = {"streamers": {"Stable Ronaldo": {"shorts": [{"id": "r0", "title": "Jason And Ron Goes On A Date",
+                                                      "vph": 2500, "dur": 30, "en": True}]}}}
+    match.run(con, m, ["Stable Ronaldo"], lambda n: [ask], NOW, reply(("S0", "C0", 0.9)), layout_of=lambda sid: None)
+    assert match.for_clip(con, "ask")["layout"] is None
+    looks = iter([None, "fit"])
+    assert match.fill_layouts(con, layout_of=lambda sid: next(looks)) == 0          # first look failed: retry later
+    assert match.fill_layouts(con, layout_of=lambda sid: next(looks)) == 1
+    fry = clip("fry", ".", 5, 0.5, creator="stableronaldo", dur=50, video="2904593598", offset=2840)
+    other = clip("other", "x", 5, 0.5, creator="stableronaldo", dur=50, video="2904593598", offset=9000)
+    top_clips.store(con, [fry, other])
+    assert match.nearby_layout(con, "fry") == "fit" and match.nearby_layout(con, "other") is None
+    assert match.fill_layouts(con, layout_of=lambda sid: "full") == 0                # nothing left to fill

@@ -84,6 +84,9 @@ def prompt_for(expected=None):
              "text": "as a title line that stays in every frame",
              "none": "in frame 1 only"}.get(header, "in frame 1 only")
     own = f"OUR hook/title text on this clip is \"{hook}\", shown {where}. " if hook else ""
+    if expected.get("fit"):
+        own += ("This clip intentionally shows a wide video panel across the middle with a blurred copy of the same "
+                "video above and below (like the top clip channels): that is not black_bars. ")
     if expected.get("chat_panel"):
         own += ("The lower part of this clip is a panel showing the stream's own chat (usernames and messages): "
                 "that is intended, not captions; our handle sits just above it. ")
@@ -223,15 +226,18 @@ def run(con, vision=None, grab=frames):
                        " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
     for cid, path, creator, hook in rows:
         theirs = not drew_captions(path, con, creator)     # no track of ours: captions on screen are theirs
+        mode = render_info(path).get("mode")
         expected = {"hook": hook, "header": _header_for(creator), "own_captions": theirs,
-                    "chat_panel": render_info(path).get("mode") == "chatstack"}
+                    "chat_panel": mode == "chatstack", "fit": mode == "fit"}
         r = check(path, vision, grab, expected) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}
-        if theirs and r["ok"] is False:          # we drew no captions: what's on screen is theirs, not double
-            left = [i for i in r["issues"] if i.get("code") != "double_captions"]
+        drop = ({"double_captions"} if theirs else set()) | ({"black_bars"} if mode == "fit" else set())
+        if drop and r["ok"] is False:    # no caption track of ours / a blurred fill we chose: not a failure
+            left = [i for i in r["issues"] if i.get("code") not in drop]
+            ignored = sorted({i.get("code") for i in r["issues"]} - {i.get("code") for i in left})
             r = {**r, "issues": left, "ok": not left or False}
             if not left:
-                r["ignored"] = ["double_captions"]
+                r["ignored"] = ignored
         codes = {i.get("code") for i in r.get("issues") or []}
         if r["ok"] is False and "double_captions" in codes and learn_own_captions(con, creator, cid) \
                 and codes == {"double_captions"}:
