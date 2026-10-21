@@ -38,6 +38,17 @@ COOKIES = "/opt/clipper/youtube_cookies.txt"
 SHORT_DL_TIMEOUT_S = 180
 
 
+def has_ipv6():
+    """A real IPv6 route out (not just Tailscale's): a UDP connect sends nothing but needs a route."""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as so:
+            so.connect(("2001:4860:4860::8888", 53))
+        return True
+    except OSError:
+        return False
+
+
 def youtube_auth():
     """Lucas's YouTube cookies for Short downloads (D59, Lucas: "use my cookies"), when the file is there.
     Only for the clipper Short itself (one download per remake); never logged."""
@@ -94,8 +105,8 @@ def recent_vods(tw, login, published, days=4):
 def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
-        try:   # -4: the VM has no IPv6 route; fail fast on a video server it cannot reach
-            r = runner([C.ytdlp(), "-4", *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "20",
+        try:   # -4 only while the VM has no IPv6 route (some YouTube video servers here answer on IPv6 only)
+            r = runner([C.ytdlp(), *([] if has_ipv6() else ["-4"]), *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "20",
                         "--retries", "3", "--fragment-retries", "3", "-f", "bv*+ba/b", "--merge-output-format", "mp4",
                         "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
                        capture_output=True, text=True, timeout=SHORT_DL_TIMEOUT_S)
