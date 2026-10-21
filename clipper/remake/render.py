@@ -110,6 +110,24 @@ def boom(sr, dur=1.1, peak=0.45):
     return s.astype(np.float32)
 
 
+def real_hits(booms, max_n=3, max_dur=1.6):
+    """Only isolated bass hits get our boom. Many or long low-end stretches are their music bed (an Agent00 remake
+    got 8 'booms' that way, 2026-10-21): then none."""
+    if len(booms) > max_n or any(b["dur"] > max_dur for b in booms):
+        return []
+    return booms
+
+
+def side_by_side(theirs, ours, out):
+    """Study copy for Lucas in Telegram (never uploaded): their Short | our remake, small enough for the bot."""
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(theirs), "-i", str(ours), "-filter_complex",
+                    "[0:v]scale=540:-2,setsar=1[a];[1:v]scale=540:-2,setsar=1[b];[a][b]hstack=shortest=1[v]",
+                    "-map", "[v]", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k", "-shortest", "-movflags", "+faststart",
+                    str(out)], check=True)
+    return Path(out)
+
+
 def build_audio(amap, sections, dur, sr=48000):
     """Stereo float32: each audio segment's stream audio with its gain, crossfaded at the switch points."""
     N = int(round(dur * sr))
@@ -137,7 +155,7 @@ def build_audio(amap, sections, dur, sr=48000):
         if i < len(segs) - 1:
             env[-xf:] = np.minimum(env[-xf:], np.linspace(1, 0, min(xf, len(seg)))[-len(env[-xf:]):])
         out[i0:i1] += seg * env[:, None] * float(s.get("gain", 1.0))
-    for b in amap.get("booms", []):
+    for b in real_hits(amap.get("booms", [])):
         s = boom(sr, max(0.5, min(1.4, b["dur"] + 0.4)), peak=float(np.clip(10 ** (b["db"] / 20) * 2.5, 0.2, 0.6)))
         k = int(b["t"] * sr)
         n = min(len(s), N - k)
