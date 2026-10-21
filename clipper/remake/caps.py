@@ -469,9 +469,17 @@ def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None, width=None
         gl = {}            # a glow around a solid box is the box's own edge
     width = width or _libass_width(st)
     outline = float(st.get("outline") or 0)
+    pos = st.get("pos") or []
+    moves = len({(round(p[0], 2), round(p[1], 2)) for p in pos if p}) > 2 and \
+        np.std([p[0] for p in pos if p]) > 0.04          # their captions follow the speaker: place each one
     for k, ev in enumerate(evs):
         cols = (st.get("colours") or [])[k] if k < len(st.get("colours") or []) else [w["c"] for w in ev["words"]]
         cy = (st.get("y") or ev.get("y", 0.5)) * out_h
+        x = (st.get("x") or 0.5) * out_w
+        if moves:
+            p = next((pos[j] for j in range(min(k, len(pos) - 1), -1, -1) if pos[j]), None)
+            if p:
+                x, cy = p[0] * out_w, p[1] * out_h
         y = cy - float(st.get("dy") or 0)
         s0, s1 = ts(ev["start"]), ts(ev["end"])
         if pad:

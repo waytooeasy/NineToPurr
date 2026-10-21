@@ -261,7 +261,8 @@ def caption_masks(th, base, y, band=0.2):
     v = th.max(2)
     fill = d & (v >= FILL_V)
     dark = d & (v < DARK_V)
-    fill = cv2.morphologyEx(fill.astype(np.uint8), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    k = max(2, int(round(th.shape[1] / 360)))        # letter strokes survive, 1-2 px picture edges don't
+    fill = cv2.morphologyEx(fill.astype(np.uint8), cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
     n, lab, stats, _ = cv2.connectedComponentsWithStats(fill, connectivity=8)
     if n > 1:              # specks (sharpness / grain differences in the picture) are not letters
         big = np.percentile(stats[1:, cv2.CC_STAT_HEIGHT], 90)
@@ -669,8 +670,9 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
         dy = (bb[2] + bb[3]) / 2 if bb else 0.0
     if box and looks.get("box") is not None:
         looks["box"]["present"] = True
+    pos = [[round(m["cx"], 4), round(m["cy"], 4)] if m else None for m in ms]   # where each caption sits
     st = {"ok": fs is not None, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3],
-          "box_pad": box, "dy": dy,
+          "box_pad": box, "dy": dy, "pos": pos,
           "font_score": round(score, 3), "track": track, "fs": fs, "spacing": None if fs is None else track * fs,
           "outline": outline, "line_h": line_h, "x": cx, "y": cy, "anim": anim, "colours": colours,
           "llm": looks, "alternatives": [(round(s, 3), e[0], e[2], t) for s, e, t in ranked[1:4]]}

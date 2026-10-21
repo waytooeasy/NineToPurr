@@ -165,6 +165,10 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
         evs = [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cols)]}
                for e, cols in zip(evs, st["colours"])]
+    pos = st.get("pos") or []
+    sevs = [{**e, "y": (pos[k][1] if k < len(pos) and pos[k] else st.get("y") or e.get("y", 0.5))}
+            for k, e in enumerate(evs)]           # caption rows to score: where each of their captions is
+
     def score(k, name, s_):
         ass = work / f"cap_{k}.ass"
         if s_ is not None:
@@ -172,7 +176,7 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         else:
             caps.write_ass(evs, ass, OW, OH, mark=mark, dur=sp["dur"])
         cand = match.burn(base, ass, work / f"cand_{k}.mp4")
-        m = match.score(short_path, cand, evs, fps, nfr, OW, OH, y=st.get("y"), line_h=st.get("line_h"), base=base)
+        m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base)
         m.pop("per_frame", None)
         C.log(f"captions '{name}': {match.summary(m)}")
         return {"path": cand, "match": m, "name": name}
