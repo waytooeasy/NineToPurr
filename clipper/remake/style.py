@@ -247,6 +247,8 @@ def measure_event(th, base, ev):
     shape = ev.get("lines") or [len(ev["words"])]
     words = ev["words"]
     out = {"lines": [], "colours": [None] * len(words)}
+    if len(lines) == 1 and len(shape) > 1:      # their caption sits on one line where the OCR saw a break
+        shape = [len(words)]
     if len(lines) == len(shape):
         i = 0
         for (r0, r1), n in zip(lines, shape):
@@ -468,8 +470,9 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
     for i in sample_idx[:4]:
         m = ms[i]
         if m:
-            r0 = max(0, int(min(ln["r0"] for ln in m["lines"]) - line_h))
-            r1 = min(out_h, int(max(ln["r1"] for ln in m["lines"]) + line_h))
+            top = min((ln["r0"] for ln in m["lines"]), default=m["cy"] * out_h - line_h)
+            bot = max((ln["r1"] for ln in m["lines"]), default=m["cy"] * out_h + line_h)
+            r0, r1 = max(0, int(top - line_h)), min(out_h, int(bot + line_h))
             crops.append(m["frame"][r0:r1])
     looks = ask_style(crops, line_h, outline, vision) if crops else {}
     st = {"ok": fs is not None, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3],

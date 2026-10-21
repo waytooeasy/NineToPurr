@@ -10,3 +10,4 @@ google-api-python-client
 google-auth-oauthlib
 tzdata
 opencv-python-headless   # editor/layout.py: face-centred 9:16 crop + facecam detection
+pillow>=10          # remake/style.py: font glyph matching
