@@ -1,0 +1,193 @@
+"""Render a remake (D58) from its spec: the streamer's VOD sections re-framed exactly like the clipper's Short
+(vmap), their look (grade + sharpening + flashes, look.py), their captions (caps.py, ASS/libass) and the stream
+audio cut at their switch points with short crossfades (amap). Their music is never added; their bass hits are
+re-made with our own synthesised boom. Their pixels are never used (D57)."""
+import subprocess
+import wave
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+from . import common as C
+from . import vmap as VM
+
+XFADE_S = 0.024     # crossfade at every audio switch (measured on the study Short)
+
+
+def shot_at(vm, n):
+    for s in vm["shots"]:
+        if s["n0"] <= n < s["n1"]:
+            return s
+    return vm["shots"][-1]
+
+
+def sec_frame_index(vm, shot, n):
+    """Section frame shown at output frame n (the map's own choice when it has one)."""
+    f = vm["frames"].get(str(n))
+    if f is not None and f[0] == shot["seg"]:
+        return int(f[1])
+    sec = vm["sections"][shot["sec"]]
+    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
+
+
+def compose(sec_img, vm, shot, n, size=None):
+    """Our frame n (ungraded): the section frame framed like theirs. `size` (w, h) renders smaller; `sec_img` may
+    be a downscaled section frame (its width says by how much)."""
+    OW, OH = vm["out_w"], vm["out_h"]
+    w, h = size or (OW, OH)
+    r = w / OW
+    sec = vm["sections"][shot["sec"]]
+    q = sec_img.shape[1] / sec["w"]
+    k, cx, cy = VM.params_at(shot, n)
+    M = np.array([[q * k / r, 0, q * (cx - k * OW / 2)], [0, q * k / r, q * (cy - k * OH / 2)]])
+    flags = cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP
+    if shot["layout"] == "full":
+        return cv2.warpAffine(sec_img, M, (w, h), flags=flags, borderMode=cv2.BORDER_REPLICATE)
+    bg = shot.get("bg") or {"rel": 0.97, "sigma": 20.0 * OW / 1080, "gain": 1.0}
+    kb = sec["h"] / OH * bg["rel"]
+    sw, sh = max(8, w // 4), max(8, h // 4)
+    # small px -> full output px: u = u_s * w / (sw * r); section x = SW/2 + (u - OW/2) * kb (blurred copy, centred)
+    Mb = np.array([[q * kb * w / (sw * r), 0, q * (sec["w"] / 2 - kb * OW / 2)],
+                   [0, q * kb * h / (sh * r), q * (sec["h"] / 2 - kb * OH / 2)]])
+    small = cv2.warpAffine(sec_img, Mb, (sw, sh), flags=cv2.INTER_AREA | cv2.WARP_INVERSE_MAP,
+                           borderMode=cv2.BORDER_REFLECT)
+    small = cv2.GaussianBlur(small, (0, 0), max(0.5, bg["sigma"] * r * sw / w))
+    out = cv2.resize(small, (w, h), interpolation=cv2.INTER_CUBIC).astype(np.float32) * bg.get("gain", 1.0)
+    out = np.clip(out, 0, 255).astype(np.uint8)
+    panel = cv2.warpAffine(sec_img, M, (w, h), flags=flags, borderMode=cv2.BORDER_CONSTANT)
+    ok = cv2.warpAffine(np.full(sec_img.shape[:2], 255, np.uint8), M, (w, h),
+                        flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP, borderValue=0) > 127
+    out[ok] = panel[ok]
+    return out
+
+
+# ---------------- look ----------------
+def poly_feats(X):
+    """Cubic polynomial features of colours X (n, 3) in 0..1."""
+    cols = [np.ones(len(X))]
+    for p in range(1, 4):
+        for i in range(p + 1):
+            for j in range(p + 1 - i):
+                cols.append(X[:, 0] ** i * X[:, 1] ** j * X[:, 2] ** (p - i - j))
+    return np.stack(cols, 1)
+
+
+def lut128(W):
+    """128^3 BGR lookup table of the fitted grade (built in chunks to stay small)."""
+    W = np.asarray(W, np.float64)
+    g = (np.arange(128) * 2 + 1) / 255.0
+    out = np.empty((128, 128, 128, 3), np.uint8)
+    for b in range(128):
+        G_, R = np.meshgrid(g, g, indexing="ij")
+        X = np.stack([np.full(G_.size, g[b]), G_.ravel(), R.ravel()], 1)
+        out[b] = (np.clip(poly_feats(X) @ W, 0, 1) * 255 + 0.5).astype(np.uint8).reshape(128, 128, 3)
+    return out
+
+
+def apply_look(img, lut, sharpen=None):
+    if sharpen and sharpen.get("amount", 0) > 0:
+        f = img.astype(np.float32)
+        img = np.clip(f + sharpen["amount"] * (f - cv2.GaussianBlur(f, (0, 0), sharpen["sigma"])), 0, 255).astype(np.uint8)
+    if lut is not None:
+        q = img >> 1
+        img = lut[q[..., 0], q[..., 1], q[..., 2]]
+    return img
+
+
+def apply_overlay(img, alpha, color):
+    if alpha <= 0:
+        return img
+    return np.clip(img.astype(np.float32) * (1 - alpha) + np.asarray(color, np.float32) * alpha, 0, 255).astype(np.uint8)
+
+
+# ---------------- audio ----------------
+def boom(sr, dur=1.1, peak=0.45):
+    """Our own sub-bass hit (sine sweep ~90 -> 38 Hz, exponential decay)."""
+    t = np.arange(int(dur * sr)) / sr
+    f = 38 + 52 * np.exp(-t / 0.12)
+    s = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-t / 0.38) * peak * np.minimum(1, t / 0.004)
+    return s.astype(np.float32)
+
+
+def build_audio(amap, sections, dur, sr=48000):
+    """Stereo float32: each audio segment's stream audio with its gain, crossfaded at the switch points."""
+    N = int(round(dur * sr))
+    out = np.zeros((N, 2), np.float32)
+    xf = int(XFADE_S * sr)
+    segs = amap["segments"]
+    cache = {}
+    for i, s in enumerate(segs):
+        if s["sec"] not in cache:
+            cache[s["sec"]] = C.read_audio(sections[s["sec"]]["file"], sr, stereo=True)
+        a = cache[s["sec"]]
+        i0 = max(0, int(round(s["t0"] * sr)) - (xf // 2 if i else 0))
+        i1 = min(N, int(round(s["t1"] * sr)) + (xf // 2 if i < len(segs) - 1 else 0))
+        if i == len(segs) - 1:
+            i1 = N
+        if i1 <= i0:
+            continue
+        k0 = int(round((i0 / sr + s["off"]) * sr))
+        seg = np.zeros((i1 - i0, 2), np.float32)
+        src = a[max(0, k0):max(0, k0 + i1 - i0)]
+        seg[max(0, -k0):max(0, -k0) + len(src)] = src[:len(seg) - max(0, -k0)]
+        env = np.ones(len(seg), np.float32)
+        if i:
+            env[:xf] = np.linspace(0, 1, min(xf, len(seg)))[:len(env[:xf])]
+        if i < len(segs) - 1:
+            env[-xf:] = np.minimum(env[-xf:], np.linspace(1, 0, min(xf, len(seg)))[-len(env[-xf:]):])
+        out[i0:i1] += seg * env[:, None] * float(s.get("gain", 1.0))
+    for b in amap.get("booms", []):
+        s = boom(sr, max(0.5, min(1.4, b["dur"] + 0.4)), peak=float(np.clip(10 ** (b["db"] / 20) * 2.5, 0.2, 0.6)))
+        k = int(b["t"] * sr)
+        n = min(len(s), N - k)
+        if n > 0:
+            out[k:k + n] += s[:n, None]
+    return np.tanh(out * 1.1) / np.tanh(1.1)
+
+
+def write_wav(path, audio, sr=48000):
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes((np.clip(audio, -1, 1) * 32767).astype("<i2").tobytes())
+
+
+# ---------------- render ----------------
+def render(spec, out_path, work):
+    """spec: {'vmap', 'amap', 'look', 'ass'} -> mp4 at the Short's aspect and fps, OW wide."""
+    vm, look = spec["vmap"], spec["look"]
+    work = Path(work)
+    OW, OH, fps = vm["out_w"], vm["out_h"], vm["fps"]
+    wav = work / "remake.wav"
+    write_wav(wav, build_audio(spec["amap"], vm["sections"], vm["nfr"] / fps))
+    lut = lut128(look["poly"]) if look.get("poly") else None
+    alpha = {int(k): v for k, v in look.get("overlay", {}).get("alpha", {}).items()}
+    color = look.get("overlay", {}).get("color", [0, 0, 255])
+    vf = f"ass={spec['ass']}:fontsdir={C.fonts_dir()}" if spec.get("ass") else "null"
+    tmp = Path(out_path).with_suffix(".tmp.mp4")
+    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{OW}x{OH}",
+                            "-r", f"{fps:g}", "-i", "-", "-i", str(wav), "-vf", vf, "-c:v", "libx264", "-preset", "medium",
+                            "-crf", "17", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                            "-movflags", "+faststart", str(tmp)], stdin=subprocess.PIPE)
+    readers = {}
+    try:
+        for n in range(vm["nfr"]):
+            shot = shot_at(vm, n)
+            sec = vm["sections"][shot["sec"]]
+            rd = readers.get(shot["sec"])
+            if rd is None:
+                rd = readers[shot["sec"]] = C.FrameReader(sec["file"], sec["fps"], (sec["w"], sec["h"]))
+            img = compose(rd.get(sec_frame_index(vm, shot, n)), vm, shot, n)
+            img = apply_overlay(apply_look(img, lut, look.get("sharpen")), alpha.get(n, 0.0), color)
+            enc.stdin.write(img.tobytes())
+    finally:
+        for rd in readers.values():
+            rd.close()
+        enc.stdin.close()
+        enc.wait()
+    if enc.returncode != 0:
+        raise RuntimeError(f"ffmpeg encode failed ({enc.returncode})")
+    tmp.replace(out_path)
+    return Path(out_path)

@@ -3,12 +3,13 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-21 13:30 UTC_
+_Last updated: 2026-10-21 16:00 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
 | Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48; top 8 streamers re-scanned every 6 h, D54)** → **streamer styles (daily, D49)** → **same moments as the top clippers (after each scan, D54)** → radar (**paced: 1 clip start every 4 h**, D52) → capture → Writer → render → QC → re-render → visual check (D47) |
+| Remake engine (`clipper-remake.timer`, every 30 min, D58) | 🟡 built (PR "Remake engine"): one popping clipper Short per run rebuilt from the streamer's VOD → `edited` clip → QC → visual check → Telegram. Live after merge + `setup.sh --units-only`. Blocked while YouTube's bot check (#64) refuses the Short download (it retries; never worked around) |
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips and clips that fail the visual check (with the reason) still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 6/day (D52) (`.env`: UTC window 00:00–23:59) |
@@ -42,7 +43,7 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
 
 ## Next for Claude
-- **Build the remake engine (D58):** pick a popping Short → find the streamer's VOD + seconds (Twitch clip `vod_offset` from the moment match, else audio fingerprint over the VOD's audio) → download those VOD sections → frame-exact shot map (SIFT) → fit crops/zooms/pans, grade, overlays → OCR their captions → render → our title → visual check → Telegram. Start from the study scripts (`remake2.py`, `align_v.py`, `audio3.py`, `lut.py`).
+- **Remake engine (D58):** deploy after merge (migrate 015, units), watch the first runs (`sqlite3 /opt/clipper/db/clip.db "select short_id,status,last_error from remakes"`). Next: stacked layouts, other clippers' fonts, caption colours read from pixels, 4K export, hook edits for remakes. See `clipper/remake/README.md`.
 - Day-3 check (D53): views per Short + stayed % → keep/raise 6/day if stayed ≥ 60 %, cut to 3 strong slots if 0-view Shorts persist.
 - Check the first same-moment matches (`select streamer, short_title, clip_id, confidence from moment_matches`) against the clips: tune `MIN_CONF` if a match is wrong.
 - Feed views per streamer / format back into the Heat Index and the Writer (learning loop).

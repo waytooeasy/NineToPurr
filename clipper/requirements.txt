@@ -1,5 +1,6 @@
 pyyaml
-yt-dlp
+yt-dlp[default]   # + yt-dlp-ejs: YouTube extraction needs a JS runtime now
+deno              # the JS runtime yt-dlp uses for YouTube (2026)
 faster-whisper
 av<19            # PyAV 19 dropped open(metadata_errors=) that faster-whisper 1.2.1 passes (VM, 2026-10-19)
 requests

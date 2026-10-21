@@ -1,0 +1,284 @@
+"""Remake engine entry (D58): pick a popping clipper Short, rebuild it frame for frame from the streamer's own VOD,
+register it as an edited clip (QC -> visual check -> Telegram -> post, like every clip).
+
+Run (from clipper/):  python -m remake.run [--short ID] [--max N] [--dry-run]
+Systemd: clipper-remake.timer (its own lock; a remake takes ~10-15 min, longer than a pipeline pass should).
+"""
+import argparse
+import json
+import os
+import shutil
+import sqlite3
+import sys
+import traceback
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from . import amap, caps, look, render, source, title, vmap
+from . import common as C
+
+OUR_CHANNEL = "Peakz Recaps"
+MAX_AGE_H = 36            # popping now: published in the last 36 h
+MAX_DUR_S = 60            # market length (D36)
+MIN_DUR_S = 8
+MIN_VPH = 1500            # views/hour to count as popping
+MAX_ATTEMPTS = 2
+PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
+MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
+MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
+LOCK = "/opt/clipper/remake.lock"
+
+
+class Unsupported(RuntimeError):
+    pass
+
+
+def _ts(s):
+    return datetime.fromisoformat(str(s).replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def candidates(market_data, con, now=None, twitch_names=None):
+    """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer}]."""
+    now = now or datetime.now(timezone.utc)
+    tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped','working')"
+                                       " OR attempts >= ?", (MAX_ATTEMPTS,))}
+    out, seen = [], set()
+    for name, d in (market_data or {}).get("streamers", {}).items():
+        if twitch_names is not None and name not in twitch_names:
+            continue
+        for s in d.get("shorts", []):
+            sid = s.get("id")
+            if not sid or sid in seen or sid in tried or s.get("channel") == OUR_CHANNEL:
+                continue
+            if not (MIN_DUR_S <= (s.get("dur") or 0) <= MAX_DUR_S) or s.get("en") is False:
+                continue
+            try:
+                age_h = (now - _ts(s["published"])).total_seconds() / 3600
+            except (KeyError, ValueError):
+                continue
+            if age_h > MAX_AGE_H or (s.get("vph") or 0) < MIN_VPH:
+                continue
+            seen.add(sid)
+            out.append({**s, "streamer": name})
+    return sorted(out, key=lambda s: -(s.get("vph") or 0))
+
+
+def twitch_watchlist_names(wl_path=None):
+    import yaml
+    cfg = yaml.safe_load(Path(wl_path or source.WATCHLIST).read_text()) or {}
+    return {str(e["name"]) for e in cfg.get("streamers", []) if e.get("platform") == "twitch" and not e.get("disabled")}
+
+
+def done_today(con, now=None):
+    now = now or datetime.now(timezone.utc)
+    return con.execute("SELECT COUNT(*) FROM remakes WHERE status='done' AND date(updated_at)=?",
+                       (now.strftime("%Y-%m-%d"),)).fetchone()[0]
+
+
+def _status(con, s, status, **kw):
+    cols = {"status": status, **kw}
+    con.execute("INSERT OR IGNORE INTO remakes (short_id, streamer, channel, title, views, vph, published)"
+                " VALUES (?,?,?,?,?,?,?)", (s["id"], s.get("streamer"), s.get("channel"), s.get("title"),
+                                            s.get("views"), s.get("vph"), s.get("published")))
+    sets = ", ".join(f"{k}=?" for k in cols) + ", updated_at=datetime('now')"
+    if status == "working":
+        sets += ", attempts=attempts+1"
+    con.execute(f"UPDATE remakes SET {sets} WHERE short_id=?", (*cols.values(), s["id"]))
+    con.commit()
+
+
+def same_moment_done(con, vod_id, a, b, share=0.5):
+    """A remake of the same VOD seconds is already done (another clipper's cut of the same moment)."""
+    for va, vb in con.execute("SELECT vod_s, vod_e FROM remakes WHERE status='done' AND vod_id=?", (vod_id,)):
+        inter = min(b, vb or 0) - max(a, va or 0)
+        if inter > share * min(b - a, (vb or 0) - (va or 0)):
+            return True
+    return False
+
+
+def register(con, s, found, am, vm, cp, mp4, our_title):
+    """Our remake becomes an edited clip (QC, visual check and Telegram take it from there)."""
+    login = found["login"]
+    dur = vm["nfr"] / vm["fps"]
+    secs = found["sections"]
+    seg0 = am["segments"][0]
+    vod_s = secs[seg0["sec"]]["vod_s"] + seg0["off"]
+    con.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, 'twitch', ?)",
+                (login, f"https://twitch.tv/{login}"))
+    creator_id = con.execute("SELECT id FROM creators WHERE name=?", (login,)).fetchone()[0]
+    url = f"https://www.twitch.tv/videos/{found['vod_id']}?t={int(vod_s)}s"
+    con.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
+                (creator_id, url, s.get("title"), s.get("views")))
+    source_id = con.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
+    first = " ".join(w["w"] for w in cp["events"][0]["words"]) if cp["events"] else s.get("title")
+    cur = con.execute(
+        "INSERT INTO clips (source_id, start_s, end_s, picked_by, state, state_changed_at, file_path, title, hook_text,"
+        " context_line, music_risk, caption_style, model_score) VALUES (?,?,?, 'ai', 'edited', datetime('now'), ?,?,?,?,0,"
+        " 'remake', ?)",
+        (source_id, vod_s, vod_s + dur, str(mp4), our_title, first,
+         f"Remake of {s.get('channel')}: \"{s.get('title')}\" ({int(s.get('vph') or 0)}/h)",
+         min(1.0, (s.get("vph") or 0) / 50000)))
+    clip_id = cur.lastrowid
+    con.execute("INSERT OR IGNORE INTO radar_candidates (clip_id, creator, title, url, video_id, vod_offset, duration_s,"
+                " view_count, clip_created_at, views_per_hour, status, clips_id, source)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?, 'edited', ?, 'remake')",
+                (f"remake:{s['id']}", login, s.get("title"), f"https://www.youtube.com/shorts/{s['id']}",
+                 found["vod_id"], int(vod_s), dur, s.get("views") or 0, s.get("published") or "",
+                 s.get("vph") or 0, clip_id))
+    con.commit()
+    return clip_id
+
+
+def _stage(work, name, fn):
+    """Cached stage result (work/<name>.json): a re-run after a fix only redoes what was deleted."""
+    f = work / f"{name}.json"
+    if f.exists():
+        return C.load_json(f)
+    out = fn()
+    C.save_json(f, out)
+    return out
+
+
+def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False):
+    """Rebuild one clipper Short. Returns our clip id; raises Unsupported / other errors (status recorded)."""
+    sid = s["id"]
+    work = C.workdir(sid)
+    _status(con, s, "working", last_error=None)
+    try:
+        short_path = source.download_short(sid, work)
+        logins = source.twitch_logins([s.get("streamer", "")], f"{s.get('title', '')} {s.get('desc', '')}")
+        found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,
+                                                            tw=tw, logins=logins))
+        am = _stage(work, "amap", lambda: amap.build(short_path, [x["file"] for x in found["sections"]]))
+        if am["matched_share"] < MIN_AUDIO:
+            raise Unsupported(f"only {am['matched_share']:.0%} of the audio is the stream")
+        vm = _stage(work, "vmap", lambda: vmap.build(short_path, found["sections"], am))
+        if vm["mapped"] < MIN_MAPPED * vm["nfr"]:
+            raise Unsupported(f"only {vm['mapped']}/{vm['nfr']} frames found in the stream")
+        if any(sh["layout"] == "other" for sh in vm["shots"]):
+            raise Unsupported("layout not supported yet (stack / overlay)")
+        secs = found["sections"]
+        a = min(secs[g["sec"]]["vod_s"] + g["t0"] + g["off"] for g in am["segments"])
+        b = max(secs[g["sec"]]["vod_s"] + g["t1"] + g["off"] for g in am["segments"])
+        if same_moment_done(con, found["vod_id"], a, b):
+            raise Unsupported("same moment already remade from another clipper")
+        _status(con, s, "working", vod_id=found["vod_id"], vod_s=a, vod_e=b)
+        lk = _stage(work, "look", lambda: look.build(short_path, vm))
+        sp = C.probe(short_path)
+        mark = os.environ.get("CLIPPER_WATERMARK", "@Peakz.Recaps").strip() or None
+        cp = _stage(work, "caps", lambda: caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass",
+                                                     vm["out_w"], vm["out_h"], vision, mark=mark,
+                                                     bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
+        if not Path(cp["ass"]).exists():
+            caps.write_ass(cp["events"], cp["ass"], vm["out_w"], vm["out_h"], mark=mark, dur=sp["dur"])
+        out = Path(out_dir) / f"remake_{sid}.mp4"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        render.render({"vmap": vm, "amap": am, "look": lk, "ass": cp["ass"]}, out, work)
+        out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
+                                                        "moving": False}))
+        said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
+        ours = title.make(s.get("title", ""), s.get("streamer", ""), said, ask)
+        C.save_json(work / "spec.json", {"short": s, "found": {k: v for k, v in found.items() if k != "hits"},
+                                         "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
+                                         "look": {k: v for k, v in lk.items() if k != "overlay"},
+                                         "overlay_frames": len(lk.get("overlay", {}).get("alpha", {})),
+                                         "captions": cp["events"], "title": ours})
+        clip_id = register(con, s, found, am, vm, cp, out, ours)
+        _status(con, s, "done", clip_id=clip_id)
+        C.log(f"{sid}: done -> clip {clip_id} '{ours}'")
+        return clip_id
+    except source.BotCheck as e:   # not this Short's fault: back in the queue, attempt not counted
+        _status(con, s, "picked", last_error=str(e)[:500])
+        con.execute("UPDATE remakes SET attempts=MAX(0, attempts-1) WHERE short_id=?", (sid,))
+        con.commit()
+        raise
+    except source.NotFound as e:
+        _status(con, s, "skipped", last_error=f"source: {e}"[:500])
+        raise
+    except Unsupported as e:
+        _status(con, s, "skipped", last_error=str(e)[:500])
+        raise
+    except Exception as e:
+        _status(con, s, "failed", last_error=f"{type(e).__name__}: {e}"[:500])
+        raise
+    finally:
+        if not keep:   # media go, the stage maps stay (a retry re-downloads only what it needs)
+            for p in work.iterdir():
+                if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
+                    p.unlink(missing_ok=True)
+            for name in ("found", "amap", "vmap"):   # they point at the deleted media
+                (work / f"{name}.json").unlink(missing_ok=True)
+
+
+def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False):
+    """Remake up to `max_n` popping Shorts (or the one named). Returns {'done': [...], 'skipped': {...}, 'failed': {...}}."""
+    res = {"done": [], "skipped": {}, "failed": {}}
+    if short:
+        picks = [short]
+    else:
+        if done_today(con, now) >= PER_DAY:
+            return res
+        if market_data is None:
+            from radar import market
+            market_data = market.load()
+        picks = candidates(market_data, con, now, twitch_watchlist_names())
+    if dry:
+        for p in picks[:10]:
+            print(f"{p['vph']:>8}/h {p['dur']:>3}s {p['streamer']:<14} {p['channel'][:22]:<22} {p['title'][:60]}")
+        return res
+    if tw is None:
+        try:
+            from radar.twitch import Twitch
+            tw = Twitch()
+        except Exception as e:  # no Twitch credentials: only moment-match hints can locate VODs
+            C.log(f"twitch client unavailable: {e}")
+    for s in picks:
+        if len(res["done"]) >= max_n:
+            break
+        try:
+            res["done"].append(remake_one(con, s, out_dir, tw=tw))
+        except source.BotCheck as e:   # every download would hit it now: stop, the timer tries again later
+            res["failed"][s["id"]] = str(e)
+            break
+        except (Unsupported, source.NotFound) as e:
+            res["skipped"][s["id"]] = str(e)
+        except Exception as e:  # one bad Short must not stop the next
+            traceback.print_exc()
+            res["failed"][s["id"]] = f"{type(e).__name__}: {e}"
+    return res
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--short", help="YouTube id of a clipper Short to remake (else: the most popping one)")
+    ap.add_argument("--streamer", default="", help="watchlist name for --short")
+    ap.add_argument("--published", default=None, help="ISO time --short was published (VOD search window)")
+    ap.add_argument("--title", default="")
+    ap.add_argument("--max", type=int, default=1)
+    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--keep", action="store_true", help="keep downloaded media in the work dir")
+    a = ap.parse_args(argv)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "editor"))   # llm.py: API cost tracking
+    con = sqlite3.connect(os.environ.get("CLIPPER_DB", "/opt/clipper/db/clip.db"), timeout=60)
+    con.row_factory = sqlite3.Row
+    out_dir = os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")
+    short = None
+    if a.short:
+        short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": "",
+                 "published": a.published or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    import fcntl
+    with open(os.environ.get("CLIPPER_REMAKE_LOCK", LOCK), "w") as fh:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print("another remake run holds the lock")
+            return
+        if short and a.keep:
+            from radar.twitch import Twitch
+            print(remake_one(con, short, out_dir, tw=Twitch(), keep=True))
+            return
+        print(json.dumps(run(con, out_dir, a.max, short, dry=a.dry_run)))
+
+
+if __name__ == "__main__":
+    main()

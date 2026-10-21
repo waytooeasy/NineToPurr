@@ -1,0 +1,18 @@
+[Unit]
+Description=Clipper remake engine (D58): rebuild a popping clipper Short from the streamer's own VOD
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/clipper/repo/clipper
+EnvironmentFile=/opt/clipper/.env
+Environment=PATH=/opt/clipper/venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=CLIPPER_DB=/opt/clipper/db/clip.db
+Environment=CLIPPER_CLIPS=/opt/clipper/clips
+Environment=CLIPPER_REMAKE=/opt/clipper/remake
+Environment=CLIPPER_REMAKE_LOCK=/opt/clipper/remake.lock
+ExecStart=/opt/clipper/venv/bin/python -m remake.run
+# one remake = download + SIFT map + render, ~10-15 min; a VOD audio search can take longer
+TimeoutStartSec=60min
+Nice=10

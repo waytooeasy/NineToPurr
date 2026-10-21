@@ -7,7 +7,7 @@ from pathlib import Path
 
 CLIPPER = Path(__file__).resolve().parents[2]
 SETUP = "clipper/infra/setup.sh"
-ENABLED = ["clipper-pipeline.timer", "clipper-upload.timer", "clipper-approve-bot.service"]
+ENABLED = ["clipper-pipeline.timer", "clipper-upload.timer", "clipper-remake.timer", "clipper-approve-bot.service"]
 
 
 def _run(tmp_path, data_has_repo=True):
@@ -108,6 +108,6 @@ def test_ytdlp_cron_idempotent_and_keeps_other_jobs(tmp_path):
 
 def test_units_put_the_venv_on_path():
     # Code runs "yt-dlp" by name; under systemd it is only found via the venv's bin/ (first VM pass).
-    for unit in ("clipper-pipeline.service", "clipper-upload.service", "clipper-approve-bot.service"):
+    for unit in ("clipper-pipeline.service", "clipper-upload.service", "clipper-remake.service", "clipper-approve-bot.service"):
         text = (CLIPPER / "infra/systemd" / unit).read_text()
         assert "Environment=PATH=/opt/clipper/venv/bin:" in text, unit

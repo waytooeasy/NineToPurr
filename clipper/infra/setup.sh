@@ -19,8 +19,8 @@ install_units() {
   $SUDO mkdir -p "$UNIT_DIR"
   $SUDO cp "$CLIP"/infra/systemd/clipper-* "$UNIT_DIR"/
   $SUDO $SYSTEMCTL daemon-reload
-  $SUDO $SYSTEMCTL enable clipper-pipeline.timer clipper-upload.timer clipper-approve-bot.service
-  $SUDO $SYSTEMCTL start clipper-pipeline.timer clipper-upload.timer clipper-approve-bot.service
+  $SUDO $SYSTEMCTL enable clipper-pipeline.timer clipper-upload.timer clipper-remake.timer clipper-approve-bot.service
+  $SUDO $SYSTEMCTL start clipper-pipeline.timer clipper-upload.timer clipper-remake.timer clipper-approve-bot.service
 }
 
 install_ytdlp_cron() {
