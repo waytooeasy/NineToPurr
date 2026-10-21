@@ -100,8 +100,25 @@ def refine(short48, secs48, segs, sr=FINE_SR):
                 best = (nc, s["off"] + d / sr)
         s["off"], s["nc"] = best[1], best[0]
         x = _at(secs48[s["sec"]], s["off"], a, n, sr)
-        s["gain"] = float(np.clip(np.dot(y, x) / (np.dot(x, x) + 1e-9), 0.2, 4.0))
+        s["gain"] = robust_gain(y, x, sr)
     return segs
+
+
+def robust_gain(y, x, sr, chunk=0.25, min_nc=0.8):
+    """Median gain over 0.25 s chunks that really are this mapping (segment edges are only approximate here)."""
+    L = int(chunk * sr)
+    gains = []
+    for i in range(0, len(y) - L + 1, L):
+        a, b = y[i:i + L], x[i:i + L]
+        den = float(np.dot(b, b))
+        if den <= 1e-9:
+            continue
+        nc = float(np.dot(a, b) / (np.linalg.norm(a) * np.sqrt(den) + 1e-9))
+        if nc >= min_nc:
+            gains.append(float(np.dot(a, b) / den))
+    if not gains:
+        gains = [float(np.dot(y, x) / (np.dot(x, x) + 1e-9))]
+    return float(np.clip(np.median(gains), 0.2, 4.0))
 
 
 def switches(short48, secs48, segs, sr=FINE_SR, span=0.3):

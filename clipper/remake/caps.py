@@ -91,8 +91,18 @@ def _key(w):
 
 
 def _same(a, b):
+    """Same caption word: equal, one still being revealed (prefix), or a small misread."""
     a, b = _key(a), _key(b)
-    return a == b or (len(a) > 2 and len(b) > 2 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.6)
+    if a == b or (a and b and (a.startswith(b) or b.startswith(a))):
+        return True
+    return len(a) > 2 and len(b) > 2 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.6
+
+
+def _spelling(variants):
+    """The full word: each reading also votes for the longer readings it is a prefix of."""
+    forms = set(variants)
+    score = {f: sum(1 for v in variants if _key(f).startswith(_key(v))) for f in forms}
+    return max(forms, key=lambda f: (score[f], len(_key(f))))
 
 
 def _compatible(cur, words):
@@ -123,7 +133,7 @@ def events(rows, step=1 / OCR_FPS):
         if cur:
             words = []
             for i, var in enumerate(cur["seen"]):
-                spelling = max(set(v for v, _ in var), key=lambda v: sum(1 for x, _ in var if x == v))
+                spelling = _spelling([v for v, _ in var])
                 words.append({"w": spelling, "c": _mean_colour([c for _, c in var]),
                               "t": round(max(cur["start"], cur["first"][i] - step / 2), 3)})
             evs.append({"start": round(cur["start"], 3), "end": round(t_end, 3),

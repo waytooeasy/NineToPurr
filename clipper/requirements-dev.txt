@@ -4,3 +4,5 @@ requests
 python-telegram-bot>=21
 pyyaml
 requests
+numpy
+opencv-python-headless   # remake engine tests (D58)
