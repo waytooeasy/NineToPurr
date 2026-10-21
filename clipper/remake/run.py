@@ -182,7 +182,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
                                                         "moving": False}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
-        ours = title.make(s.get("title", ""), s.get("streamer", ""), said, ask)
+        names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
+        ours = title.make(s.get("title", ""), found["login"], said, ask, names=names)
         C.save_json(work / "spec.json", {"short": s, "found": {k: v for k, v in found.items() if k != "hits"},
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},

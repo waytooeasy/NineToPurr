@@ -281,6 +281,13 @@ def test_ocr_parse_needs_one_object_per_frame():
 
 
 # ---------------- title ----------------
+def test_title_never_names_a_streamer_who_is_not_in_the_clip():
+    theirs = "Agent00 Met A Fan With The Craziest ATL Accent! 😭💀"
+    answers = iter(["Kai Cenat Gets Stopped By A Fan 💀", "Fan With An Insane ATL Accent Stops Agent00 😭💀"])
+    t = title.make(theirs, "agent00", "KAI CENAT?", ask=lambda p: next(answers), names=["Kai Cenat", "Agent00"])
+    assert t == "Fan With An Insane ATL Accent Stops Agent00 😭💀"
+
+
 def test_title_is_ours_never_theirs():
     theirs = "Jason And Ron Goes On A Date 💕😂"
     answers = iter(["Jason and Ron Goes On A Date 💕😂", "Ron Takes Jason On A Fry Date 😂"])
