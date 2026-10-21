@@ -348,11 +348,30 @@ def _key_index(tokens):
     return best
 
 
+SENTENCE_END = re.compile(r"[.!?…]+[\"')\]]*$")
+
+
+def caption_chunks(ws, chunk):
+    """Groups of up to `chunk` words that never run over a sentence end ("TWO. WHAT" on the fry clip)."""
+    out, cur = [], []
+    for w in ws:
+        cur.append(w)
+        if len(cur) == chunk or SENTENCE_END.search(w["w"]):
+            out.append(cur)
+            cur = []
+    return out + ([cur] if cur else [])
+
+
+def bare(token):
+    """A caption word without the transcript's commas and full stops (the market shows none; ! and ? stay)."""
+    return re.sub(r"(?<=\w)[.,;:]+(?=[\"')\]]*$)", "", token)
+
+
 def caption_text(tokens, st=None):
     """Market caption line: case + keyword highlight colour from today's style (editor/style.py), pop-in."""
     import style as S
     st = st or S.DEFAULT
-    tokens = [t for t in (S.onscreen(t) for t in tokens) if t]   # no emoji on screen
+    tokens = [t for t in (S.onscreen(bare(t)) for t in tokens) if t]   # no emoji on screen
     hi, fill = S.ass_color(st["highlight"]), S.ass_color(st["fill"])
     k = _key_index(tokens) if hi != fill else None     # no keyword colour in this market: plain words
     parts = [("{\\c" + hi + "}" + esc(S.apply_case(t, st["case"])) + "{\\c" + fill + "}") if i == k
@@ -430,10 +449,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{pos}{caption_text(g, st)}")
     else:
         ws = [w for w in words if w["s"] >= start and w["e"] <= end and w["w"]]
-        for i in range(0, len(ws), chunk):
-            g = ws[i:i + chunk]
+        groups = caption_chunks(ws, chunk)
+        for i, g in enumerate(groups):
             t0 = g[0]["s"] - start
-            t1 = (ws[i + chunk]["s"] - start) if i + chunk < len(ws) else g[-1]["e"] - start
+            t1 = (groups[i + 1][0]["s"] - start) if i + 1 < len(groups) else g[-1]["e"] - start
             ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{pos}{caption_text([w['w'] for w in g], st)}")
     Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
 

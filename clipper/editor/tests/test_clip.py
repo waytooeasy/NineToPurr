@@ -231,3 +231,13 @@ def test_own_captions_are_cut_away_in_crop_mode_and_ours_go_on(tmp_path, monkeyp
     clip.write_render_info(mp4, {"layout": {"mode": "crop", "cut": 0.14, "path": [[0, 1], [1, 2]]}}, ass)
     assert json.loads(clip.render_info_path(mp4).read_text()) == {"our_captions": True, "mode": "crop",
                                                                    "cut": 0.14, "moving": True}
+
+
+def test_captions_stop_at_sentence_ends_and_drop_full_stops():
+    # fry clip 2026-10-21: "TWO. WHAT", "LEMONADE. I" (two sentences in one caption, with the full stop)
+    ws = [{"s": i, "e": i + 0.5, "w": w} for i, w in enumerate(["One", "two.", "What", "is", "it?", "Lemonade,", "I"])]
+    assert [[w["w"] for w in g] for g in clip.caption_chunks(ws, 2)] == [["One", "two."], ["What", "is"], ["it?"],
+                                                                          ["Lemonade,", "I"]]
+    assert [clip.bare(t) for t in ["two.", "it?", "Lemonade,", "U.S.", "wait...", "\"no.\""]] == \
+        ["two", "it?", "Lemonade", "U.S", "wait", "\"no\""]
+    assert "TWO" in clip.caption_text(["two."]) and "." not in clip.caption_text(["two."]).split("}")[-1]
