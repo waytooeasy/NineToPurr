@@ -93,6 +93,25 @@ def shifted_min(A, B, rows, r=1):
     return best[rows[y0:y1]]
 
 
+def frame_shift(theirs, ours, max_s=4, step=10):
+    """Frames our render runs late (+) or early (-) against theirs, read in sequence (both at their frame rate):
+    the shift that matches best on most frames, 0 if none is clearly better."""
+    def frames(p):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(p), "-vf", "scale=135:240:flags=area", "-pix_fmt",
+                              "gray", "-f", "rawvideo", "-"], capture_output=True, check=True).stdout
+        return np.frombuffer(raw, np.uint8).reshape(-1, 240, 135).astype(np.float32)
+    a, b = frames(theirs), frames(ours)
+    votes, gain = [], []
+    for n in range(max_s, min(len(a), len(b)) - max_s, step):
+        d = [float(np.abs(a[n] - b[n + s]).mean()) for s in range(-max_s, max_s + 1)]
+        votes.append(int(np.argmin(d)) - max_s)
+        gain.append(d[max_s] - min(d))
+    if not votes:
+        return 0
+    s = max(set(votes), key=votes.count)
+    return s if s != 0 and votes.count(s) >= 0.6 * len(votes) and np.mean(gain) > 0.5 else 0
+
+
 def _stretches(flags, fps, what, min_frames=4):
     out, s = [], None
     for i, f in enumerate(list(flags) + [False]):

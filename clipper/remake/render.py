@@ -24,11 +24,12 @@ def shot_at(vm, n):
 
 def sec_frame_index(vm, shot, n):
     """Section frame shown at output frame n (the map's own choice when it has one)."""
-    f = vm["frames"].get(str(n))
+    shift = int(vm.get("frame_shift", 0))        # measured on the rendered result (match.frame_shift)
+    f = vm.get("frames", {}).get(str(n))
     if f is not None and f[0] == shot["seg"]:
-        return int(f[1])
+        return int(f[1]) + shift
     sec = vm["sections"][shot["sec"]]
-    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
+    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"])) + shift
 
 
 def compose(sec_img, vm, shot, n, size=None):

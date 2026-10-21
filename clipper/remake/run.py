@@ -157,6 +157,14 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     base = work / "base.mp4"
     if not base.exists():
         render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
+        s = match.frame_shift(short_path, base)
+        if s:      # ours n + s shows their frame n: show it at n
+            C.log(f"render runs {s:+d} frame(s) off theirs: re-rendered in step")
+            vm = {**vm, "frame_shift": int(vm.get("frame_shift", 0)) + s}
+            C.save_json(work / "frame_shift.json", {"shift": vm["frame_shift"]})
+            render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
+    elif (work / "frame_shift.json").exists():
+        vm = {**vm, "frame_shift": C.load_json(work / "frame_shift.json")["shift"]}
     # their caption states, frame-exact from the pixels (a new word / caption / no caption), one OCR per state
     y0 = float(np.median([e["y"] for e in cp["events"]])) if cp["events"] else 0.5
     pe = _stage(work, "pixcaps", lambda: {"events": style.pixel_events(short_path, base, fps, nfr, (OW, OH), y0,
@@ -319,7 +327,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             for p in work.iterdir():
                 if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
                     p.unlink(missing_ok=True)
-            for name in ("found", "amap", "vmap", "vmap_aligned"):   # they point at the deleted media
+            for name in ("found", "amap", "vmap", "vmap_aligned", "frame_shift"):   # they point at the deleted media
                 (work / f"{name}.json").unlink(missing_ok=True)
 
 

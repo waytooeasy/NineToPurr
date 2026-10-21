@@ -224,3 +224,14 @@ def test_a_clippers_caption_look_is_remembered_when_it_matched_better(tmp_path, 
     assert run.load_channel_style("Succesful Celebrity")["family"] == "Antonio Bold"
     assert "x" not in run.load_channel_style("Succesful Celebrity")                      # per Short, not per channel
     assert run.load_channel_style("") is None
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg")
+def test_a_render_one_frame_late_is_measured(tmp_path):
+    rng = np.random.default_rng(9)
+    frames = [cv2.resize(rng.integers(0, 255, (8, 5, 3), dtype=np.uint8), (270, 480), interpolation=cv2.INTER_NEAREST)
+              for _ in range(60)]
+    T = _video(tmp_path / "t.mp4", frames[1:59])
+    late = _video(tmp_path / "o.mp4", frames[0:58])        # ours n + 1 shows their n
+    assert match.frame_shift(T, late, step=3) == 1
+    assert match.frame_shift(T, T, step=3) == 0
