@@ -50,6 +50,27 @@ def test_sections_cover_every_offset_and_split_far_ones():
     assert secs == [(80.0, 180.0), (880.0, 950.0)]
 
 
+def test_short_download_uses_the_cookie_file_only_when_present(tmp_path, monkeypatch):
+    seen = []
+
+    class OK:
+        returncode, stderr = 0, ""
+
+    def runner(cmd, **k):
+        seen.append(cmd)
+        return OK()
+    monkeypatch.setenv("YTDLP_COOKIES", str(tmp_path / "missing.txt"))
+    (tmp_path / "a").mkdir()
+    source.download_short("a", tmp_path / "a", runner=runner)
+    assert "--cookies" not in seen[-1]
+    c = tmp_path / "cookies.txt"
+    c.write_text("# Netscape HTTP Cookie File\n")
+    monkeypatch.setenv("YTDLP_COOKIES", str(c))
+    (tmp_path / "b").mkdir()
+    source.download_short("b", tmp_path / "b", runner=runner)
+    assert seen[-1][seen[-1].index("--cookies") + 1] == str(c)
+
+
 def test_bot_check_is_reported_not_worked_around(tmp_path):
     class R:
         returncode, stderr = 1, "ERROR: [youtube] x: Sign in to confirm you're not a bot. Use --cookies"

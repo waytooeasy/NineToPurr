@@ -5,6 +5,7 @@
 2. Coarse locate: loud 2 s snippets of the Short's audio, normalised cross-correlation over the VOD audio.
 3. Download only the VOD video around the found seconds (1080p60 sections); the exact map runs on those files.
 """
+import os
 import re
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -28,8 +29,17 @@ class NotFound(RuntimeError):
 
 
 class BotCheck(RuntimeError):
-    """YouTube asks the VM to sign in ('confirm you're not a bot'): try again later. We never work around it
-    (no cookies, PO tokens or proxies; issue #64)."""
+    """YouTube asks the VM to sign in ('confirm you're not a bot'): try again later (or refresh the cookie file)."""
+
+
+COOKIES = "/opt/clipper/youtube_cookies.txt"
+
+
+def youtube_auth():
+    """Lucas's YouTube cookies for Short downloads (D59, Lucas: "use my cookies"), when the file is there.
+    Only for the clipper Short itself (one download per remake); never logged."""
+    p = os.environ.get("YTDLP_COOKIES", COOKIES)
+    return ["--cookies", p] if p and Path(p).is_file() else []
 
 
 def twitch_logins(names, text="", wl_path=None):
@@ -81,8 +91,9 @@ def recent_vods(tw, login, published, days=4):
 def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
-        r = runner([C.ytdlp(), "-f", "bv*+ba/b", "--merge-output-format", "mp4", "-o", str(out),
-                    f"https://www.youtube.com/shorts/{short_id}"], capture_output=True, text=True)
+        r = runner([C.ytdlp(), *youtube_auth(), "--sleep-requests", "1", "-f", "bv*+ba/b",
+                    "--merge-output-format", "mp4", "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
+                   capture_output=True, text=True)
         if r.returncode != 0:
             err = (r.stderr or "")[-400:]
             if "not a bot" in err or "Sign in to confirm" in err:
