@@ -240,3 +240,11 @@ def test_no_panel_shows_the_black_borders():
     assert L.filtergraph(crop).startswith("[0:v]crop=528:940:100:80,")                     # x and y inside it
     moving = {**crop, "path": [[0, 300], [2, 1700]]}
     assert "\\,100\\,1271):80," in L.filtergraph(moving)                                  # x clamped to the content
+
+
+def test_stack_gameplay_leaves_out_the_streams_caption_band():
+    stack = {"mode": "stack", "cam": [0, 600, 420, 300], "cam_h": 768, "W": 1920, "H": 1080,
+             "content": [68, 80, 1688, 952], "cut": L.OWN_CAPTION_CUT}
+    gh = 952 * (1 - L.OWN_CAPTION_CUT)                                           # 818.7 px of gameplay height
+    fg = L.filtergraph(stack)
+    assert f"crop={L._even(gh * 1080 / 1152)}:{L._even(gh)}:" in fg and ":80,scale=1080:1152" in fg

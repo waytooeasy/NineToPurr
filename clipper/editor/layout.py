@@ -3,8 +3,9 @@
 - "crop":  full-bleed 9:16 cut of the source that follows the people in it like a camera operator: both main
            faces when they fit, else the biggest, panning smoothly (IRL / just chatting). A static cut on the
            median face showed a white shirt and hands for most of Stable Ronaldo's fry clip (2026-10-21).
-           A stream that burns its own captions at the bottom gets that band cut away (`cut`) so a moving cut
-           never shows half a caption line; the Editor then draws ours, like the market's IRL Shorts.
+           A stream that burns its own captions at the bottom gets that band cut away (`cut`, every layout) so
+           a 9:16 cut never shows half a caption line and nothing sits under the Shorts UI at the bottom; the
+           Editor then draws ours (seam or centre), like the market's Shorts.
 - "chatstack": the same following crop on top and the stream's own chat overlay below it as a readable panel
            (Lucas 2026-10-21: "U can't even see the chat"; a 9:16 cut showed a cut-off strip of it). The chat
            box is found by Claude Haiku on two frames (both looks must agree); its spot in the picture is
@@ -256,11 +257,12 @@ def filtergraph(layout):
         x, y, cw, ch = fit_box(layout["cam"], ox, oy, CW, CH)
         cam_h = layout.get("cam_h", CAM_H)
         gh = OUT_H - cam_h
-        gw = min(CW, CH * OUT_W / gh)         # gameplay: centre cut, panel aspect 1080:1152
+        GH = CH * (1 - (layout.get("cut") or 0.0))   # a stream's own caption band stays out of the gameplay
+        gw = min(CW, GH * OUT_W / gh)         # gameplay: centre cut, panel aspect 1080:1152
         gx = ox + (CW - gw) / 2
         return (f"[0:v]split[c][g];"
                 f"[c]crop={_even(cw)}:{_even(ch)}:{_even(x)}:{_even(y)},scale={OUT_W}:{cam_h},setsar=1[top];"
-                f"[g]crop={_even(gw)}:{_even(min(CH, gw * gh / OUT_W))}:{_even(gx)}:{_even(oy)},"
+                f"[g]crop={_even(gw)}:{_even(min(GH, gw * gh / OUT_W))}:{_even(gx)}:{_even(oy)},"
                 f"scale={OUT_W}:{gh},setsar=1[bot];"
                 f"[top][bot]vstack=inputs=2[v]")
     if not W or not H or layout.get("cx") is None:
@@ -551,10 +553,8 @@ def detect_layout(video, start, end, cut=0.0):
         faces = []
     lay = choose_layout(faces, W, H)
     box = content_box(video, start, end, W, H)
-    if box:
-        lay["content"] = list(box)
-    if lay["mode"] == "crop" and cut:
-        lay["cut"] = cut
+    extra = {**({"content": list(box)} if box else {}), **({"cut": cut} if cut else {})}
+    lay = {**lay, **extra}
     if lay["mode"] == "crop" and lay.get("follow"):
         lay = chat_layout(lay, find_chat(video, start, end, W, H))
     try:
@@ -568,7 +568,7 @@ def detect_layout(video, start, end, cut=0.0):
             col, row = edge_profiles(video, start, end, face)
             box = cam_box_from_profiles(col, row, face, W, H) if col else None
             if box:
-                lay = {**choose_layout(faces, W, H, cam_box=box), **({"content": lay["content"]} if "content" in lay else {})}
+                lay = {**choose_layout(faces, W, H, cam_box=box), **extra}
         except Exception:  # noqa: BLE001 - keep the face-sized estimate
             pass
     return lay
