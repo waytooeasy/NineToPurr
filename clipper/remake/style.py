@@ -497,7 +497,7 @@ def libass_width(entry, text, fs, spacing, fonts_dir=None):
 
 def libass_bbox(entry, text, fs, spacing, fonts_dir=None):
     """(x0, x1, y0, y1) of the ink of `text` drawn with \\an5 at the canvas centre (W/2, H/2), or None."""
-    W, H = 4000, int(fs * 3)
+    W, H = 4000, int(fs * 3) // 2 * 2
     with tempfile.TemporaryDirectory() as d:
         ass = Path(d) / "w.ass"
         ass.write_text(
