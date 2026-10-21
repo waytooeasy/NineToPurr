@@ -50,6 +50,18 @@ def test_sections_cover_every_offset_and_split_far_ones():
     assert secs == [(80.0, 180.0), (880.0, 950.0)]
 
 
+def test_short_download_forces_ipv4_only_without_an_ipv6_route(tmp_path, monkeypatch):
+    seen = []
+
+    class OK:
+        returncode, stderr = 0, ""
+    for v6, name in ((False, "a"), (True, "b")):
+        monkeypatch.setattr(source, "has_ipv6", lambda v6=v6: v6)
+        (tmp_path / name).mkdir()
+        source.download_short(name, tmp_path / name, runner=lambda cmd, **k: seen.append(cmd) or OK())
+    assert "-4" in seen[0] and "-4" not in seen[1]
+
+
 def test_short_download_uses_the_cookie_file_only_when_present(tmp_path, monkeypatch):
     seen = []
 
