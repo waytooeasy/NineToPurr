@@ -1,0 +1,10 @@
+[Unit]
+Description=Remake one popping clipper Short every 30 minutes (D58)
+
+[Timer]
+OnBootSec=10min
+OnUnitInactiveSec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
