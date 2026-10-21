@@ -3,14 +3,18 @@
 - "crop":  full-bleed 9:16 cut of the source that follows the people in it like a camera operator: both main
            faces when they fit, else the biggest, panning smoothly (IRL / just chatting). A static cut on the
            median face showed a white shirt and hands for most of Stable Ronaldo's fry clip (2026-10-21).
-           A stream that burns its own captions at the bottom gets that band cut away (`cut`) so a moving cut
-           never shows half a caption line; the Editor then draws ours, like the market's IRL Shorts.
+           A stream that burns its own captions at the bottom gets that band cut away (`cut`, every layout) so
+           a 9:16 cut never shows half a caption line and nothing sits under the Shorts UI at the bottom; the
+           Editor then draws ours (seam or centre), like the market's Shorts.
 - "chatstack": the same following crop on top and the stream's own chat overlay below it as a readable panel
            (Lucas 2026-10-21: "U can't even see the chat"; a 9:16 cut showed a cut-off strip of it). The chat
            box is found by Claude Haiku on two frames (both looks must agree); its spot in the picture is
            blurred so no half chat shows up there. No chat overlay -> plain crop.
 - "stack": facecam on top, gameplay below, both full width (gaming with a corner facecam).
-No blurred letterbox bars: none of the top channels use them.
+No blurred letterbox bars: none of the top channels use them. Black borders in the source itself (a stream's
+black header bar, letterboxing) are measured (rows/columns that are near-black in every sampled frame, by
+median, so a bar with a little text in it still counts) and kept out of every panel (`content`):
+Jynxzi's black stats bar ran across the seam of a stack as a black band (2026-10-21).
 
 `choose_layout()` is pure (tests need no OpenCV); `detect_layout()` samples frames with OpenCV's
 YuNet face detector (model downloaded by setup.sh; OpenCV 5 dropped the Haar cascades).
@@ -39,6 +43,10 @@ DEADBAND = 0.04             # target moves smaller than this share of the width 
 PAIR_FIT = 0.9              # two faces are framed together when they span <= 90 % of the crop width
 MIN_FACE_SHARE = 0.35       # a face counts for framing when its area is >= 35 % of the frame's biggest
 OWN_CAPTION_CUT = 0.14      # bottom share of the source cut when the stream burns its captions there
+BORDER_MIN = 0.015          # a black border thinner than this share of the frame is left alone
+CONTENT_MIN = 0.7           # never trim a side to less than 70 % (a dark scene can fool cropdetect)
+BLACK = 24                  # a row/column whose median luma stays below this in every frame is border
+SMALL_W, SMALL_H = 480, 270 # border search works on downscaled grey frames
 CHAT_PANEL_MAX = 640        # chatstack: tallest chat panel (older lines above that are trimmed)
 CHAT_PANEL_MIN = 140        # a thinner panel is unreadable: plain crop instead
 CHAT_PAD = 0.015            # padding around the found chat box, share of the frame
@@ -174,7 +182,7 @@ def target_cx(faces, cw):
     return big[0][0] + big[0][2] / 2
 
 
-def smooth_path(points, W, cw, pan=PAN_MAX, dead=DEADBAND):
+def smooth_path(points, W, cw, pan=PAN_MAX, dead=DEADBAND, lo=None, hi=None):
     """[(t, target or None)] -> camera path [(t, cx)]: gaps hold the last target, a median of 3 drops one-frame
     jumps, small moves inside the deadband are ignored (no jitter) and the pan speed is limited (no jump cuts).
     Clamped so the window stays inside the frame."""
@@ -187,7 +195,8 @@ def smooth_path(points, W, cw, pan=PAN_MAX, dead=DEADBAND):
         last = x if x is not None else last
         filled.append(last)
     med = [median(filled[max(0, i - 1):i + 2]) for i in range(len(filled))]
-    lo, hi = cw / 2, W - cw / 2
+    lo = cw / 2 if lo is None else lo
+    hi = W - cw / 2 if hi is None else hi
     cur, prev_t, out = min(max(med[0], lo), hi), points[0][0], []
     for (t, _), x in zip(points, med):
         x = min(max(x, lo), hi)
@@ -213,29 +222,47 @@ def keyframes(path, eps=1.0):
     return keep
 
 
-def x_expr(path, cw, W):
+def x_expr(path, cw, lo, hi):
     """ffmpeg crop x over time (t = seconds from the clip start), piecewise linear through the keyframes:
-    x0 + sum(dx_i * clip((t - t_i) / dt_i, 0, 1)). A flat sum, so long paths don't nest."""
+    x0 + sum(dx_i * clip((t - t_i) / dt_i, 0, 1)), kept within [lo, hi]. A flat sum, so long paths don't nest."""
     pts = [(t, cx - cw / 2) for t, cx in keyframes(path)]
     e = f"{pts[0][1]:.1f}"
     for (t0, x0), (t1, x1) in zip(pts, pts[1:]):
         if abs(x1 - x0) >= 0.5 and t1 > t0:
             e += f"{x1 - x0:+.1f}*clip((t-{t0:.2f})/{t1 - t0:.3f},0,1)"
-    return f"clip({e},0,{W - cw:.0f})"
+    return f"clip({e},{lo:.0f},{hi:.0f})"
+
+
+def fit_box(box, ox, oy, CW, CH):
+    """A crop box (x, y, w, h) moved inside the content area; shrunk around its centre (same shape) if it
+    is bigger than the content."""
+    x, y, w, h = box
+    k = min(1.0, CW / w if w else 1.0, CH / h if h else 1.0)
+    cx, cy, w, h = x + w / 2, y + h / 2, w * k, h * k
+    x = min(max(cx - w / 2, ox), ox + CW - w)
+    y = min(max(cy - h / 2, oy), oy + CH - h)
+    return x, y, w, h
+
+
+def content(layout):
+    """(x, y, w, h) of the picture inside the source's black borders, or the whole frame."""
+    return tuple(layout.get("content") or (0, 0, layout["W"], layout["H"]))
 
 
 def filtergraph(layout):
     """ffmpeg filter_complex prefix producing [v] at 1080x1920 from [0:v]."""
     W, H = layout["W"], layout["H"]
     if layout["mode"] == "stack":
-        x, y, cw, ch = layout["cam"]
+        ox, oy, CW, CH = content(layout)
+        x, y, cw, ch = fit_box(layout["cam"], ox, oy, CW, CH)
         cam_h = layout.get("cam_h", CAM_H)
         gh = OUT_H - cam_h
-        gw = min(W, H * OUT_W / gh)           # gameplay: centre cut, panel aspect 1080:1152
-        gx = (W - gw) / 2
+        GH = CH * (1 - (layout.get("cut") or 0.0))   # a stream's own caption band stays out of the gameplay
+        gw = min(CW, GH * OUT_W / gh)         # gameplay: centre cut, panel aspect 1080:1152
+        gx = ox + (CW - gw) / 2
         return (f"[0:v]split[c][g];"
                 f"[c]crop={_even(cw)}:{_even(ch)}:{_even(x)}:{_even(y)},scale={OUT_W}:{cam_h},setsar=1[top];"
-                f"[g]crop={_even(gw)}:{_even(min(H, gw * gh / OUT_W))}:{_even(gx)}:0,"
+                f"[g]crop={_even(gw)}:{_even(min(GH, gw * gh / OUT_W))}:{_even(gx)}:{_even(oy)},"
                 f"scale={OUT_W}:{gh},setsar=1[bot];"
                 f"[top][bot]vstack=inputs=2[v]")
     if not W or not H or layout.get("cx") is None:
@@ -243,14 +270,16 @@ def filtergraph(layout):
     cut = layout.get("cut") or 0.0
     chat = layout.get("chat") if layout["mode"] == "chatstack" else None
     ph = OUT_H - layout["chat_h"] if chat else OUT_H           # picture panel height
-    cw = crop_w(W, H, cut, ph)
-    ch = min(H * (1 - cut), cw * ph / OUT_W)
+    ox, oy, CW, CH = content(layout)
+    cw = crop_w(CW, CH, cut, ph)
+    ch = min(CH * (1 - cut), cw * ph / OUT_W)
     if len(layout.get("path") or []) > 1:
-        x = x_expr(layout["path"], cw, W).replace(",", "\\,")   # escaped like the centre-crop fallback
+        x = x_expr(layout["path"], cw, ox, ox + CW - cw).replace(",", "\\,")   # escaped like the fallback
     else:
-        x = _even(min(max(layout["cx"] - cw / 2, 0), W - cw))
+        x = _even(min(max(layout["cx"] - cw / 2, ox), ox + CW - cw))
+    y = _even(oy)
     if not chat:
-        return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{OUT_H},setsar=1[v]"
+        return f"[0:v]crop={_even(cw)}:{_even(ch)}:{x}:{y},scale={OUT_W}:{OUT_H},setsar=1[v]"
     x0, y0, x1, y1 = chat
     bw, bh = _even(x1 - x0), _even(y1 - y0)
     r = max(2, min(20, min(bw, bh) // 4))
@@ -259,7 +288,7 @@ def filtergraph(layout):
             f"color=c=black:s={bw}x{bh}:r=30:d=0.04,format=gray,geq=lum='{feather(chat, W, H)}',"
             f"loop=loop=-1:size=1[m];[bl][m]alphamerge[hide];"                # ...and no hard edge where it ends
             f"[s0][hide]overlay={x0}:{y0}:shortest=1[clean];"
-            f"[clean]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{ph},setsar=1[pic];"
+            f"[clean]crop={_even(cw)}:{_even(ch)}:{x}:{y},scale={OUT_W}:{ph},setsar=1[pic];"
             f"[s2]crop={bw}:{bh}:{x0}:{y0},scale={OUT_W}:{layout['chat_h']},setsar=1[chat];"
             f"[pic][chat]vstack=inputs=2[v]")
 
@@ -456,11 +485,60 @@ def follow(lay, video, start, end, track=track_faces):
     """Add the moving-camera path to a face crop (layout["path"] = [[t, cx], ...])."""
     if lay.get("mode") not in ("crop", "chatstack") or not lay.get("follow"):
         return lay
-    cw = crop_w(lay["W"], lay["H"], lay.get("cut") or 0.0, OUT_H - (lay.get("chat_h") or 0))
+    ox, oy, CW, CH = content(lay)
+    cw = crop_w(CW, CH, lay.get("cut") or 0.0, OUT_H - (lay.get("chat_h") or 0))
     pts = [(t, target_cx(f, cw)) for t, f in track(video, start, end)]
     if not any(x is not None for _, x in pts):
         return lay
-    return {**lay, "path": [[round(t, 2), round(x, 1)] for t, x in smooth_path(pts, lay["W"], cw)]}
+    path = smooth_path(pts, lay["W"], cw, lo=ox + cw / 2, hi=ox + CW - cw / 2)
+    return {**lay, "path": [[round(t, 2), round(x, 1)] for t, x in path]}
+
+
+def grey_frames(video, times, w=SMALL_W, h=SMALL_H):
+    """Downscaled grey frames (bytes, row-major w*h) at `times`."""
+    out = []
+    for t in times:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", f"scale={w}:{h},format=gray", "-f", "rawvideo", "-"], capture_output=True, check=True)
+        if len(r.stdout) == w * h:
+            out.append(r.stdout)
+    return out
+
+
+def black_borders(frames, w, h, black=BLACK):
+    """(x, y, w, h) in small-frame pixels of what is not near-black in every frame, or None (all black).
+    Median per row/column: a black bar with a little text (viewer count, a chat line) stays a bar."""
+    if not frames:
+        return None
+    rows = [max(median(f[y * w:(y + 1) * w]) for f in frames) for y in range(h)]
+    cols = [max(median(f[y * w + x] for y in range(h)) for f in frames) for x in range(w)]
+    ys = [y for y, v in enumerate(rows) if v >= black]
+    xs = [x for x, v in enumerate(cols) if v >= black]
+    if not ys or not xs:
+        return None
+    return xs[0], ys[0], xs[-1] - xs[0] + 1, ys[-1] - ys[0] + 1
+
+
+def content_box(video, start, end, W, H, grab=grey_frames):
+    """(x, y, w, h) in source pixels of the picture inside black borders (a stream's black header bar,
+    letterboxing), from 3 frames of the window. None when there is nothing worth trimming or the result is
+    implausible (a dark scene)."""
+    try:
+        span = max(end - start, 0.1)
+        b = black_borders(grab(video, [start + span * f for f in (0.2, 0.5, 0.8)]), SMALL_W, SMALL_H)
+    except Exception:  # noqa: BLE001 - no trimming is always fine
+        return None
+    if not b:
+        return None
+    sx, sy = W / SMALL_W, H / SMALL_H
+    x0, y0 = _even(b[0] * sx), _even(b[1] * sy)
+    x1, y1 = min(W, _even(round((b[0] + b[2]) * sx))), min(H, _even(round((b[1] + b[3]) * sy)))
+    w, h = x1 - x0, y1 - y0
+    if w < CONTENT_MIN * W or h < CONTENT_MIN * H:
+        return None
+    if max(x0, W - x1) < BORDER_MIN * W and max(y0, H - y1) < BORDER_MIN * H:
+        return None
+    return x0, y0, w, h
 
 
 def detect_layout(video, start, end, cut=0.0):
@@ -474,8 +552,9 @@ def detect_layout(video, start, end, cut=0.0):
     except Exception:  # noqa: BLE001 - no OpenCV / unreadable frames: centred crop
         faces = []
     lay = choose_layout(faces, W, H)
-    if lay["mode"] == "crop" and cut:
-        lay["cut"] = cut
+    box = content_box(video, start, end, W, H)
+    extra = {**({"content": list(box)} if box else {}), **({"cut": cut} if cut else {})}
+    lay = {**lay, **extra}
     if lay["mode"] == "crop" and lay.get("follow"):
         lay = chat_layout(lay, find_chat(video, start, end, W, H))
     try:
@@ -489,7 +568,7 @@ def detect_layout(video, start, end, cut=0.0):
             col, row = edge_profiles(video, start, end, face)
             box = cam_box_from_profiles(col, row, face, W, H) if col else None
             if box:
-                lay = choose_layout(faces, W, H, cam_box=box)
+                lay = {**choose_layout(faces, W, H, cam_box=box), **extra}
         except Exception:  # noqa: BLE001 - keep the face-sized estimate
             pass
     return lay

@@ -197,3 +197,54 @@ def test_chatstack_filtergraph_renders(tmp_path):
                            "stream=width,height:format=duration", "-of", "csv=p=0", str(out)],
                           capture_output=True, text=True).stdout.split()
     assert dims[0] == "1080,1920" and abs(float(dims[-1]) - 2) < 0.2
+
+
+def _frame(w, h, bar_rows=(), text_rows=(), dark=False):
+    px = []
+    for y in range(h):
+        for x in range(w):
+            if y in bar_rows:
+                px.append(230 if (y in text_rows and x < w // 8) else 2)        # black bar, a little text
+            else:
+                px.append(20 if dark else 90)
+    return bytes(px)
+
+
+def test_black_borders_are_found_by_row_and_column_medians():
+    w, h = 48, 27
+    bar = _frame(w, h, bar_rows=range(0, 2), text_rows={1})                     # Jynxzi: stats bar on top
+    assert L.black_borders([bar, bar], w, h) == (0, 2, 48, 25)
+    assert L.black_borders([_frame(w, h, bar_rows=range(0, 2)), _frame(w, h)], w, h) == (0, 0, 48, 27)  # one frame shows it
+    assert L.black_borders([_frame(w, h, dark=True)], w, h) is None             # all near-black
+
+
+def test_content_box_scales_and_sanity_checks():
+    grab = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 20), text_rows={10})] * 3  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=grab) == (0, 80, 1920, 1000)
+    thin = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 1))]  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=thin) is None                # 4 px: nothing to trim
+    huge = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 120))]  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=huge) is None                # implausible
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=lambda v, ts: 1 / 0) is None
+
+
+def test_no_panel_shows_the_black_borders():
+    stack = {"mode": "stack", "cam": [0, 600, 420, 300], "cam_h": 768, "W": 1920, "H": 1080,
+             "content": [0, 80, 1920, 940]}
+    fg = L.filtergraph(stack)
+    assert ":80,scale=1080:1152" in fg                                                   # gameplay starts under the bar
+    assert "crop=420:300:0:600" in fg                                                    # cam inside: unchanged
+    assert L.fit_box((0, 900, 420, 300), 0, 80, 1920, 940) == (0, 720, 420, 300)         # moved up into the picture
+    assert L.fit_box((0, 0, 2000, 1000), 0, 80, 1920, 940)[2:] == (1880, 940)            # shrunk, same shape
+    crop = {"mode": "crop", "cx": 100, "W": 1920, "H": 1080, "content": [100, 80, 1700, 940]}
+    assert L.filtergraph(crop).startswith("[0:v]crop=528:940:100:80,")                     # x and y inside it
+    moving = {**crop, "path": [[0, 300], [2, 1700]]}
+    assert "\\,100\\,1271):80," in L.filtergraph(moving)                                  # x clamped to the content
+
+
+def test_stack_gameplay_leaves_out_the_streams_caption_band():
+    stack = {"mode": "stack", "cam": [0, 600, 420, 300], "cam_h": 768, "W": 1920, "H": 1080,
+             "content": [68, 80, 1688, 952], "cut": L.OWN_CAPTION_CUT}
+    gh = 952 * (1 - L.OWN_CAPTION_CUT)                                           # 818.7 px of gameplay height
+    fg = L.filtergraph(stack)
+    assert f"crop={L._even(gh * 1080 / 1152)}:{L._even(gh)}:" in fg and ":80,scale=1080:1152" in fg

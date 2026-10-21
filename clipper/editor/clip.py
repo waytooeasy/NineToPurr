@@ -465,14 +465,15 @@ def has_own_captions(pick):
 
 
 def draws_captions(pick):
-    """Our caption track goes on unless the stream shows its own captions and they stay on screen (stack)."""
+    """Our caption track goes on unless the stream shows its own captions and they stay on screen (no cut)."""
     lay = pick.get("layout") or {}
-    return not has_own_captions(pick) or bool(lay.get("mode") in ("crop", "chatstack") and lay.get("cut"))
+    return not has_own_captions(pick) or bool(lay.get("cut"))
 
 
 def ensure_layout(video, pick):
     """Pick the 9:16 layout once per clip (face-following crop or facecam-over-gameplay stack). A stream with
-    its own burned-in captions loses that bottom band in crop mode (half a caption line in a moving cut)."""
+    its own burned-in captions loses that bottom band (half a caption line in a 9:16 cut, or under the Shorts
+    UI at the bottom of a stack: Jynxzi 2026-10-21) and gets ours."""
     if not pick.get("layout"):
         from layout import OWN_CAPTION_CUT, detect_layout
         cut = OWN_CAPTION_CUT if has_own_captions(pick) else 0.0

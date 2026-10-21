@@ -218,6 +218,7 @@ def test_own_captions_are_cut_away_in_crop_mode_and_ours_go_on(tmp_path, monkeyp
     ron = {"start": 0, "end": 10, "hook": "He lost it", "creator": "stableronaldo"}
     assert not clip.draws_captions({**ron, "layout": {"mode": "stack"}})
     assert clip.draws_captions({**ron, "layout": {"mode": "crop", "cut": 0.14}})
+    assert clip.draws_captions({**ron, "layout": {"mode": "stack", "cut": 0.14}})       # Jynxzi: his sat under the UI
     assert clip.draws_captions({**ron, "creator": "xqc", "layout": {"mode": "stack"}})
     seen = {}
     import layout
