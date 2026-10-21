@@ -60,7 +60,7 @@ def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=N
                 pf.append((float(d.mean()), None))
                 continue
             pic = float(d[~rows].mean()) if (~rows).any() else 0.0
-            err = (d[rows] > STRONG).sum()
+            err = (shifted_min(A, B, rows) > STRONG).sum()      # 1 px off (= 4 px at 1080) is not an error
             if z is not None and i < len(z):
                 theirs_px = (np.abs(A - blur(z[i])).max(2)[rows] > STRONG).sum()
             else:
@@ -78,6 +78,19 @@ def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=N
             "overall": round(float(min(picture, captions)), 1),
             "per_frame": [(round(p, 1), None if c is None else round(c, 3)) for p, c in pf],
             "bad": sorted(bad, key=lambda b: b[0])[:12]}
+
+
+def shifted_min(A, B, rows, r=1):
+    """Per pixel of the caption rows: the smallest |A - B| over B shifted by up to r px each way (max channel)."""
+    ys = np.where(rows)[0]
+    y0, y1 = max(0, ys.min() - r), min(A.shape[0], ys.max() + 1 + r)
+    a, b = A[y0:y1], B[y0:y1]
+    best = None
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            d = np.abs(a - np.roll(np.roll(b, dy, 0), dx, 1)).max(2)
+            best = d if best is None else np.minimum(best, d)
+    return best[rows[y0:y1]]
 
 
 def _stretches(flags, fps, what, min_frames=4):

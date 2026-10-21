@@ -73,6 +73,54 @@ FONTS = [
     ("Changa One", 0, 0, "ChangaOne-Regular.ttf", f"{G}/ofl/changaone/ChangaOne-Regular.ttf"),
     ("Dela Gothic One", 0, 0, "DelaGothicOne-Regular.ttf", f"{G}/ofl/delagothicone/DelaGothicOne-Regular.ttf"),
 ]
+# weights of variable fonts, cut to static files at fetch time (libass would only use the default weight):
+# (family we give the static file, bold, italic, file, variable font source, axes)
+VAR_FONTS = [
+    ("Oswald Medium", 0, 0, "Oswald-Medium.ttf", f"{G}/ofl/oswald/Oswald%5Bwght%5D.ttf", {"wght": 500}),
+    ("Oswald SemiBold", 0, 0, "Oswald-SemiBold.ttf", f"{G}/ofl/oswald/Oswald%5Bwght%5D.ttf", {"wght": 600}),
+    ("Oswald Bold", 0, 0, "Oswald-Bold.ttf", f"{G}/ofl/oswald/Oswald%5Bwght%5D.ttf", {"wght": 700}),
+    ("Antonio SemiBold", 0, 0, "Antonio-SemiBold.ttf", f"{G}/ofl/antonio/Antonio%5Bwght%5D.ttf", {"wght": 600}),
+    ("Antonio Bold", 0, 0, "Antonio-Bold.ttf", f"{G}/ofl/antonio/Antonio%5Bwght%5D.ttf", {"wght": 700}),
+    ("Roboto Condensed Bold", 0, 0, "RobotoCondensed-Bold.ttf",
+     f"{G}/ofl/robotocondensed/RobotoCondensed%5Bwght%5D.ttf", {"wght": 700}),
+    ("Roboto Condensed Black", 0, 0, "RobotoCondensed-Black.ttf",
+     f"{G}/ofl/robotocondensed/RobotoCondensed%5Bwght%5D.ttf", {"wght": 900}),
+    ("Roboto Black", 0, 0, "Roboto-Black.ttf", f"{G}/ofl/roboto/Roboto%5Bwdth,wght%5D.ttf", {"wght": 900, "wdth": 100}),
+    ("Roboto Bold", 0, 0, "Roboto-Bold.ttf", f"{G}/ofl/roboto/Roboto%5Bwdth,wght%5D.ttf", {"wght": 700, "wdth": 100}),
+    ("Inter Black", 0, 0, "Inter-Black.ttf", f"{G}/ofl/inter/Inter%5Bopsz,wght%5D.ttf", {"wght": 900, "opsz": 32}),
+    ("Inter ExtraBold", 0, 0, "Inter-ExtraBold.ttf", f"{G}/ofl/inter/Inter%5Bopsz,wght%5D.ttf", {"wght": 800, "opsz": 32}),
+    ("Open Sans ExtraBold", 0, 0, "OpenSans-ExtraBold.ttf", f"{G}/ofl/opensans/OpenSans%5Bwdth,wght%5D.ttf",
+     {"wght": 800, "wdth": 100}),
+    ("Teko SemiBold", 0, 0, "Teko-SemiBold.ttf", f"{G}/ofl/teko/Teko%5Bwght%5D.ttf", {"wght": 600}),
+    ("League Gothic", 0, 0, "LeagueGothic-Regular.ttf", f"{G}/ofl/leaguegothic/LeagueGothic%5Bwdth%5D.ttf",
+     {"wdth": 100}),
+    ("Nunito Black", 0, 0, "Nunito-Black.ttf", f"{G}/ofl/nunito/Nunito%5Bwght%5D.ttf", {"wght": 900}),
+    ("Rubik Bold", 0, 0, "Rubik-Bold.ttf", f"{G}/ofl/rubik/Rubik%5Bwght%5D.ttf", {"wght": 700}),
+    ("Rubik Black", 0, 0, "Rubik-Black.ttf", f"{G}/ofl/rubik/Rubik%5Bwght%5D.ttf", {"wght": 900}),
+    ("Big Shoulders Display Black", 0, 0, "BigShouldersDisplay-Black.ttf",
+     f"{G}/ofl/bigshouldersdisplay/BigShouldersDisplay%5Bwght%5D.ttf", {"wght": 900}),
+    ("Sofia Sans Condensed Black", 0, 0, "SofiaSansCondensed-Black.ttf",
+     f"{G}/ofl/sofiasanscondensed/SofiaSansCondensed%5Bwght%5D.ttf", {"wght": 900}),
+    ("Sofia Sans Condensed Bold", 0, 0, "SofiaSansCondensed-Bold.ttf",
+     f"{G}/ofl/sofiasanscondensed/SofiaSansCondensed%5Bwght%5D.ttf", {"wght": 700}),
+    ("Archivo Narrow Bold", 0, 0, "ArchivoNarrow-Bold.ttf", f"{G}/ofl/archivonarrow/ArchivoNarrow%5Bwght%5D.ttf",
+     {"wght": 700}),
+    ("Outfit Black", 0, 0, "Outfit-Black.ttf", f"{G}/ofl/outfit/Outfit%5Bwght%5D.ttf", {"wght": 900}),
+    ("League Spartan Black", 0, 0, "LeagueSpartan-Black.ttf", f"{G}/ofl/leaguespartan/LeagueSpartan%5Bwght%5D.ttf",
+     {"wght": 900}),
+    ("Barlow Condensed Bold", 0, 0, "BarlowCondensed-Bold.ttf", None, None),
+    ("Barlow Condensed SemiBold", 0, 0, "BarlowCondensed-SemiBold.ttf", None, None),
+    ("Barlow Semi Condensed Bold", 0, 0, "BarlowSemiCondensed-Bold.ttf", None, None),
+    ("Saira Semi Condensed Bold", 0, 0, "SairaSemiCondensed-Bold.ttf", None, None),
+    ("Pathway Gothic One", 0, 0, "PathwayGothicOne-Regular.ttf", None, None),
+]
+_STATIC = {"BarlowCondensed-Bold.ttf": f"{G}/ofl/barlowcondensed/BarlowCondensed-Bold.ttf",
+           "BarlowCondensed-SemiBold.ttf": f"{G}/ofl/barlowcondensed/BarlowCondensed-SemiBold.ttf",
+           "BarlowSemiCondensed-Bold.ttf": f"{G}/ofl/barlowsemicondensed/BarlowSemiCondensed-Bold.ttf",
+           "SairaSemiCondensed-Bold.ttf": f"{G}/ofl/sairasemicondensed/SairaSemiCondensed-Bold.ttf",
+           "PathwayGothicOne-Regular.ttf": f"{G}/ofl/pathwaygothicone/PathwayGothicOne-Regular.ttf"}
+FONTS += [(f, b, i, fn, _STATIC[fn]) if axes is None else (f, b, i, fn, url, axes)
+          for f, b, i, fn, url, axes in VAR_FONTS]
 TRACKS = (-0.04, 0.0, 0.04, 0.08, 0.12, 0.16)   # letter spacing / font size tried for every font
 DIFF_MIN = 48           # |their - base| (max channel) above this is caption
 FILL_V = 150            # caption fill: brightest channel at least this (white, yellow, green, red ... fills)
@@ -95,19 +143,50 @@ def ensure_fonts(d=None, get=None):
         p = d / e[3]
         if not p.exists():
             try:
-                if get is None:
-                    import requests
-                    r = requests.get(e[4], timeout=30)
-                    r.raise_for_status()
-                    data = r.content
+                if len(e) > 5:      # a weight of a variable font
+                    var = d / "_var" / re.sub(r"[^A-Za-z0-9.,\[\]-]", "_", e[4].rsplit("/", 1)[-1])
+                    if not var.exists():
+                        var.parent.mkdir(parents=True, exist_ok=True)
+                        var.write_bytes(_fetch(e[4], get))
+                    static_instance(var, e[5], e[0], p)
                 else:
-                    data = get(e[4])
-                p.write_bytes(data)
+                    p.write_bytes(_fetch(e[4], get))
             except Exception as ex:  # noqa: BLE001
                 C.log(f"font {e[0]} unavailable: {ex}")
                 continue
         ok.append(e)
     return ok
+
+
+def _fetch(url, get=None):
+    if get is not None:
+        return get(url)
+    import requests
+    r = requests.get(url, timeout=60)
+    r.raise_for_status()
+    return r.content
+
+
+def static_instance(var_path, axes, family, out):
+    """One weight of a variable font as a static font named `family` (so libass can ask for it by name)."""
+    from fontTools.ttLib import TTFont
+    from fontTools.varLib import instancer
+    f = TTFont(str(var_path))
+    axes = {a: v for a, v in axes.items() if a in {x.axisTag for x in f["fvar"].axes}}
+    inst = instancer.instantiateVariableFont(f, axes)
+    name = inst["name"]
+    for rec in list(name.names):
+        if rec.nameID in (16, 17, 21, 22, 25):
+            name.removeNames(nameID=rec.nameID)
+    ps = re.sub(r"[^A-Za-z0-9]", "", family) + "-Regular"
+    for nid, val in ((1, family), (2, "Regular"), (3, ps), (4, family), (6, ps)):
+        name.setName(val, nid, 3, 1, 0x409)
+        name.setName(val, nid, 1, 0, 0)
+    if "OS/2" in inst:
+        inst["OS/2"].fsSelection = (inst["OS/2"].fsSelection & ~0b1100001) | 0b1000000   # REGULAR, not bold/italic
+        inst["head"].macStyle = 0
+    inst.save(str(out))
+    return out
 
 
 def text_mask(path, text, size=120, track=0.0):

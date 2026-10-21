@@ -11,3 +11,4 @@ google-auth-oauthlib
 tzdata
 opencv-python-headless   # editor/layout.py: face-centred 9:16 crop + facecam detection
 pillow>=10          # remake/style.py: font glyph matching
+fonttools>=4.40   # remake/style.py: static weights of variable caption fonts
