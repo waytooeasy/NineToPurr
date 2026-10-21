@@ -226,9 +226,16 @@ def find(short, work, con=None, tw=None, logins=()):
         C.log(f"VOD {vod_id} ({login}): {sum(h['nc'] >= MIN_NC for h in hits)}/{len(hits)} snippets found")
         if not good:
             continue
+        offs = [h["vod_t"] - h["short_t"] for h in good]
+        try:   # every part of the Short, not only its loud snippets (a clipper jumps across minutes)
+            from . import amap as A
+            rows = A.dense(short_audio, [C.read_audio(audio, LOC_SR, highpass=120)], sr=LOC_SR)
+            offs += [base + o for t, k, o, nc in rows if k is not None and nc >= A.MIN_NC]
+        except Exception as e:  # noqa: BLE001 - the snippets alone still give a window
+            C.log(f"dense locate failed: {e}")
         secs = []
-        for k, (a, b) in enumerate(sections_for([h["vod_t"] - h["short_t"] for h in good], dur)):
-            f = download_video(vod_id, a, b, work / f"sec{k}_{vod_id}_{int(a)}.mp4")
+        for k, (a, b) in enumerate(sections_for(offs, dur)):
+            f = download_video(vod_id, a, b, work / f"sec{k}_{vod_id}_{int(a)}_{int(b)}.mp4")
             secs.append({"file": str(f), "vod_s": a, "vod_e": b})
         return {"vod_id": vod_id, "login": login, "sections": secs, "hits": hits}
     raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)})")
