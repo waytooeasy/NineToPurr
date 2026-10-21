@@ -22,6 +22,7 @@ MIN_NC = 0.7           # a snippet counts as found at this normalised correlatio
 HINT_PAD_S = 600       # audio searched around a moment-match hint
 MAX_SECTION_S = 720    # longest single video section downloaded
 DENSE_PAD_S = 300      # dense audio pass: this far around the snippet hits
+FRAGMENTS = 8          # parallel HLS fragments: a 10 h VOD's audio took 15+ min one fragment at a time
 WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
 
 
@@ -111,7 +112,7 @@ def download_short(short_id, out_dir, runner=subprocess.run):
 def download_audio(vod_id, out, start=None, end=None):
     out = Path(out)
     if not out.exists():
-        cmd = [C.ytdlp(), "-f", "Audio_Only/audio_only/ba/worst", "-o", str(out)]
+        cmd = [C.ytdlp(), "-N", str(FRAGMENTS), "-f", "Audio_Only/audio_only/ba/worst", "-o", str(out)]
         if start is not None:
             cmd += ["--download-sections", f"*{int(max(0, start))}-{int(end)}"]
         subprocess.run(cmd + [f"https://www.twitch.tv/videos/{vod_id}"], check=True, capture_output=True)
@@ -121,7 +122,8 @@ def download_audio(vod_id, out, start=None, end=None):
 def download_video(vod_id, start, end, out):
     out = Path(out)
     if not out.exists():
-        subprocess.run([C.ytdlp(), "-f", "b[height<=1080]/b", "--download-sections", f"*{int(start)}-{int(end + 0.999)}",
+        subprocess.run([C.ytdlp(), "-N", str(FRAGMENTS), "-f", "b[height<=1080]/b",
+                        "--download-sections", f"*{int(start)}-{int(end + 0.999)}",
                         "--merge-output-format", "mp4", "-o", str(out), f"https://www.twitch.tv/videos/{vod_id}"],
                        check=True, capture_output=True)
     return out
