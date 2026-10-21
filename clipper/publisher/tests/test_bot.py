@@ -277,3 +277,11 @@ def test_fyi_names_the_popping_clipper_short_of_the_same_moment(con, add_clip, m
     text = ctx.application.bot.send_message.await_args.kwargs["text"]
     assert "🎯 same moment as a popping Short: \"Jynxzi's Mom Walks In On Stream\" (9,120 views/h)" in text
     assert approvals.same_moment_of(con, cid + 1) is None
+
+
+def test_remake_shows_its_source_short_in_telegram_only(con, add_clip):
+    cid = add_clip()
+    con.execute("INSERT INTO remakes (short_id, title, vph, status, clip_id) VALUES ('s1', 'Ron Date', 9000, 'done', ?)",
+                (cid,))
+    con.commit()
+    assert approvals.same_moment_of(con, cid) == {"title": "Ron Date", "vph": 9000}

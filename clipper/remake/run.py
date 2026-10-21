@@ -117,12 +117,13 @@ def register(con, s, found, am, vm, cp, mp4, our_title):
                 (creator_id, url, s.get("title"), s.get("views")))
     source_id = con.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
     first = " ".join(w["w"] for w in cp["events"][0]["words"]) if cp["events"] else s.get("title")
+    # context_line becomes the public YouTube description: never name the clipper or their title there.
+    # Telegram shows the source Short from the remakes table (approvals.same_moment_of).
     cur = con.execute(
         "INSERT INTO clips (source_id, start_s, end_s, picked_by, state, state_changed_at, file_path, title, hook_text,"
         " context_line, music_risk, caption_style, model_score) VALUES (?,?,?, 'ai', 'edited', datetime('now'), ?,?,?,?,0,"
         " 'remake', ?)",
-        (source_id, vod_s, vod_s + dur, str(mp4), our_title, first,
-         f"Remake of {s.get('channel')}: \"{s.get('title')}\" ({int(s.get('vph') or 0)}/h)",
+        (source_id, vod_s, vod_s + dur, str(mp4), our_title, first, None,
          min(1.0, (s.get("vph") or 0) / 50000)))
     clip_id = cur.lastrowid
     con.execute("INSERT OR IGNORE INTO radar_candidates (clip_id, creator, title, url, video_id, vod_offset, duration_s,"

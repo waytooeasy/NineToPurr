@@ -348,6 +348,9 @@ def test_register_makes_an_edited_clip_the_bot_can_show():
     rc = c.execute("SELECT creator, source, video_id, vod_offset FROM radar_candidates WHERE clips_id=?",
                    (clip_id,)).fetchone()
     assert tuple(rc) == ("stableronaldo", "remake", "2904593598", 2734)
+    # the description (context_line) never names the clipper or their title
+    ctx = c.execute("SELECT context_line FROM clips WHERE id=?", (clip_id,)).fetchone()[0]
+    assert not ctx or ("SpecificMinds" not in ctx and "Jason And Ron" not in ctx)
 
 
 def test_same_moment_from_another_clipper_is_not_remade_twice():

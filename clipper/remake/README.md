@@ -23,7 +23,7 @@ the normal flow as an `edited` clip: QC → visual check → Telegram ✅ Post.
 | captions | `caps.build` | Haiku vision OCR at 10 fps → caption events, word reveal times, colours; one position per Short; start/end refined on the pixels; ASS in their style (Montserrat Black, glow + shadow, words fade/blur in) |
 | render | `render.render` | frames composed at their aspect (1080 wide) and fps, look applied, libass captions, stream audio crossfaded at their switch points, our own boom on their bass hits |
 | title | `title.make` | Haiku: same hook, their names, never their wording |
-| register | `run.register` | creators/sources/clips (`edited`, `caption_style='remake'`, `music_risk=0`) + radar_candidates (`source='remake'`) |
+| register | `run.register` | creators/sources/clips (`edited`, `caption_style='remake'`, `music_risk=0`, no `context_line`: it is the public description, so the clipper is never named there) + radar_candidates (`source='remake'`). Telegram shows the source Short from `remakes` |
 
 Stages are cached as JSON in the work dir (`$CLIPPER_REMAKE/<short id>/`): a re-run after a fix redoes only what
 was deleted. Media are deleted after each run (`--keep` keeps them).
