@@ -210,3 +210,44 @@ def test_same_moment_lookup_needs_a_db_and_a_match(tmp_path):
                 " short_dur, candidate_json, matched_at)")
     con.execute("INSERT INTO moment_matches VALUES ('s', 'Jynxzi', 'c1', 0.9, 'T', 900, 21, '{}', '2026-10-20 10:00:00')")
     assert clip.same_moment(con, "c1") == {"title": "T", "dur": 21, "vph": 900}
+
+
+def test_own_captions_are_cut_away_in_crop_mode_and_ours_go_on(tmp_path, monkeypatch):
+    # Stable Ronaldo 2026-10-21: his own captions were half cut by the 9:16 crop and we drew none
+    monkeypatch.setattr(clip, "own_caption_logins", lambda *a, **k: {"stableronaldo"})
+    ron = {"start": 0, "end": 10, "hook": "He lost it", "creator": "stableronaldo"}
+    assert not clip.draws_captions({**ron, "layout": {"mode": "stack"}})
+    assert clip.draws_captions({**ron, "layout": {"mode": "crop", "cut": 0.14}})
+    assert clip.draws_captions({**ron, "creator": "xqc", "layout": {"mode": "stack"}})
+    seen = {}
+    import layout
+    monkeypatch.setattr(layout, "detect_layout", lambda v, s, e, cut=0.0: seen.setdefault("cut", cut) and
+                        {"mode": "crop", "cx": 1, "W": 2, "H": 2, "cut": cut})
+    assert clip.ensure_layout("v.mp4", ron)["layout"]["cut"] == layout.OWN_CAPTION_CUT
+    words = [{"s": 1, "e": 1.5, "w": "my"}, {"s": 1.5, "e": 2, "w": "gun"}]
+    ass, mp4 = tmp_path / "a.ass", tmp_path / "a.mp4"
+    clip.build_ass(words, {**ron, "layout": {"mode": "crop", "cut": 0.14}}, ass)
+    assert ",Cap," in ass.read_text()
+    clip.write_render_info(mp4, {"layout": {"mode": "crop", "cut": 0.14, "path": [[0, 1], [1, 2]]}}, ass)
+    assert json.loads(clip.render_info_path(mp4).read_text()) == {"our_captions": True, "mode": "crop",
+                                                                   "cut": 0.14, "moving": True}
+
+
+def test_captions_stop_at_sentence_ends_and_drop_full_stops():
+    # fry clip 2026-10-21: "TWO. WHAT", "LEMONADE. I" (two sentences in one caption, with the full stop)
+    ws = [{"s": i, "e": i + 0.5, "w": w} for i, w in enumerate(["One", "two.", "What", "is", "it?", "Lemonade,", "I"])]
+    assert [[w["w"] for w in g] for g in clip.caption_chunks(ws, 2)] == [["One", "two."], ["What", "is"], ["it?"],
+                                                                          ["Lemonade,", "I"]]
+    assert [clip.bare(t) for t in ["two.", "it?", "Lemonade,", "U.S.", "wait...", "\"no.\""]] == \
+        ["two", "it?", "Lemonade", "U.S", "wait", "\"no\""]
+    assert "TWO" in clip.caption_text(["two."]) and "." not in clip.caption_text(["two."]).split("}")[-1]
+
+
+def test_chatstack_keeps_our_text_above_the_chat_panel(tmp_path):
+    ass = tmp_path / "a.ass"
+    words = [{"s": 1, "e": 1.5, "w": "my"}, {"s": 1.5, "e": 2, "w": "gun"}]
+    lay = {"mode": "chatstack", "chat_h": 640, "cx": 1, "W": 2, "H": 2}       # picture ends at 1280
+    clip.build_ass(words, {"start": 0, "end": 10, "hook": "He lost it", "creator": "xqc", "layout": lay}, ass,
+                   st={**__import__("style").DEFAULT, "position": "lower"})
+    txt = ass.read_text()
+    assert "\\pos(540,1140)" in txt and "\\pos(540,1230)" in txt          # captions and handle above it

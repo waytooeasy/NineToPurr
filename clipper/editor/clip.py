@@ -348,11 +348,30 @@ def _key_index(tokens):
     return best
 
 
+SENTENCE_END = re.compile(r"[.!?…]+[\"')\]]*$")
+
+
+def caption_chunks(ws, chunk):
+    """Groups of up to `chunk` words that never run over a sentence end ("TWO. WHAT" on the fry clip)."""
+    out, cur = [], []
+    for w in ws:
+        cur.append(w)
+        if len(cur) == chunk or SENTENCE_END.search(w["w"]):
+            out.append(cur)
+            cur = []
+    return out + ([cur] if cur else [])
+
+
+def bare(token):
+    """A caption word without the transcript's commas and full stops (the market shows none; ! and ? stay)."""
+    return re.sub(r"(?<=\w)[.,;:]+(?=[\"')\]]*$)", "", token)
+
+
 def caption_text(tokens, st=None):
     """Market caption line: case + keyword highlight colour from today's style (editor/style.py), pop-in."""
     import style as S
     st = st or S.DEFAULT
-    tokens = [t for t in (S.onscreen(t) for t in tokens) if t]   # no emoji on screen
+    tokens = [t for t in (S.onscreen(bare(t)) for t in tokens) if t]   # no emoji on screen
     hi, fill = S.ass_color(st["highlight"]), S.ass_color(st["fill"])
     k = _key_index(tokens) if hi != fill else None     # no keyword colour in this market: plain words
     parts = [("{\\c" + hi + "}" + esc(S.apply_case(t, st["case"])) + "{\\c" + fill + "}") if i == k
@@ -366,9 +385,10 @@ def build_ass(words, pick, path, chunk=None, st=None):
     yellow). Pop-in, heavy font, seam position for stack layouts. Hook only for the first 2.5 s.
     No context-line banner: none of the top channels show one. No emoji on screen (style.onscreen);
     the channel handle sits low-centre like the top channels' watermark. A streamer whose stream already
-    shows live captions (watchlist `own_captions`) gets no second caption track."""
+    shows live captions (watchlist `own_captions` or learned) gets no second caption track, unless the
+    layout cut their caption band away (full-bleed crop, `layout["cut"]`): then ours, like the market."""
     import style as S
-    from layout import caption_y
+    from layout import caption_y, picture_bottom
     st = dict(st or S.load(creator=pick.get("creator")))   # this streamer's market look when known (D49)
     st["highlight"] = S.highlight_for(st, pick.get("hook") or pick.get("start"))
     chunk = chunk or st["words"]
@@ -386,6 +406,9 @@ def build_ass(words, pick, path, chunk=None, st=None):
     else:
         y = seam if stack else S.POSITIONS[st["position"]]
         hook_y = 1180 if stack else 380  # stack: in the gameplay, clear of the seam captions
+    bottom = picture_bottom(lay)         # chatstack: the chat panel starts here; keep our text above it
+    y = min(y, bottom - 140)
+    mark_y = min(WATERMARK_Y, bottom - 50)
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -415,9 +438,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                   f"{{\\pos(540,{hook_y})}}{POP}{esc(S.apply_case(hook, st['case']))}")
     if watermark():
         ev.append(f"Dialogue: 2,{ass_time(0)},{ass_time(dur)},Mark,,0,0,0,,"
-                  f"{{\\pos(540,{WATERMARK_Y})}}{esc(S.onscreen(watermark()))}")
+                  f"{{\\pos(540,{mark_y})}}{esc(S.onscreen(watermark()))}")
     pos = f"{{\\pos(540,{y})}}"
-    if str(pick.get("creator") or "").lower().lstrip("@") in own_caption_logins():
+    if not draws_captions(pick):
         Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")   # theirs are on screen already
         return
     if pick.get("es_words"):
@@ -429,19 +452,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             ev.append(f"Dialogue: 0,{ass_time(i*step)},{ass_time((i+1)*step)},Cap,,0,0,0,,{pos}{caption_text(g, st)}")
     else:
         ws = [w for w in words if w["s"] >= start and w["e"] <= end and w["w"]]
-        for i in range(0, len(ws), chunk):
-            g = ws[i:i + chunk]
+        groups = caption_chunks(ws, chunk)
+        for i, g in enumerate(groups):
             t0 = g[0]["s"] - start
-            t1 = (ws[i + chunk]["s"] - start) if i + chunk < len(ws) else g[-1]["e"] - start
+            t1 = (groups[i + 1][0]["s"] - start) if i + 1 < len(groups) else g[-1]["e"] - start
             ev.append(f"Dialogue: 0,{ass_time(t0)},{ass_time(t1)},Cap,,0,0,0,,{pos}{caption_text([w['w'] for w in g], st)}")
     Path(path).write_text(head + "\n".join(ev) + "\n", encoding="utf-8")
 
 
+def has_own_captions(pick):
+    return str(pick.get("creator") or "").lower().lstrip("@") in own_caption_logins()
+
+
+def draws_captions(pick):
+    """Our caption track goes on unless the stream shows its own captions and they stay on screen (stack)."""
+    lay = pick.get("layout") or {}
+    return not has_own_captions(pick) or bool(lay.get("mode") in ("crop", "chatstack") and lay.get("cut"))
+
+
 def ensure_layout(video, pick):
-    """Pick the 9:16 layout once per clip (face-centred crop or facecam-over-gameplay stack)."""
+    """Pick the 9:16 layout once per clip (face-following crop or facecam-over-gameplay stack). A stream with
+    its own burned-in captions loses that bottom band in crop mode (half a caption line in a moving cut)."""
     if not pick.get("layout"):
-        from layout import detect_layout
-        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"])}
+        from layout import OWN_CAPTION_CUT, detect_layout
+        cut = OWN_CAPTION_CUT if has_own_captions(pick) else 0.0
+        pick = {**pick, "layout": detect_layout(video, pick["start"], pick["end"], cut=cut)}
     return pick
 
 
@@ -481,6 +516,19 @@ def render(video, pick, ass, out):
     run(["ffmpeg", "-y", "-ss", str(pick["start"]), "-t", f"{pick['end'] - pick['start']:.3f}", "-i", str(video),
          "-filter_complex", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
          "-c:a", "aac", "-b:a", "160k", "-r", "30", "-movflags", "+faststart", str(out)])
+    write_render_info(out, pick, ass)
+
+
+def render_info_path(mp4):
+    return Path(mp4).with_suffix(".json")
+
+
+def write_render_info(out, pick, ass):
+    """What went into this file, for the visual check: did we burn a caption track, which layout."""
+    lay = pick.get("layout") or {}
+    ours = bool(re.search(r"^Dialogue: 0,[^,]*,[^,]*,Cap,", Path(ass).read_text(encoding="utf-8"), re.M))
+    render_info_path(out).write_text(json.dumps({"our_captions": ours, "mode": lay.get("mode"),
+                                                 "cut": lay.get("cut") or 0, "moving": len(lay.get("path") or []) > 1}))
 
 
 def log(row, path="clips_log.csv"):

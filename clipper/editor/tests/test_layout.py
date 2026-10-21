@@ -102,3 +102,98 @@ def test_tiny_cam_panel_is_never_blown_up():
     assert L.choose_layout(faces, 1920, 1080, cam_box=(71, 56, 148, 124))["mode"] == "crop"
     assert L.choose_layout(faces, 1920, 1080)["mode"] == "crop"                  # face-sized estimate too small too
     assert L.choose_layout([(216, 87, 74, 104)] * 6, 1920, 1080, cam_box=(0, 0, 405, 315))["mode"] == "stack"  # xQc
+
+
+def test_two_people_who_fit_are_framed_together_else_the_biggest():
+    cw = L.crop_w(1920, 1080)                                                   # ~607 px window
+    assert L.target_cx([(700, 300, 150, 150), (950, 320, 140, 140)], cw) == (700 + 1090) / 2
+    assert L.target_cx([(200, 300, 150, 150), (1500, 320, 220, 220)], cw) == 1610  # too far apart: biggest
+    assert L.target_cx([(1500, 320, 220, 220), (300, 300, 60, 60)], cw) == 1610    # a small background face
+    assert L.target_cx([], cw) is None
+
+
+def test_camera_path_holds_small_moves_pans_at_limited_speed_and_stays_in_frame():
+    W, cw = 1920, L.crop_w(1920, 1080)
+    pts = [(t / 2, 600) for t in range(4)] + [(2.0 + t / 2, 1700) for t in range(8)] + [(6.0, None)]
+    path = L.smooth_path(pts, W, cw)
+    xs = [x for _, x in path]
+    assert xs[0] == 600 and xs[-1] == xs[-2]                                     # no face: hold the last place
+    steps = [b - a for a, b in zip(xs, xs[1:])]
+    assert max(steps) <= L.PAN_MAX * W * 0.5 + 1e-6                              # <= 480 px/s at 2 samples/s
+    assert xs[-1] <= W - cw / 2 + 1e-6                                           # never past the edge
+    jitter = L.smooth_path([(t / 2, 900 + (30 if t % 2 else -30)) for t in range(10)], W, cw)
+    assert len({round(x) for _, x in jitter}) == 1                               # inside the deadband: still
+
+
+def test_moving_crop_is_one_flat_ffmpeg_expression_with_the_caption_band_cut():
+    lay = {"mode": "crop", "cx": 960, "W": 1920, "H": 1080, "cut": L.OWN_CAPTION_CUT,
+           "path": [[0, 400], [1, 400], [3, 1500], [6, 1500]]}
+    fg = L.filtergraph(lay)
+    assert fg.startswith("[0:v]crop=522:928:clip(") and "\\,0\\,1)" in fg       # band cut, commas escaped
+    assert L.keyframes([(0, 100), (1, 200), (2, 300), (3, 300)]) == [(0, 100), (2, 300), (3, 300)]  # straight runs
+
+
+def test_follow_adds_the_path_only_to_face_crops():
+    track = lambda v, s, e: [(0.0, [(300, 300, 260, 260)]), (0.5, [(320, 300, 260, 260)])]  # noqa: E731
+    crop = L.choose_layout([(300, 300, 260, 260)] * 4, 1920, 1080)              # IRL: a big face
+    assert crop["mode"] == "crop" and L.follow(crop, "v", 0, 1, track)["path"][0] == [0.0, 440.0]
+    assert "path" not in L.follow(L.choose_layout([], 1920, 1080), "v", 0, 1, track)   # no face: centre crop
+    stack = L.choose_layout([(1700, 80, 90, 90)] * 5, 1920, 1080)
+    assert L.follow(stack, "v", 0, 1, track) is stack
+
+
+def test_chat_box_needs_two_agreeing_looks_and_a_sane_size():
+    ron = [{"chat": True, "box": [0.70, 0.0, 1.0, 0.22]}, {"chat": True, "box": [0.69, 0.01, 0.99, 0.24]}]
+    assert L.chat_box_from_replies(ron, 1920, 1080) == (1296, 0, 1920, 274)      # padded, snapped to the edge
+    assert L.chat_box_from_replies([ron[0], {"chat": True, "box": [0.0, 0.6, 0.3, 0.9]}], 1920, 1080) is None
+    assert L.chat_box_from_replies([ron[0], {"chat": False}], 1920, 1080) is None
+    assert L.chat_box_from_replies([ron[0]], 1920, 1080) is None                     # one look is not enough
+    big = {"chat": True, "box": [0.1, 0.1, 0.9, 0.9]}
+    assert L.chat_box_from_replies([big, big], 1920, 1080) is None                   # a misread
+    assert L.chat_box_from_replies([{"chat": True, "box": "top right"}] * 2, 1920, 1080) is None
+
+
+def test_chatstack_puts_the_chat_under_the_picture_without_bars():
+    crop = {"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "follow": True}
+    lay = L.chat_layout(crop, (1296, 0, 1920, 274))
+    assert lay["mode"] == "chatstack" and lay["chat_h"] == 474 and L.picture_bottom(lay) == 1446
+    tall = L.chat_layout(crop, (1500, 0, 1920, 1000))                              # keep the newest 640 px
+    assert tall["chat_h"] == 640 and tall["chat"][1:] == [750, 1920, 1000]
+    assert L.chat_layout(crop, (0, 0, 1920, 200)) is crop                           # too thin to read
+    fg = L.filtergraph(lay)
+    assert fg.startswith("[0:v]split=3") and "boxblur" in fg and f"scale=1080:1446" in fg and "vstack" in fg
+    assert L.picture_bottom(crop) == 1920
+
+
+def test_find_chat_asks_twice_and_never_raises():
+    seen = []
+    ask = lambda img: seen.append(img) or '{"chat": true, "box": [0.7, 0, 1, 0.22]}'   # noqa: E731
+    box = L.find_chat("v", 0, 10, 1920, 1080, ask=ask, grab=lambda v, ts: [b"a", b"b"])
+    assert box == (1314, 0, 1920, 254) and seen == [b"a", b"b"]
+    assert L.find_chat("v", 0, 10, 1920, 1080, ask=lambda i: 1 / 0, grab=lambda v, ts: [b"a", b"b"]) is None
+
+
+def test_blurred_chat_spot_fades_out_only_where_it_meets_the_picture():
+    assert L.feather((1296, 0, 1920, 274), 1920, 1080) == "255*clip(min(X/40\\,(H-1-Y)/40)\\,0\\,1)"
+    assert L.feather((0, 0, 1920, 1080), 1920, 1080) == "255"
+    assert L.feather((100, 500, 300, 560), 1920, 1080).count("min(") == 3              # all four sides, thin box
+
+
+def test_chatstack_filtergraph_renders(tmp_path):
+    import shutil
+    import subprocess
+    import pytest
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    src, out = tmp_path / "s.mp4", tmp_path / "o.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=1920x1080:rate=30:duration=2",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    lay = L.chat_layout({"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "follow": True, "cut": 0.14},
+                        (1296, 0, 1920, 274))
+    lay["path"] = [[0, 900], [1, 1500], [2, 1500]]
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-filter_complex", L.filtergraph(lay),
+                    "-map", "[v]", str(out)], check=True)
+    dims = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                           "stream=width,height:format=duration", "-of", "csv=p=0", str(out)],
+                          capture_output=True, text=True).stdout.split()
+    assert dims[0] == "1080,1920" and abs(float(dims[-1]) - 2) < 0.2

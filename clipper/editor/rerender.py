@@ -55,6 +55,8 @@ def rerender_one(con, row, model="small", out_dir=None):
     clip.build_ass(words, pick, ass)
     clip.render(source, pick, ass, tmp)
     os.replace(tmp, mp4)
+    if clip.render_info_path(tmp).exists():
+        os.replace(clip.render_info_path(tmp), clip.render_info_path(mp4))
     return mp4
 
 
