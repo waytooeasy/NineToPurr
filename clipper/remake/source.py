@@ -33,7 +33,7 @@ class BotCheck(RuntimeError):
 
 
 COOKIES = "/opt/clipper/youtube_cookies.txt"
-SHORT_DL_TIMEOUT_S = 240
+SHORT_DL_TIMEOUT_S = 180
 
 
 def youtube_auth():
@@ -92,12 +92,13 @@ def recent_vods(tw, login, published, days=4):
 def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
-        try:
-            r = runner([C.ytdlp(), *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "30", "-f", "bv*+ba/b",
-                        "--merge-output-format", "mp4", "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
+        try:   # -4: the VM has no IPv6 route; fail fast on a video server it cannot reach
+            r = runner([C.ytdlp(), "-4", *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "20",
+                        "--retries", "3", "--fragment-retries", "3", "-f", "bv*+ba/b", "--merge-output-format", "mp4",
+                        "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
                        capture_output=True, text=True, timeout=SHORT_DL_TIMEOUT_S)
-        except subprocess.TimeoutExpired:   # YouTube throttling (429 retries): same as the bot check, try later
-            raise BotCheck(f"YouTube download of {short_id} hung > {SHORT_DL_TIMEOUT_S} s (throttled)")
+        except subprocess.TimeoutExpired:   # this video's server is unreachable from here: next Short
+            raise RuntimeError(f"YouTube download of {short_id} timed out after {SHORT_DL_TIMEOUT_S} s")
         if r.returncode != 0:
             err = (r.stderr or "")[-400:]
             if "not a bot" in err or "Sign in to confirm" in err or "429" in err:

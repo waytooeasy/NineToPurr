@@ -71,7 +71,7 @@ def test_short_download_uses_the_cookie_file_only_when_present(tmp_path, monkeyp
     assert seen[-1][seen[-1].index("--cookies") + 1] == str(c)
 
 
-def test_hung_or_throttled_download_means_try_later(tmp_path):
+def test_hung_download_fails_this_short_throttling_stops_the_run(tmp_path):
     import subprocess as sp
 
     def hang(*a, **k):
@@ -79,9 +79,10 @@ def test_hung_or_throttled_download_means_try_later(tmp_path):
 
     class R429:
         returncode, stderr = 1, "ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests"
-    with pytest.raises(source.BotCheck):
+    with pytest.raises(RuntimeError) as e:          # one unreachable video server: this Short fails, next one
         source.download_short("x", tmp_path, runner=hang)
-    with pytest.raises(source.BotCheck):
+    assert not isinstance(e.value, source.BotCheck)
+    with pytest.raises(source.BotCheck):            # YouTube throttling us: stop the run, try later
         source.download_short("y", tmp_path, runner=lambda *a, **k: R429())
 
 
