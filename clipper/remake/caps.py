@@ -428,6 +428,7 @@ def _box_lines(ev, x, cy, pad, lh, box, width, upper):
     """Their solid box, drawn per reveal state around the words shown so far (measured padding)."""
     col = ass_colour(_rgb_hex(box.get("colour"), "#000000"))
     alpha = _ass_alpha(box.get("opacity", 0.85))
+    soft = float(box.get("soft_edges") or 0) * 0.25 * lh
     words = [(w["w"].upper() if upper else w["w"]) for w in ev["words"]]
     times = [max(ev["start"], w["t"]) for w in ev["words"]] + [ev["end"]]
     shape = ev.get("lines") or [len(words)]
@@ -445,7 +446,7 @@ def _box_lines(ev, x, cy, pad, lh, box, width, upper):
         bw = max(width(r) for r in rows) + 2 * pad[0]
         bh = len(rows) * lh + (len(rows) - 1) * 0.3 * lh + 2 * pad[1]
         x0, y0 = x - bw / 2, cy - bh / 2
-        out.append(f"Dialogue: 0,{ts(t0)},{ts(t1)},C,,0,0,0,,{{\\an7\\pos(0,0)\\bord0\\shad0\\c{col}\\alpha{alpha}\\p1}}"
+        out.append(f"Dialogue: 0,{ts(t0)},{ts(t1)},C,,0,0,0,,{{\\an7\\pos(0,0)\\bord0\\shad0\\blur{soft:.1f}\\c{col}\\alpha{alpha}\\p1}}"
                    f"m {x0:.0f} {y0:.0f} l {x0 + bw:.0f} {y0:.0f} {x0 + bw:.0f} {y0 + bh:.0f} {x0:.0f} {y0 + bh:.0f}{{\\p0}}")
     return out
 

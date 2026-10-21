@@ -194,8 +194,19 @@ def caption_masks(th, base, y, band=0.2):
     return d, fill, dark
 
 
-def lines_of(fill, min_rows=6):
-    """Row ranges of text lines in the fill mask (horizontal projection), biggest blocks only."""
+def lines_of(fill, min_rows=6, near=None, k=None):
+    """Row ranges of text lines in the fill mask (horizontal projection), biggest blocks only; with `near` (row),
+    only the k consecutive lines closest to it (picture differences elsewhere are not captions)."""
+    runs = _line_runs(fill, min_rows)
+    if near is None or not runs:
+        return runs
+    k = max(1, min(k or 1, len(runs)))
+    best = min(range(len(runs) - k + 1),
+               key=lambda i: abs((runs[i][0] + runs[i + k - 1][1]) / 2 - near))
+    return runs[best:best + k]
+
+
+def _line_runs(fill, min_rows=6):
     prof = fill.sum(1)
     on = prof > max(2, 0.12 * prof.max()) if prof.max() else prof > 0
     runs, s = [], None
@@ -269,10 +280,13 @@ def hex_of(bgr):
 def measure_event(th, base, ev):
     """Their caption of one event at a fully revealed frame: lines, words with real colours, box, outline."""
     _, fill, dark = caption_masks(th, base, ev.get("y", 0.5))
-    lines = lines_of(fill)
+    shape = ev.get("lines") or [len(ev["words"])]
+    lines = lines_of(fill, near=ev.get("y", 0.5) * th.shape[0], k=len(shape))
     if not lines:
         return None
-    shape = ev.get("lines") or [len(ev["words"])]
+    rows = np.zeros(th.shape[0], bool)
+    rows[max(0, lines[0][0] - 4):lines[-1][1] + 4] = True
+    fill, dark = fill & rows[:, None], dark & rows[:, None]
     words = ev["words"]
     out = {"lines": [], "colours": [None] * len(words)}
     if len(lines) == 1 and len(shape) > 1:      # their caption sits on one line where the OCR saw a break
@@ -361,7 +375,7 @@ def animation(short_path, base_path, evs, fps, size, n_events=6, look_frames=14)
                 hs.append(0.0)
                 vs.append(0.0)
                 continue
-            ls = lines_of(fill)
+            ls = lines_of(fill, near=ev.get("y", 0.5) * a.shape[0])
             hs.append(float(max((r1 - r0) for r0, r1 in ls)) if ls else float(ys.max() - ys.min()))
             vs.append(float(a.max(2)[fill].mean()))
         if len(hs) < 4 or max(hs) == 0:
@@ -434,7 +448,7 @@ PROMPT = ("These are crops of the burned-in captions of one YouTube Short. Descr
           "\"blur\": 0 (hard) to 1 (very soft), \"colour\": \"#RRGGBB\", \"opacity\": 0-1}}, "
           "\"glow\": {{\"present\": bool, \"colour\": \"#RRGGBB\" or \"text\" if it takes each word's colour, "
           "\"size\": glow radius / letter height, \"opacity\": 0-1}}, "
-          "\"box\": {{\"present\": bool, \"colour\": \"#RRGGBB\", \"opacity\": 0-1}}, \"italic\": bool, "
+          "\"box\": {{\"present\": bool, \"colour\": \"#RRGGBB\", \"opacity\": 0-1, \"soft_edges\": 0 (sharp) to 1 (very feathered), \"rounded\": 0 (square) to 1 (pill)}}, \"italic\": bool, "
           "\"case\": \"upper\" | \"as_is\"}}")
 
 
@@ -587,7 +601,21 @@ OCR_PROMPT = ("Each image is a crop of one YouTube Short frame around its big bu
               "left to right); an image without a caption: {{\"lines\": []}}. There are {n} images.")
 
 
-def caption_states(short_path, base_path, fps, nfr, size, y, band=0.2, chunk=120):
+def refine_y(short_path, base_path, fps, nfr, size, y, samples=24):
+    """Their caption's centre row (fraction): the text line nearest the OCR's guess, median over sampled frames."""
+    ys = []
+    for n in np.linspace(0, max(0, nfr - 1), samples).astype(int):
+        a, b = frame(short_path, n, fps, size), frame(base_path, n, fps, size)
+        if a is None or b is None:
+            continue
+        _, fill, _ = caption_masks(a, b, y)
+        ls = lines_of(fill, near=y * size[1])
+        if ls:
+            ys.append((ls[0][0] + ls[0][1]) / 2 / size[1])
+    return float(np.median(ys)) if len(ys) >= 3 else y
+
+
+def caption_states(short_path, base_path, fps, nfr, size, y, band=0.1, chunk=120):
     """[(n0, n1)] frame ranges in which their caption shows the same text (a new word, a new caption or no caption
     starts a new range), found on |their - base| fill masks at SEG_W wide."""
     W0, H0 = size
@@ -600,6 +628,13 @@ def caption_states(short_path, base_path, fps, nfr, size, y, band=0.2, chunk=120
         for i in range(min(len(a), len(b))):
             n = k + i
             _, fill, _ = caption_masks(a[i], b[i], y, band)
+            ls = lines_of(fill, min_rows=3, near=y * h, k=3)
+            if ls:
+                keep = np.zeros(h, bool)
+                keep[max(0, ls[0][0] - 2):ls[-1][1] + 2] = True
+                fill = fill & keep[:, None]
+            else:
+                fill = np.zeros_like(fill)
             m = cv2.dilate(fill.astype(np.uint8), k3) > 0 if fill.sum() >= 40 else None
             if m is None:
                 if cur is not None:
@@ -618,7 +653,7 @@ def caption_states(short_path, base_path, fps, nfr, size, y, band=0.2, chunk=120
     return [(a, b) for a, b in segs if b - a >= 2]
 
 
-def read_states(short_path, segs, fps, size, y, vision, band=0.2, batch=12):
+def read_states(short_path, segs, fps, size, y, vision, band=0.12, batch=12):
     """Text lines of each caption state (one frame 70 % of the way in, cropped to the caption rows)."""
     W0, H0 = size
     r0, r1 = max(0, int((y - band) * H0)), min(H0, int((y + band) * H0))
@@ -677,6 +712,7 @@ def state_events(segs, texts, fps, y):
 
 
 def pixel_events(short_path, base_path, fps, nfr, size, y, vision):
+    y = refine_y(short_path, base_path, fps, nfr, size, y)
     segs = caption_states(short_path, base_path, fps, nfr, size, y)
     if not segs:
         return []
