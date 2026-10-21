@@ -515,6 +515,12 @@ def metrics_step(con):
     return {"public": n, "analytics": a}
 
 
+def own_cuts():
+    """D60 (Lucas: "i prefer new ones"): every Short is a remake of a popping clipper Short (remake/, its own timer);
+    our own cuts of Twitch clips are off. CLIPPER_OWN_CUTS=1 turns them back on."""
+    return os.environ.get("CLIPPER_OWN_CUTS", "0").strip() == "1"
+
+
 def run_pass(con, steps=None):
     """Run each stage; return {stage: result or 'error: ...'}. `steps` lets tests inject mocks."""
     model = os.environ.get("WHISPER_MODEL", "small")
@@ -524,7 +530,7 @@ def run_pass(con, steps=None):
         "market": lambda: market_step(con=con),   # daily + 6-h refresh: what's popping on Shorts (D48, D54)
         "styles": lambda: styles_step(con=con),   # daily: each streamer's popping look and layout (D49, D56)
         "match": lambda: match_step(con),      # per market scan: the clippers' popping moments (D54)
-        "radar": lambda: radar_step(con, pace=True),
+        "radar": lambda: radar_step(con, pace=True) if own_cuts() else "off: remakes only (D60)",
         "capture": lambda: capture_step(con),
         "editor": lambda: editor_step(con, model),
         "qc": lambda: qc.run(con),

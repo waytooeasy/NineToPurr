@@ -3,13 +3,13 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-21 16:00 UTC_
+_Last updated: 2026-10-21 18:05 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
-| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48; top 8 streamers re-scanned every 6 h, D54)** → **streamer styles (daily, D49)** → **same moments as the top clippers (after each scan, D54)** → radar (**paced: 1 clip start every 4 h**, D52) → capture → Writer → render → QC → re-render → visual check (D47) |
-| Remake engine (`clipper-remake.timer`, every 30 min, D58) | 🟡 built (PR "Remake engine"): one popping clipper Short per run rebuilt from the streamer's VOD → `edited` clip → QC → visual check → Telegram. Live after merge + `setup.sh --units-only`. Blocked while YouTube's bot check (#64) refuses the Short download (it retries; never worked around) |
+| Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48; top 8 streamers re-scanned every 6 h, D54)** → **streamer styles (daily, D49)** → **same moments as the top clippers (after each scan, D54)** → radar (**off since D60: remakes only**) → capture → Writer → render → QC → re-render → visual check (D47) |
+| Remake engine (`clipper-remake.timer`, every 30 min, D58) | ✅ live since 2026-10-21: one popping clipper Short per run rebuilt from the streamer's Twitch VOD → `edited` clip → QC → visual check → Telegram/auto-post. **The only source of Shorts (D60)**; our own cuts are off. Skips streamers with no Twitch VOD (Speed, Ludwig: YouTube streams). Downloads the Short with the cookie file `/opt/clipper/youtube_cookies.txt` (D59); the VM has IPv6 since 2026-10-21 (some YouTube servers only answer on IPv6) |
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips and clips that fail the visual check (with the reason) still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 6/day (D52) (`.env`: UTC window 00:00–23:59) |
@@ -37,13 +37,11 @@ _Last updated: 2026-10-21 16:00 UTC_
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 
 ## Waiting on Lucas
-- GitHub secrets for the daily Trend Scout: `YOUTUBE_API_KEY`, `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` (same values as `/opt/clipper/.env`). Without them it sees titles only (no lengths, descriptions, discovery).
 - AdSense signup + W-8BEN.
-- Anthropic Console spend limit.
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
 
 ## Next for Claude
-- **Remake engine (D58):** deploy after merge (migrate 015, units), watch the first runs (`sqlite3 /opt/clipper/db/clip.db "select short_id,status,last_error from remakes"`). Next: stacked layouts, other clippers' fonts, caption colours read from pixels, 4K export, hook edits for remakes. See `clipper/remake/README.md`.
+- **Remake engine (D58, D60):** watch the first runs (`sqlite3 /opt/clipper/db/clip.db "select short_id,status,last_error from remakes"`). Next: stacked layouts, other clippers' fonts, caption colours read from pixels, 4K export, hook edits for remakes. See `clipper/remake/README.md`.
 - Day-3 check (D53): views per Short + stayed % → keep/raise 6/day if stayed ≥ 60 %, cut to 3 strong slots if 0-view Shorts persist.
 - Check the first same-moment matches (`select streamer, short_title, clip_id, confidence from moment_matches`) against the clips: tune `MIN_CONF` if a match is wrong.
 - Feed views per streamer / format back into the Heat Index and the Writer (learning loop).
