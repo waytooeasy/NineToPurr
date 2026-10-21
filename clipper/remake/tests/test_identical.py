@@ -170,3 +170,15 @@ def test_box_is_drawn_around_the_words_shown(tmp_path):
     assert "m 420 902 l 660 902" in boxes[1]                              # "A BB": 200 + 40 wide
     main = [ln for ln in txt.splitlines() if ln.startswith("Dialogue: 2,")][0]
     assert "\\pos(540,950)" in main                                      # letters' centre at y, minus libass offset
+
+
+def test_video_is_resynced_when_the_audio_map_puts_it_a_frame_off():
+    from remake import vmap
+    rng = np.random.default_rng(2)
+    sec = np.stack([cv2.GaussianBlur(rng.integers(0, 255, (120, 160), dtype=np.uint8), (0, 0), 2) for _ in range(30)])
+    th = sec[1:21]                                   # their frame n is section frame n + 1
+    M = [[1, 0, 0], [0, 1, 0]]
+    out = [(n, 0, n, M, 0.9) for n in range(20)]     # the audio says section frame n
+    fixed = vmap.resync(out, th, 0, sec, 0)
+    assert [m for _, _, m, _, _ in fixed] == list(range(1, 21))
+    assert vmap.resync(out, sec[:20], 0, sec, 0) == out
