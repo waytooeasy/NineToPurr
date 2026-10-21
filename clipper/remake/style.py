@@ -694,8 +694,12 @@ def with_font(st, alt_index, fonts_dir=None):
         b = libass_width(entry, "HELLO WORLD", 100, tr * 100, fonts_dir)
         scale = a / b if b else None
     fs = st["fs"] * scale if (st.get("fs") and scale) else st.get("fs")
+    dy = st.get("dy", 0.0)
+    if fs:
+        bb = libass_bbox(entry, "HELLO", fs, tr * fs, fonts_dir)
+        dy = (bb[2] + bb[3]) / 2 if bb else dy
     return {**st, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3], "track": tr, "fs": fs,
-            "spacing": None if fs is None else tr * fs}
+            "spacing": None if fs is None else tr * fs, "dy": dy}
 
 
 # ---------------- caption states from their pixels (exact timing) ----------------
