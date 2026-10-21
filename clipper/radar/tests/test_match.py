@@ -211,3 +211,20 @@ def test_market_refresh_follows_the_streamers_radar_posts(con, tmp_path, monkeyp
     monkeypatch.setattr(M, "refresh", lambda d, key, now=None, names=None:
                         seen.update(names=names) or {**d, "refreshed": now.strftime(ISO)})
     assert run_pipeline.market_step(NOW, key="K", con=con) == "refreshed Jynxzi" and seen["names"] == ["Jynxzi"]
+
+
+def test_neighbouring_clips_are_not_one_moment_and_the_matched_clip_is_posted(con):
+    # 2026-10-21: "Jason asks Ron out" (VOD 2872-2932 s) was matched; Radar pulled the fry clip next to it
+    # (2840-2890 s, 18 s shared), posted that as the matched moment, then blocked the real one as "posted".
+    ask = clip("ask", "Jason asks Ron out to the pumpkin patch", 169, 37, creator="stableronaldo", dur=60,
+               video="2904593598", offset=2872)
+    fry = clip("fry", ".", 5, 0.5, creator="stableronaldo", dur=50, video="2904593598", offset=2840)
+    assert not run_pipeline.same_footage(ask, fry)
+    assert run_pipeline.same_footage(ask, {**fry, "vod_offset": 2860})          # 30 of 50 s shared: one moment
+    m = {"streamers": {"Stable Ronaldo": {"shorts": [{"id": "r0", "title": "Jason And Ron Goes On A Date", "vph": 2500,
+                                                      "dur": 30, "en": True}]}}}
+    match.run(con, m, ["Stable Ronaldo"], lambda n: [ask], NOW, reply(("S0", "C0", 0.9)))
+    out = run_pipeline.same_moments_first(con, [fry], NOW)
+    assert [c["clip_id"] for c in out] == ["ask", "fry"] and "match" not in out[1]
+    twin = {**fry, "clip_id": "twin", "vod_offset": 2875}                      # a near copy of the matched clip
+    assert [c["clip_id"] for c in run_pipeline.same_moments_first(con, [twin, fry], NOW)] == ["ask", "fry"]
