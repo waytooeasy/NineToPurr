@@ -102,7 +102,7 @@ def _spelling(variants):
     """The full word: each reading also votes for the longer readings it is a prefix of."""
     forms = set(variants)
     score = {f: sum(1 for v in variants if _key(f).startswith(_key(v))) for f in forms}
-    return max(forms, key=lambda f: (score[f], len(_key(f))))
+    return max(forms, key=lambda f: (score[f], len(_key(f)), variants.count(f)))
 
 
 def _compatible(cur, words):
@@ -155,8 +155,11 @@ def events(rows, step=1 / OCR_FPS):
                 cur["seen"].append([])
                 cur["first"].append(r["t"])
             cur["seen"][i].append((w, c))
-        if len(flat) >= sum(cur["lines"] or [0]):
-            cur["lines"] = [len(line) for line in r["lines"]]
+        if len(flat) > cur.get("nmax", 0):
+            cur["nmax"], cur["shapes"] = len(flat), []
+        if len(flat) == cur.get("nmax"):   # line breaks: the shape read most often once all words are up
+            cur["shapes"].append(tuple(len(line) for line in r["lines"]))
+            cur["lines"] = list(max(set(cur["shapes"]), key=cur["shapes"].count))
         if isinstance(r.get("y"), (int, float)):
             cur["ys"].append(float(r["y"]))
     if rows:
