@@ -11,6 +11,8 @@ from . import render as R
 
 CAP_BAND = (0.33, 0.67)    # rows where captions usually sit: not used to fit the grade
 OVERLAY_MIN = 0.08         # weaker colour washes are grade noise
+PEAK_MIN = 0.2             # a flash peaks at least this strong
+SAT_MIN = 100              # ... in a saturated colour (max - min channel of its colour)
 
 
 def _pairs(short_path, vm, ns, width):
@@ -98,7 +100,7 @@ def overlays(short_path, vm, W, width=270):
     lut = R.lut128(W) if W is not None else None
     OW, OH = vm["out_w"], vm["out_h"]
     w, h = width, int(round(width * OH / OW / 2) * 2)
-    alpha, cols = {}, []
+    alpha, colour, cols = {}, {}, []
     for shot in vm["shots"]:
         n0, n1 = shot["n0"], shot["n1"]
         th = C.read_frames(short_path, n0, n1 - n0, vm["fps"], (w, h))
@@ -126,21 +128,32 @@ def overlays(short_path, vm, W, width=270):
             if al >= OVERLAY_MIN:
                 c = sol[:3] / al
                 alpha[n] = round(min(al, 0.9), 3)
+                colour[n] = c
                 cols.append(c)
     if not cols:
         return {"alpha": {}, "color": [0, 0, 255]}
-    col = np.median(np.array(cols), 0)
-    # keep only frames whose wash has that colour family (grade noise has random colours)
-    good = {n: a for n, a in alpha.items()}
+    # a wash is a short, strong, saturated colour event (red flash on the punch line); a grade mismatch on one
+    # shot is weak, long and grey-ish: keep only runs that look like the former
     runs, cur = [], []
-    for n in sorted(good):
+    for n in sorted(alpha):
         if cur and n != cur[-1] + 1:
             runs.append(cur)
             cur = []
         cur.append(n)
     if cur:
         runs.append(cur)
-    keep = {n: good[n] for r in runs if len(r) >= 4 for n in r}
+    keep, keep_cols = {}, []
+    for r in runs:
+        rc = np.array([colour[n] for n in r])
+        c = np.median(rc, 0)
+        peak = max(alpha[n] for n in r)
+        if (len(r) >= 4 and len(r) <= 3 * vm["fps"] and peak >= PEAK_MIN
+                and float(c.max() - c.min()) >= SAT_MIN and float(np.median(rc.std(0))) <= 60):
+            keep.update({n: alpha[n] for n in r})
+            keep_cols.append(c)
+    if not keep:
+        return {"alpha": {}, "color": [0, 0, 255]}
+    col = np.median(np.array(keep_cols), 0)
     return {"alpha": {str(n): a for n, a in keep.items()}, "color": [float(np.clip(x, 0, 255)) for x in col]}
 
 

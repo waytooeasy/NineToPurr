@@ -129,6 +129,16 @@ def register(con, s, found, am, vm, cp, mp4, our_title):
     return clip_id
 
 
+def _stage(work, name, fn):
+    """Cached stage result (work/<name>.json): a re-run after a fix only redoes what was deleted."""
+    f = work / f"{name}.json"
+    if f.exists():
+        return C.load_json(f)
+    out = fn()
+    C.save_json(f, out)
+    return out
+
+
 def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False):
     """Rebuild one clipper Short. Returns our clip id; raises Unsupported / other errors (status recorded)."""
     sid = s["id"]
@@ -137,11 +147,12 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
     try:
         short_path = source.download_short(sid, work)
         logins = source.twitch_logins([s.get("streamer", "")], f"{s.get('title', '')} {s.get('desc', '')}")
-        found = source.find({"id": sid, "published": s["published"]}, work, con=con, tw=tw, logins=logins)
-        am = amap.build(short_path, [x["file"] for x in found["sections"]])
+        found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,
+                                                            tw=tw, logins=logins))
+        am = _stage(work, "amap", lambda: amap.build(short_path, [x["file"] for x in found["sections"]]))
         if am["matched_share"] < MIN_AUDIO:
             raise Unsupported(f"only {am['matched_share']:.0%} of the audio is the stream")
-        vm = vmap.build(short_path, found["sections"], am)
+        vm = _stage(work, "vmap", lambda: vmap.build(short_path, found["sections"], am))
         if vm["mapped"] < MIN_MAPPED * vm["nfr"]:
             raise Unsupported(f"only {vm['mapped']}/{vm['nfr']} frames found in the stream")
         if any(sh["layout"] == "other" for sh in vm["shots"]):
@@ -152,11 +163,13 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         if same_moment_done(con, found["vod_id"], a, b):
             raise Unsupported("same moment already remade from another clipper")
         _status(con, s, "working", vod_id=found["vod_id"], vod_s=a, vod_e=b)
-        lk = look.build(short_path, vm)
+        lk = _stage(work, "look", lambda: look.build(short_path, vm))
         sp = C.probe(short_path)
         mark = os.environ.get("CLIPPER_WATERMARK", "@Peakz.Recaps").strip() or None
-        cp = caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass", vm["out_w"], vm["out_h"],
-                        vision, mark=mark)
+        cp = _stage(work, "caps", lambda: caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass",
+                                                     vm["out_w"], vm["out_h"], vision, mark=mark))
+        if not Path(cp["ass"]).exists():
+            caps.write_ass(cp["events"], cp["ass"], vm["out_w"], vm["out_h"], mark=mark, dur=sp["dur"])
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
         render.render({"vmap": vm, "amap": am, "look": lk, "ass": cp["ass"]}, out, work)
@@ -187,10 +200,12 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         _status(con, s, "failed", last_error=f"{type(e).__name__}: {e}"[:500])
         raise
     finally:
-        if not keep:
+        if not keep:   # media go, the stage maps stay (a retry re-downloads only what it needs)
             for p in work.iterdir():
                 if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
                     p.unlink(missing_ok=True)
+            for name in ("found", "amap", "vmap"):   # they point at the deleted media
+                (work / f"{name}.json").unlink(missing_ok=True)
 
 
 def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False):
