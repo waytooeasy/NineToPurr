@@ -149,7 +149,8 @@ def _stage(work, name, fn):
     return out
 
 
-def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision):
+def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
+               channel=""):
     """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
     study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}."""
     OW, OH, fps, nfr = vm["out_w"], vm["out_h"], vm["fps"], vm["nfr"]
@@ -162,6 +163,12 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
                                                                          vision)})
     evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
     st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
+    known = load_channel_style(channel)
+    if known and (not st.get("ok") or st.get("font_score", 0) < known.get("font_score", 0) - 0.1):
+        # this Short's captions measured poorly: start from this clipper's look fitted on an earlier Short
+        keep = {k: st[k] for k in ("colours", "pos", "x", "y") if st.get(k) is not None}
+        st = {**known, **keep, "ok": True, "from_channel": channel}
+        C.log(f"style: {channel}'s known look ({known.get('family')}) replaces a weak measurement")
     if st.get("ok"):         # fitted on their pixels: size, spacing, position, box, font
         def fit():
             s, e = tune.tune(st, tune.Scorer(short_path, base, evs, st, fps, (OW, OH), work=work))
@@ -199,7 +206,36 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         if best is None or r["match"]["captions"] > best["match"]["captions"]:
             best = r
     best["tried"] = tried
+    if best["name"].startswith("measured") and st.get("ok"):
+        save_channel_style(channel, st, best["match"]["captions"])
     return best
+
+
+STYLE_KEYS = ("family", "bold", "italic", "file", "track", "fs", "spacing", "dy", "box_pad", "llm", "anim", "outline",
+              "line_h", "font_score", "alternatives")
+
+
+def _style_file(channel):
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", (channel or "").lower()).strip("-")
+    return (C.root() / "_styles" / f"{slug}.json") if slug else None
+
+
+def load_channel_style(channel):
+    f = _style_file(channel)
+    return C.load_json(f) if f and f.exists() else None
+
+
+def save_channel_style(channel, st, captions_pct):
+    """Remember a clipper's caption look when it matched their Short better than the one we had."""
+    f = _style_file(channel)
+    if not f:
+        return
+    old = load_channel_style(channel)
+    if old and old.get("captions_pct", 0) >= captions_pct:
+        return
+    f.parent.mkdir(parents=True, exist_ok=True)
+    C.save_json(f, {**{k: st.get(k) for k in STYLE_KEYS}, "captions_pct": captions_pct})
 
 
 def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False,
@@ -242,7 +278,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
                                                      bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
-        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style, vision)
+        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style, vision, s.get("channel", ""))
         shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
@@ -331,6 +367,7 @@ def main(argv=None):
     ap.add_argument("--streamer", default="", help="watchlist name for --short")
     ap.add_argument("--published", default=None, help="ISO time --short was published (VOD search window)")
     ap.add_argument("--title", default="")
+    ap.add_argument("--channel", default="", help="the clipper's channel for --short (their caption look is remembered)")
     ap.add_argument("--max", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--keep", action="store_true", help="keep downloaded media in the work dir")
@@ -341,7 +378,7 @@ def main(argv=None):
     out_dir = os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")
     short = None
     if a.short:
-        short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": "",
+        short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": a.channel,
                  "published": a.published or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     import fcntl
     with open(os.environ.get("CLIPPER_REMAKE_LOCK", LOCK), "w") as fh:

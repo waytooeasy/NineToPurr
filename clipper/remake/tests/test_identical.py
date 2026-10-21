@@ -212,3 +212,15 @@ def test_tuning_moves_the_caption_look_towards_theirs():
     best, err = tune.tune({"fs": 100.0, "track": 0.0, "spacing": 0.0, "dy": 0.0, "x": 0.5, "line_h": 60, "llm": {}},
                           score, rounds=2)
     assert abs(best["fs"] - 106) < 2 and abs(best["dy"] - 4) < 0.5 and abs(best["x"] - 0.504) < 1e-6 and err < 0.05
+
+
+def test_a_clippers_caption_look_is_remembered_when_it_matched_better(tmp_path, monkeypatch):
+    from remake import run
+    monkeypatch.setenv("CLIPPER_REMAKE", str(tmp_path))
+    st = {"family": "Antonio Bold", "fs": 134.0, "font_score": 0.76, "x": 0.5}
+    run.save_channel_style("Succesful Celebrity", st, 85.0)
+    assert run.load_channel_style("Succesful Celebrity")["family"] == "Antonio Bold"
+    run.save_channel_style("Succesful Celebrity", {**st, "family": "Anton"}, 60.0)      # worse: not kept
+    assert run.load_channel_style("Succesful Celebrity")["family"] == "Antonio Bold"
+    assert "x" not in run.load_channel_style("Succesful Celebrity")                      # per Short, not per channel
+    assert run.load_channel_style("") is None
