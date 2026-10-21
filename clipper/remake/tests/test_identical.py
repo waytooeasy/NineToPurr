@@ -139,10 +139,11 @@ def test_match_score_sees_wrong_captions_and_wrong_pictures(tmp_path):
 
 
 def test_caption_states_become_events_with_word_reveals():
-    segs = [(0, 12), (12, 30), (30, 45), (50, 60)]
-    texts = [[["YOU"]], [["YOU", "THINK"]], [["BOZO"]], [["BOZO"]]]
+    segs = [(0, 12), (12, 30), (30, 45), (50, 60), (90, 99)]
+    texts = [[["YOU"]], [["YOU", "THINK"]], [["BOZO"]], [["BOZO"]], [["BOZO"]]]
     evs = style.state_events(segs, texts, 30, 0.5)
-    assert [(e["start"], e["end"]) for e in evs] == [(0.0, 1.0), (1.0, 1.5), (1.667, 2.0)]
+    # BOZO lost for 5 frames (a flash) is one caption; BOZO again a second later is a new one
+    assert [(e["start"], e["end"]) for e in evs] == [(0.0, 1.0), (1.0, 2.0), (3.0, 3.3)]
     assert [(w["w"], w["t"]) for w in evs[0]["words"]] == [("YOU", 0.0), ("THINK", 0.4)]
 
 
