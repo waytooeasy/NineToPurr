@@ -194,27 +194,31 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     sevs = [{**e, "y": (pos[k][1] if k < len(pos) and pos[k] else st.get("y") or e.get("y", 0.5))}
             for k, e in enumerate(evs)]           # caption rows to score: where each of their captions is
 
-    def score(k, name, s_):
+    def score(k, name, s_, events=None):
         ass = work / f"cap_{k}.ass"
         if s_ is not None:
             caps.write_ass_style(evs, ass, OW, OH, s_, mark=mark, dur=sp["dur"])
         else:
-            caps.write_ass(evs, ass, OW, OH, mark=mark, dur=sp["dur"])
+            caps.write_ass(events or evs, ass, OW, OH, mark=mark, dur=sp["dur"])
         cand = match.burn(base, ass, work / f"cand_{k}.mp4")
         m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base)
         m.pop("per_frame", None)
         C.log(f"captions '{name}': {match.summary(m)}")
         return {"path": cand, "match": m, "name": name}
 
-    first = [(f"measured: {st['family']}", st)] if st.get("ok") else []
-    rest = [(f"next font: {alt['family']}", alt) for alt in (style.with_font(st, i) for i in range(2)) if alt
-            and alt["family"] != st["family"]] if st.get("ok") else []
-    rest.append(("study look", None))
+    # (name, measured style or None for the study look, caption events for the study look)
+    cands = [(f"measured: {st['family']}", st, None)] if st.get("ok") else []
+    if st.get("ok"):
+        cands += [(f"next font: {alt['family']}", alt, None) for alt in (style.with_font(st, i) for i in range(2))
+                  if alt and alt["family"] != st["family"]]
+    cands.append(("study look", None, None))
+    if evs is not cp["events"]:      # the study look as first built: OCR words and timing (glow captions read best so)
+        cands.append(("study look, OCR captions", None, cp["events"]))
     tried, best = [], None
-    for k, (name, s_) in enumerate(first + rest):
+    for k, (name, s_, events) in enumerate(cands):
         if best and best["match"]["captions"] >= CAPTIONS_GOOD:
             break
-        r = score(k, name, s_)
+        r = score(k, name, s_, events)
         tried.append({"name": name, **{x: r["match"][x] for x in ("picture", "captions", "overall")}})
         if best is None or r["match"]["captions"] > best["match"]["captions"]:
             best = r
