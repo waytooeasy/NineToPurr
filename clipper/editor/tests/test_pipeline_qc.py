@@ -245,3 +245,11 @@ def test_lock_blocks_second_pass(tmp_path):
             assert second is False
     with run_pipeline.locked(lock) as again:
         assert again
+
+
+def test_own_cuts_are_off_unless_turned_on(monkeypatch):
+    """D60: remakes only; the radar step does nothing unless CLIPPER_OWN_CUTS=1."""
+    monkeypatch.delenv("CLIPPER_OWN_CUTS", raising=False)
+    assert run_pipeline.own_cuts() is False
+    monkeypatch.setenv("CLIPPER_OWN_CUTS", "1")
+    assert run_pipeline.own_cuts() is True
