@@ -25,6 +25,7 @@ MIN_VPH = 1500            # views/hour to count as popping
 MAX_ATTEMPTS = 2
 PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
+MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
 LOCK = "/opt/clipper/remake.lock"
 
 
@@ -138,7 +139,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         logins = source.twitch_logins([s.get("streamer", "")], f"{s.get('title', '')} {s.get('desc', '')}")
         found = source.find({"id": sid, "published": s["published"]}, work, con=con, tw=tw, logins=logins)
         am = amap.build(short_path, [x["file"] for x in found["sections"]])
-        if am["matched_share"] < MIN_MAPPED:
+        if am["matched_share"] < MIN_AUDIO:
             raise Unsupported(f"only {am['matched_share']:.0%} of the audio is the stream")
         vm = vmap.build(short_path, found["sections"], am)
         if vm["mapped"] < MIN_MAPPED * vm["nfr"]:
