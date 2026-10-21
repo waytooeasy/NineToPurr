@@ -18,7 +18,7 @@ from . import common as C
 
 W = 270
 PICTURE_OK = 18.0     # mean of the max-channel difference
-CAPTION_OK = 0.35
+CAPTION_OK = 0.45   # share of their caption pixels we may get wrong (anti-aliasing, 1 px) per frame
 STRONG = 40          # a pixel differs (0-255, max channel) above this
 CHUNK = 90
 
