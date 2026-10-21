@@ -43,14 +43,15 @@ def sample_events(evs, ms, st):
     sev, pos, cols = [], [], []
     for i, (k, _, nw) in enumerate(ms):
         e = evs[k]
-        words = [{**w, "t": float(i)} for w in e["words"][:nw]]
+        t0 = i + 0.5             # sample frame i + 1 sits mid-caption (frame 0 is a spacer)
+        words = [{**w, "t": t0} for w in e["words"][:nw]]
         shape, left = [], nw
         for n in e.get("lines") or [len(e["words"])]:
             if left <= 0:
                 break
             shape.append(min(n, left))
             left -= n
-        sev.append({**e, "start": float(i), "end": float(i + 1), "words": words, "lines": shape})
+        sev.append({**e, "start": t0, "end": t0 + 1.0, "words": words, "lines": shape})
         p = (st.get("pos") or [])
         pos.append(p[k] if k < len(p) else None)
         c = (st.get("colours") or [])
@@ -63,6 +64,7 @@ def build_sample(base_path, ms, fps, size, path):
     p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}",
                           "-r", "1", "-i", "-", "-c:v", "libx264", "-crf", "8", "-pix_fmt", "yuv444p", str(path)],
                          stdin=subprocess.PIPE)
+    p.stdin.write(np.zeros((H, W, 3), np.uint8).tobytes())          # spacer frame 0
     for _, n, _ in ms:
         f = S.frame(base_path, n, fps, size)
         p.stdin.write((f if f is not None else np.zeros((H, W, 3), np.uint8)).tobytes())
@@ -76,9 +78,9 @@ def burn_frames(sample, ass, count, size, fonts_dir=None):
     h = int(round(SW * H / W / 2) * 2)
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(sample), "-vf",
                           f"ass={ass}:fontsdir={fonts_dir or C.fonts_dir()},scale={SW}:{h}:flags=area",
-                          "-frames:v", str(count), "-pix_fmt", "bgr24", "-f", "rawvideo", "-"],
+                          "-frames:v", str(count + 1), "-pix_fmt", "bgr24", "-f", "rawvideo", "-"],
                          capture_output=True, check=True).stdout
-    return np.frombuffer(raw, np.uint8).reshape(-1, h, SW, 3)
+    return np.frombuffer(raw, np.uint8).reshape(-1, h, SW, 3)[1:]
 
 
 class Scorer:
