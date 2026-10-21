@@ -260,13 +260,13 @@ def calibrate(out_w, out_h, fonts_dir=None):
 
 
 def header(out_w, out_h, fs, fsp):
-    return (f"[Script Info]\nScriptType: v4.00+\nPlayResX: {out_w}\nPlayResY: {out_h}\nWrapStyle: 2\n"
+    return (f"[Script Info]\nScriptType: v4.00+\nPlayResX: {out_w}\nPlayResY: {out_h}\nWrapStyle: 0\n"
             "ScaledBorderAndShadow: yes\n\n[V4+ Styles]\n"
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
             "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
             "MarginR, MarginV, Encoding\n"
             f"Style: C,{FONT},{fs:.1f},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,{fsp:.2f},0,1,0,0,"
-            "5,0,0,0,1\n"
+            f"5,{round(0.08 * out_w)},{round(0.08 * out_w)},0,1\n"
             f"Style: Mark,{FONT},{42 * out_w / 1080:.0f},&H66FFFFFF,&H00FFFFFF,&H99000000,&HFF000000,1,0,0,0,100,100,1,0,1,2,0,"
             "5,80,80,0,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
