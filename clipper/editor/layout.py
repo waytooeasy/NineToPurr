@@ -255,8 +255,10 @@ def filtergraph(layout):
     bw, bh = _even(x1 - x0), _even(y1 - y0)
     r = max(2, min(20, min(bw, bh) // 4))
     return (f"[0:v]split=3[s0][s1][s2];"
-            f"[s1]crop={bw}:{bh}:{x0}:{y0},boxblur={r}:2[hide];"            # no half chat in the picture
-            f"[s0][hide]overlay={x0}:{y0}[clean];"
+            f"[s1]crop={bw}:{bh}:{x0}:{y0},boxblur={r}:2[bl];"               # no half chat in the picture...
+            f"color=c=black:s={bw}x{bh}:r=30:d=0.04,format=gray,geq=lum='{feather(chat, W, H)}',"
+            f"loop=loop=-1:size=1[m];[bl][m]alphamerge[hide];"                # ...and no hard edge where it ends
+            f"[s0][hide]overlay={x0}:{y0}:shortest=1[clean];"
             f"[clean]crop={_even(cw)}:{_even(ch)}:{x}:0,scale={OUT_W}:{ph},setsar=1[pic];"
             f"[s2]crop={bw}:{bh}:{x0}:{y0},scale={OUT_W}:{layout['chat_h']},setsar=1[chat];"
             f"[pic][chat]vstack=inputs=2[v]")
@@ -266,6 +268,20 @@ def caption_y(layout):
     """Where captions sit (ASS \\pos y, 1920 tall): on the seam for stack, a bit below centre for crop."""
     lay = layout or {}
     return lay.get("cam_h", CAM_H) if lay.get("mode") == "stack" else 1080
+
+
+def feather(box, W, H, f=40):
+    """geq alpha for the blurred chat spot: opaque inside, fading out over `f` px on each side that borders the
+    picture (a side on the frame edge needs no fade). Commas escaped for the filtergraph."""
+    x0, y0, x1, y1 = box
+    f = max(4, min(f, (x1 - x0) // 4, (y1 - y0) // 4))
+    terms = [t for t, inner in (("X", x0 > 0), ("(W-1-X)", x1 < W), ("Y", y0 > 0), ("(H-1-Y)", y1 < H)) if inner]
+    if not terms:
+        return "255"
+    e = f"{terms[0]}/{f}"
+    for t in terms[1:]:
+        e = f"min({e}\\,{t}/{f})"
+    return f"255*clip({e}\\,0\\,1)"
 
 
 def picture_bottom(layout):

@@ -171,3 +171,29 @@ def test_find_chat_asks_twice_and_never_raises():
     box = L.find_chat("v", 0, 10, 1920, 1080, ask=ask, grab=lambda v, ts: [b"a", b"b"])
     assert box == (1314, 0, 1920, 254) and seen == [b"a", b"b"]
     assert L.find_chat("v", 0, 10, 1920, 1080, ask=lambda i: 1 / 0, grab=lambda v, ts: [b"a", b"b"]) is None
+
+
+def test_blurred_chat_spot_fades_out_only_where_it_meets_the_picture():
+    assert L.feather((1296, 0, 1920, 274), 1920, 1080) == "255*clip(min(X/40\\,(H-1-Y)/40)\\,0\\,1)"
+    assert L.feather((0, 0, 1920, 1080), 1920, 1080) == "255"
+    assert L.feather((100, 500, 300, 560), 1920, 1080).count("min(") == 3              # all four sides, thin box
+
+
+def test_chatstack_filtergraph_renders(tmp_path):
+    import shutil
+    import subprocess
+    import pytest
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    src, out = tmp_path / "s.mp4", tmp_path / "o.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=1920x1080:rate=30:duration=2",
+                    "-pix_fmt", "yuv420p", str(src)], check=True)
+    lay = L.chat_layout({"mode": "crop", "cx": 1500, "W": 1920, "H": 1080, "follow": True, "cut": 0.14},
+                        (1296, 0, 1920, 274))
+    lay["path"] = [[0, 900], [1, 1500], [2, 1500]]
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-filter_complex", L.filtergraph(lay),
+                    "-map", "[v]", str(out)], check=True)
+    dims = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                           "stream=width,height:format=duration", "-of", "csv=p=0", str(out)],
+                          capture_output=True, text=True).stdout.split()
+    assert dims[0] == "1080,1920" and abs(float(dims[-1]) - 2) < 0.2
