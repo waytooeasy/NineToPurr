@@ -179,7 +179,12 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         C.log(f"style: {channel}'s known look ({known.get('family')}) replaces a weak measurement")
     if st.get("ok"):         # fitted on their pixels: size, spacing, position, box, font
         def fit():
-            s, e = tune.tune(st, tune.Scorer(short_path, base, evs, st, fps, (OW, OH), work=work))
+            tdir = work / "tune"
+            tdir.mkdir(exist_ok=True)
+            try:
+                s, e = tune.tune(st, tune.Scorer(short_path, base, evs, st, fps, (OW, OH), work=tdir))
+            finally:
+                shutil.rmtree(tdir, ignore_errors=True)
             return {**s, "tune_err": e}
         st = _stage(work, "style_tuned", fit)
     if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
