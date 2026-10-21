@@ -568,22 +568,49 @@ def pick_samples(evs, n=SAMPLES):
     return sorted(ok[:n], key=lambda e: e["start"])
 
 
-def measure_all(short_path, base_path, evs, fps, size):
-    """Per event: their measured caption at a fully revealed frame (most of the way through the event)."""
+def measure_all(short_path, base_path, evs, fps, size, at=(0.4, 0.6, 0.85)):
+    """Per event: their measured caption once fully revealed; word colours voted over a few frames (one frame can
+    carry a picture difference that looks like a coloured word)."""
     out = []
     for ev in evs:
-        t = ev["start"] + 0.75 * (ev["end"] - ev["start"])
-        t = max(t, max(w["t"] for w in ev["words"]) + 0.15) if ev["words"] else t
-        n = int(min(t, ev["end"] - 0.05) * fps)
-        th, ba = frame(short_path, n, fps, size), frame(base_path, n, fps, size)
-        if th is None or ba is None:
+        t0 = max(w["t"] for w in ev["words"]) + 0.1 if ev["words"] else ev["start"]
+        span = max(0.0, ev["end"] - 0.03 - t0)
+        found = []
+        for f in at:
+            n = int((t0 + f * span) * fps)
+            th, ba = frame(short_path, n, fps, size), frame(base_path, n, fps, size)
+            if th is None or ba is None:
+                continue
+            m = measure_event(th, ba, ev)
+            if m:
+                m["frame"] = th
+                found.append(m)
+        if not found:
             out.append(None)
             continue
-        m = measure_event(th, ba, ev)
-        if m:
-            m["frame"] = th
+        m = found[-1]
+        m["colours"] = [vote_colour([x["colours"][i] for x in found]) for i in range(len(ev["words"]))]
         out.append(m)
     return out
+
+
+def vote_colour(cs):
+    """White if any reading says white or the readings disagree; else their median colour."""
+    cs = [c for c in cs if c]
+    if not cs:
+        return None
+    if DEFAULT_WHITE in cs:
+        return DEFAULT_WHITE if cs.count(DEFAULT_WHITE) * 2 >= len(cs) or len(cs) < 2 else _median_hex(
+            [c for c in cs if c != DEFAULT_WHITE])
+    rgb = np.array([[int(c[i:i + 2], 16) for i in (1, 3, 5)] for c in cs], float)
+    if len(cs) >= 2 and np.abs(rgb - np.median(rgb, 0)).max() > 80:
+        return DEFAULT_WHITE
+    return _median_hex(cs)
+
+
+def _median_hex(cs):
+    rgb = np.median(np.array([[int(c[i:i + 2], 16) for i in (1, 3, 5)] for c in cs], float), 0).astype(int)
+    return "#%02X%02X%02X" % tuple(rgb)
 
 
 def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=None):
