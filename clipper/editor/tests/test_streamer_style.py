@@ -67,3 +67,14 @@ def test_layout_majority_over_all_images():
     per = [{"captions": True, "layout": "fit"}, {"captions": False, "layout": "fit"}, {"captions": True, "layout": "full"}]
     assert SS.aggregate(per)["layout"] == "fit"
     assert "layout" not in SS.aggregate([{"layout": "fit"}, {"layout": "full"}])          # no clear majority
+
+
+def test_streamers_radar_posts_are_styled_even_outside_the_top(tmp_path):
+    import streamer_style as SS
+    sh = lambda: [{"id": f"v{i}", "en": True} for i in range(4)]   # noqa: E731
+    m = {"updated": "u", "streamers": {"Big": {"demand_vph": 9, "shorts": sh()}, "Ron": {"demand_vph": 1, "shorts": sh()}}}
+    seen = []
+    one = '{"captions": true, "font": "condensed", "layout": "fit"}'
+    doc = SS.run(m, {}, out_path=tmp_path / "s.json", vision=lambda imgs: "[" + ",".join([one] * len(imgs)) + "]",
+                 grab=lambda ids: seen.append(ids) or [b"x"] * 3, top=1, also=["Ron", "Nobody"])
+    assert set(doc["streamers"]) == {"Big", "Ron"} and doc["streamers"]["Ron"]["layout"] == "fit"

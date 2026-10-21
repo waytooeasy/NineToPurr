@@ -137,11 +137,15 @@ def due(p=None, market_updated=None, now=None):
     return (now - t).total_seconds() > MAX_AGE_H * 3600
 
 
-def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, top=TOP_STREAMERS):
-    """styles.json for the `top` streamers by Shorts demand. `logins`: {streamer: [radar logins/slugs]}."""
+def run(market, logins, out_path=None, vision=None, grab=thumbnails, now=None, top=TOP_STREAMERS, also=()):
+    """styles.json for the `top` streamers by Shorts demand plus `also` (the streamers Radar posts: Stable Ronaldo
+    was posted but outside the top 10 by demand, so his clips had no market layout, 2026-10-21).
+    `logins`: {streamer: [radar logins/slugs]}."""
     now = now or datetime.now(timezone.utc)
     vision = vision or anthropic_vision
     ranked = sorted(market["streamers"].items(), key=lambda kv: -kv[1].get("demand_vph", 0))[:top]
+    ranked += [(n, market["streamers"][n]) for n in also
+               if n in market["streamers"] and n not in {r[0] for r in ranked}]
     try:  # yesterday's looks: a field with no clear majority today keeps yesterday's value (no flip-flop)
         prev = json.loads(Path(out_path or path()).read_text()).get("streamers") or {}
     except (OSError, ValueError, AttributeError):
