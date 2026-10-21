@@ -122,7 +122,7 @@ def resync(out, th, n0, sec, m_lo, samples=16):
         for n, _, m, M, _ in pick:
             j = m + d - m_lo
             if 0 <= j < len(sec):
-                s.append(warp_ncc(th[n - n0], sec[j], np.asarray(M)))
+                s.append(warp_ncc(th[n - n0], sec[j], np.asarray(M, np.float64)))
         if len(s) == len(pick):
             score[d] = float(np.mean(s))
     if not score:
