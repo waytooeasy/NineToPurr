@@ -40,7 +40,9 @@ def _ts(s):
 def candidates(market_data, con, now=None, twitch_names=None):
     """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer}]."""
     now = now or datetime.now(timezone.utc)
-    tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped','working')"
+    # a 'working' row older than 2 h is a run that was killed (stop/timeout): it may be tried again
+    tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped')"
+                                       " OR (status='working' AND updated_at >= datetime('now','-2 hours'))"
                                        " OR attempts >= ?", (MAX_ATTEMPTS,))}
     out, seen = [], set()
     for name, d in (market_data or {}).get("streamers", {}).items():

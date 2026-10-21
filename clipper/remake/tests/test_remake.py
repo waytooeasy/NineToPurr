@@ -316,6 +316,15 @@ def test_candidates_popping_recent_short_twitch_not_ours_not_tried():
     assert [s["id"] for s in got] == ["B", "A"]                       # most popping first
 
 
+def test_a_killed_run_does_not_block_its_short_forever():
+    c = db()
+    c.execute("INSERT INTO remakes (short_id, status, attempts, updated_at) VALUES ('A','working',1,datetime('now','-3 hours'))")
+    c.execute("INSERT INTO remakes (short_id, status, attempts, updated_at) VALUES ('B','working',1,datetime('now'))")
+    got = [s["id"] for s in run.candidates(MARKET, c, datetime.now(timezone.utc).replace(hour=15),
+                                           twitch_names={"Stable Ronaldo", "Jynxzi"})]
+    assert "B" not in got
+
+
 def test_register_makes_an_edited_clip_the_bot_can_show():
     c = db()
     s = {"id": "A", "title": "Jason And Ron Goes On A Date", "channel": "SpecificMinds", "views": 30000,
