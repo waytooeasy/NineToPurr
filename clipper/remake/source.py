@@ -27,6 +27,11 @@ class NotFound(RuntimeError):
     pass
 
 
+class BotCheck(RuntimeError):
+    """YouTube asks the VM to sign in ('confirm you're not a bot'): try again later. We never work around it
+    (no cookies, PO tokens or proxies; issue #64)."""
+
+
 def twitch_logins(names, text="", wl_path=None):
     """Twitch logins for watchlist names, plus any watchlist streamer named in `text` (title/description)."""
     cfg = yaml.safe_load(Path(wl_path or WATCHLIST).read_text()) or {}
@@ -73,11 +78,16 @@ def recent_vods(tw, login, published, days=4):
     return sorted(out, key=lambda x: x["start"], reverse=True)
 
 
-def download_short(short_id, out_dir):
+def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
-        subprocess.run([C.ytdlp(), "-f", "bv*+ba/b", "--merge-output-format", "mp4", "-o", str(out),
-                        f"https://www.youtube.com/shorts/{short_id}"], check=True, capture_output=True)
+        r = runner([C.ytdlp(), "-f", "bv*+ba/b", "--merge-output-format", "mp4", "-o", str(out),
+                    f"https://www.youtube.com/shorts/{short_id}"], capture_output=True, text=True)
+        if r.returncode != 0:
+            err = (r.stderr or "")[-400:]
+            if "not a bot" in err or "Sign in to confirm" in err:
+                raise BotCheck(f"YouTube bot check on {short_id}")
+            raise RuntimeError(f"yt-dlp {short_id}: {err.strip()[-200:]}")
     return out
 
 

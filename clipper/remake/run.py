@@ -171,6 +171,11 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         _status(con, s, "done", clip_id=clip_id)
         C.log(f"{sid}: done -> clip {clip_id} '{ours}'")
         return clip_id
+    except source.BotCheck as e:   # not this Short's fault: back in the queue, attempt not counted
+        _status(con, s, "picked", last_error=str(e)[:500])
+        con.execute("UPDATE remakes SET attempts=MAX(0, attempts-1) WHERE short_id=?", (sid,))
+        con.commit()
+        raise
     except source.NotFound as e:
         _status(con, s, "skipped", last_error=f"source: {e}"[:500])
         raise
@@ -214,6 +219,9 @@ def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, 
             break
         try:
             res["done"].append(remake_one(con, s, out_dir, tw=tw))
+        except source.BotCheck as e:   # every download would hit it now: stop, the timer tries again later
+            res["failed"][s["id"]] = str(e)
+            break
         except (Unsupported, source.NotFound) as e:
             res["skipped"][s["id"]] = str(e)
         except Exception as e:  # one bad Short must not stop the next
