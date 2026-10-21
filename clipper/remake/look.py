@@ -125,10 +125,10 @@ def overlays(short_path, vm, W, width=270):
             bands[n] = [round(float(diff[int(j * h / 16):int((j + 1) * h / 16)].mean()), 2) for j in range(16)]
             m = np.ones((h, w), bool)
             m[int(CAP_BAND[0] * h):int(CAP_BAND[1] * h)] = False
-            if str(n) in vm.get("frames", {str(n): 1}):
-                M = frame_transform(b[m].reshape(-1, 3), a[m].reshape(-1, 3))
-                if M is not None:
-                    mats[n] = M
+            # every frame, also those the map missed (a white flash hides the picture): wrong content is refused
+            M = frame_transform(b[m].reshape(-1, 3), a[m].reshape(-1, 3))
+            if M is not None:
+                mats[n] = M
             d, o = (a - b)[m].reshape(-1, 3), b[m].reshape(-1, 3)
             A = np.zeros((d.size, 4))
             A[0::3, 0] = 1

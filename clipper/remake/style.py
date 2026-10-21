@@ -381,8 +381,14 @@ def measure_event(th, base, ev):
             out["lines"].append({"r0": int(r0), "r1": int(r1), "x0": int(xs.min()), "x1": int(xs.max() + 1),
                                  "text": text, "mask": tight(lm)})
             if len(cols) == n:
+                hug = _hugging(lm, dark[r0:r1], th[r0:r1])
                 for k, (c0, c1) in enumerate(cols):
-                    px = th[r0:r1, c0:c1][lm[:, c0:c1]]
+                    sel = lm[:, c0:c1] & hug[:, c0:c1]
+                    if sel.sum() < 0.3 * max(1, lm[:, c0:c1].sum()):
+                        sel = lm[:, c0:c1] if not dark[r0:r1].any() else None   # no box/outline to trust
+                    if sel is None:
+                        continue
+                    px = th[r0:r1, c0:c1][sel]
                     if len(px) > 20:
                         out["colours"][i + k] = hex_of(np.median(px.reshape(-1, 3), 0))
             i += n
@@ -400,6 +406,15 @@ def measure_event(th, base, ev):
     out["line_h"] = float(np.median(cap))
     out["outline"] = outline_px(fill, dark, out["line_h"])
     return out
+
+
+def _hugging(fill, dark, th, frac=0.18):
+    """Letter pixels: fill pixels close to their box / outline (dark) — a bright picture blob that leaked into the
+    caption mask has no dark edge around it."""
+    h = max(3, fill.shape[0])
+    k = max(3, int(frac * h) | 1)
+    near = cv2.dilate((th.max(2) < DARK_V).astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+    return fill & near
 
 
 def box_pad(th, text_box, base=None, dark_v=60, share=0.6, differ=25):
