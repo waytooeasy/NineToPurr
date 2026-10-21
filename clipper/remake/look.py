@@ -10,7 +10,8 @@ from . import common as C
 from . import render as R
 
 CAP_BAND = (0.33, 0.67)    # rows where captions usually sit: not used to fit the grade
-OVERLAY_MIN = 0.08         # weaker colour washes are grade noise
+OVERLAY_MIN = 0.04         # per-frame washes weaker than this are not stored
+CORE_MIN = 0.15            # a wash's core frames are at least this strong
 PEAK_MIN = 0.2             # a flash peaks at least this strong
 SAT_MIN = 100              # ... in a saturated colour (max - min channel of its colour)
 
@@ -135,26 +136,32 @@ def overlays(short_path, vm, W, width=270):
                 cols.append(c)
     if not cols:
         return {"alpha": {}, "color": [0, 0, 255], "bands": {str(n): v for n, v in bands.items()}}
-    # a wash is a short, strong, saturated colour event (red flash on the punch line); a grade mismatch on one
-    # shot is weak, long and grey-ish: keep only runs that look like the former
+    # a wash is a short, strong, saturated colour event (red flash on the punch line); grade mismatch on a shot is
+    # weak, long and grey-ish. Cores: >= CORE_MIN; grown while the same colour fades out (or in).
+    bd = {str(n): v for n, v in bands.items()}
+    keep, keep_cols = {}, []
+    core = sorted(n for n, a in alpha.items() if a >= CORE_MIN)
     runs, cur = [], []
-    for n in sorted(alpha):
+    for n in core:
         if cur and n != cur[-1] + 1:
             runs.append(cur)
             cur = []
         cur.append(n)
     if cur:
         runs.append(cur)
-    keep, keep_cols = {}, []
     for r in runs:
-        rc = np.array([colour[n] for n in r])
-        c = np.median(rc, 0)
-        peak = max(alpha[n] for n in r)
-        if (len(r) >= 4 and len(r) <= 3 * vm["fps"] and peak >= PEAK_MIN
-                and float(c.max() - c.min()) >= SAT_MIN and float(np.median(rc.std(0))) <= 60):
-            keep.update({n: alpha[n] for n in r})
-            keep_cols.append(c)
-    bd = {str(n): v for n, v in bands.items()}
+        c = np.median(np.array([colour[n] for n in r]), 0)
+        if max(alpha[n] for n in r) < PEAK_MIN or float(c.max() - c.min()) < SAT_MIN:
+            continue
+        lo, hi = r[0], r[-1]
+        while (lo - 1) in alpha and np.linalg.norm(colour[lo - 1] - c) < 90:
+            lo -= 1
+        while (hi + 1) in alpha and np.linalg.norm(colour[hi + 1] - c) < 90:
+            hi += 1
+        if hi - lo + 1 > 3 * vm["fps"]:
+            continue
+        keep.update({n: alpha[n] for n in range(lo, hi + 1) if n in alpha})
+        keep_cols.append(c)
     if not keep:
         return {"alpha": {}, "color": [0, 0, 255], "bands": bd}
     col = np.median(np.array(keep_cols), 0)
