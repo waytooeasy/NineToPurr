@@ -281,6 +281,13 @@ def test_ocr_parse_needs_one_object_per_frame():
 
 
 # ---------------- title ----------------
+def test_title_never_names_a_streamer_who_is_not_in_the_clip():
+    theirs = "Agent00 Met A Fan With The Craziest ATL Accent! 😭💀"
+    answers = iter(["Kai Cenat Gets Stopped By A Fan 💀", "Fan With An Insane ATL Accent Stops Agent00 😭💀"])
+    t = title.make(theirs, "agent00", "KAI CENAT?", ask=lambda p: next(answers), names=["Kai Cenat", "Agent00"])
+    assert t == "Fan With An Insane ATL Accent Stops Agent00 😭💀"
+
+
 def test_title_is_ours_never_theirs():
     theirs = "Jason And Ron Goes On A Date 💕😂"
     answers = iter(["Jason and Ron Goes On A Date 💕😂", "Ron Takes Jason On A Fry Date 😂"])
@@ -314,6 +321,15 @@ def test_candidates_popping_recent_short_twitch_not_ours_not_tried():
     c.execute("DELETE FROM remakes")
     got = run.candidates(MARKET, c, NOW, twitch_names={"Stable Ronaldo", "Jynxzi"})
     assert [s["id"] for s in got] == ["B", "A"]                       # most popping first
+
+
+def test_a_killed_run_does_not_block_its_short_forever():
+    c = db()
+    c.execute("INSERT INTO remakes (short_id, status, attempts, updated_at) VALUES ('A','working',1,datetime('now','-3 hours'))")
+    c.execute("INSERT INTO remakes (short_id, status, attempts, updated_at) VALUES ('B','working',1,datetime('now'))")
+    got = [s["id"] for s in run.candidates(MARKET, c, datetime.now(timezone.utc).replace(hour=15),
+                                           twitch_names={"Stable Ronaldo", "Jynxzi"})]
+    assert "B" not in got
 
 
 def test_register_makes_an_edited_clip_the_bot_can_show():

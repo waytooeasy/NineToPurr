@@ -74,7 +74,7 @@ async def push_pending(app: Application) -> int:
     con, chat_id, sent = app.bot_data["con"], app.bot_data["chat_id"], 0
     for row in approvals.pending_to_send(con):
         current = style.version(creator=approvals.creator_of(con, row["id"]))   # global + streamer style (D49)
-        if row["style_version"] != current:
+        if row["style_version"] != current and not approvals.is_remake(row):
             approvals.restyle(con, row["id"])
             continue
         if approvals.vqa_pending(row):

@@ -8,7 +8,7 @@ TOO_CLOSE = 0.8
 
 PROMPT = """You write YouTube Shorts titles for a streamer-clips channel.
 A clipper's Short of this moment is popping right now. Their title: "{title}"
-The streamer this channel files it under: {streamer}. What happens (their captions): {captions}
+Whose stream the footage is from: {streamer}. What happens (their captions): {captions}
 
 Write OUR title for the same clip: the same moment and the same hook, with the people named exactly as their title
 names them (nicknames included; never add a name their title does not use), at most {max_len} characters, English, same tone. If they use emojis, use at most two. Do NOT copy their
@@ -43,14 +43,25 @@ def clean(t):
     return t[:MAX_LEN].rstrip()
 
 
-def make(theirs, streamer, captions="", ask=anthropic_ask):
+def wrong_names(t, theirs, streamer, names=()):
+    """Streamer names in our title that are neither in their title nor the stream's owner (a Kai Cenat title on
+    an Agent00 clip, 2026-10-21)."""
+    low, th = t.lower(), theirs.lower()
+    return [n for n in names if n and re.search(r"\b" + re.escape(n.lower()) + r"\b", low)
+            and not re.search(r"\b" + re.escape(n.lower()) + r"\b", th) and n.lower() != (streamer or "").lower()]
+
+
+def make(theirs, streamer, captions="", ask=anthropic_ask, names=()):
     extra = ""
     best = ""
     for _ in range(3):
         t = clean(ask(PROMPT.format(title=theirs, streamer=streamer, captions=captions or "-", max_len=MAX_LEN,
                                     extra=extra)))
-        if t and not too_close(t, theirs):
+        bad = wrong_names(t, theirs, streamer, names) if t else []
+        if t and not too_close(t, theirs) and not bad:
             return t
-        best = best or t
-        extra = f'Your last try "{t}" was too close to theirs: change the wording more. '
-    return best if best and not too_close(best, theirs) else f"{streamer} {theirs}"[:MAX_LEN]
+        if not bad:
+            best = best or t
+        extra = (f'Your last try "{t}" named {", ".join(bad)}, who is not in this clip. ' if bad else
+                 f'Your last try "{t}" was too close to theirs: change the wording more. ')
+    return best if best and not too_close(best, theirs) else theirs[:MAX_LEN]

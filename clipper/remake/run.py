@@ -40,7 +40,9 @@ def _ts(s):
 def candidates(market_data, con, now=None, twitch_names=None):
     """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer}]."""
     now = now or datetime.now(timezone.utc)
-    tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped','working')"
+    # a 'working' row older than 2 h is a run that was killed (stop/timeout): it may be tried again
+    tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped')"
+                                       " OR (status='working' AND updated_at >= datetime('now','-2 hours'))"
                                        " OR attempts >= ?", (MAX_ATTEMPTS,))}
     out, seen = [], set()
     for name, d in (market_data or {}).get("streamers", {}).items():
@@ -180,7 +182,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
                                                         "moving": False}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
-        ours = title.make(s.get("title", ""), s.get("streamer", ""), said, ask)
+        names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
+        ours = title.make(s.get("title", ""), found["login"], said, ask, names=names)
         C.save_json(work / "spec.json", {"short": s, "found": {k: v for k, v in found.items() if k != "hits"},
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},
