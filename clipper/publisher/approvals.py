@@ -30,6 +30,14 @@ def pending_to_send(con):
     ).fetchall()
 
 
+def is_remake(row) -> bool:
+    """A remake (D58) is the clipper's edit rebuilt frame for frame: never re-cut in our caption style."""
+    try:
+        return (row["caption_style"] or "") == "remake"
+    except (IndexError, KeyError):
+        return False
+
+
 def creator_of(con, clip_id: int):
     """Radar creator login/slug of a clip (radar_candidates.creator), or None."""
     try:

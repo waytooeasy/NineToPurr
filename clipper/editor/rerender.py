@@ -69,7 +69,7 @@ def run(con, model="small", out_dir=None):
         "SELECT c.id, c.hook_text, c.context_line, c.start_s, c.end_s, c.file_path,"
         " r.clip_id AS radar_id, r.file_path AS source_file, r.source, r.creator"
         " FROM clips c JOIN radar_candidates r ON r.clips_id = c.id"
-        " WHERE c.state='needs_rerender'"
+        " WHERE c.state='needs_rerender' AND COALESCE(c.caption_style, '') != 'remake'"   # remakes: no source capture
         " AND (c.last_error IS NULL OR c.state_changed_at < datetime('now','-2 hours'))"
         " ORDER BY c.id").fetchall()
     for row in rows:

@@ -149,6 +149,20 @@ def test_clip_in_an_old_style_goes_back_for_rerender_not_to_lucas(con, add_clip,
     assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1
 
 
+def test_a_remake_is_never_sent_back_for_a_style_rerender(con, add_clip, tmp_path, monkeypatch):
+    """D58: a remake is the clipper's edit rebuilt frame for frame; our caption style does not apply."""
+    import json
+    cid = add_clip()
+    con.execute("UPDATE clips SET caption_style='remake', style_version=NULL WHERE id=?", (cid,))
+    con.commit()
+    sf = tmp_path / "style.json"
+    sf.write_text(json.dumps({"caption": {"case": "title", "highlight": "#00FF66"}}))
+    monkeypatch.setenv("CLIPPER_STYLE", str(sf))
+    ctx = make_ctx(con)
+    assert asyncio.run(approve_bot.push_pending(ctx.application)) == 1
+    assert st(con, cid) != "needs_rerender"
+
+
 def test_auto_post_approves_and_sends_stop_button(con, add_clip, monkeypatch):
     monkeypatch.setenv("AUTO_POST", "1")
     cid = add_clip()
