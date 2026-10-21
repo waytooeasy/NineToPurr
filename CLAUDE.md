@@ -31,7 +31,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 - **Build loop:** agent finishes → PR opens itself → CI → if red, the agent is asked to fix it (max 2) → **Lucas merges** → the next ready issue starts. Keep CI green; never weaken or skip tests.
 - Issues run in order via the agent queue. Put `Depends on: #N` at the top of an issue body to sequence it. Labels: `agent` (queue it), `hold` (stop), `in-progress` (running), `needs-hq` (decision needed).
 - Every PR: tests for new code (`pytest`, sample data, no network), module README updated, `DECISIONS.md` untouched (HQ only).
-- Sources = streamers' own footage (Twitch clips, Twitch/YouTube live VODs). Competitor Shorts = format research only; never download or re-upload them. See `.claude/skills/shorts-format`.
+- Sources = streamers' own footage (Twitch clips, Twitch/YouTube live VODs). Competitor Shorts: download them to **study and imitate** their edit (which parts of the stream, cuts, zooms, captions, layout), **never re-upload or reuse their footage** (D57). See `.claude/skills/shorts-format`.
 - Subagents in `.claude/agents/` (builder-radar/editor/publisher, reviewer, security). Read only what the task needs to save tokens.
 - Lucas wants short, direct answers and the whole system in mind; ask when unsure instead of assuming.
 - **Keep `clipper/docs/STATUS.md` current:** if your PR changes what runs, what's next or who something waits on, update it in the same PR.

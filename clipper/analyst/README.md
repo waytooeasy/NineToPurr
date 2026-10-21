@@ -5,7 +5,7 @@
 **Status:** DB schema + queries + ledger in `../db/` (tested on sample data). Trend Scout built and tested offline. Puller not built.
 
 ## Trend Scout (`trend_scout.py`)
-Competitor streamer-clip Shorts, **metadata only** (never downloads or stores videos).
+Competitor streamer-clip Shorts, metadata only here. (D57 allows downloading a clipper's Short to study its edit; never to re-upload.)
 
 ```
 python clipper/analyst/trend_scout.py --library clipper/formats/library.md --report report.md
