@@ -230,7 +230,11 @@ def find(short, work, con=None, tw=None, logins=()):
         try:   # every part of the Short, not only its loud snippets (a clipper jumps across minutes)
             from . import amap as A
             rows = A.dense(short_audio, [C.read_audio(audio, LOC_SR, highpass=120)], sr=LOC_SR)
-            offs += [base + o for t, k, o, nc in rows if k is not None and nc >= A.MIN_NC]
+            dense = [base + o for t, k, o, nc in rows if k is not None and nc >= A.MIN_NC]
+            votes = {}
+            for o in dense:
+                votes[round(o)] = votes.get(round(o), 0) + 1
+            offs += [o for o in dense if votes[round(o)] >= 2]   # one stray window is not a section
         except Exception as e:  # noqa: BLE001 - the snippets alone still give a window
             C.log(f"dense locate failed: {e}")
         secs = []
