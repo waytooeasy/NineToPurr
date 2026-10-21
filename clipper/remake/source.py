@@ -33,6 +33,7 @@ class BotCheck(RuntimeError):
 
 
 COOKIES = "/opt/clipper/youtube_cookies.txt"
+SHORT_DL_TIMEOUT_S = 240
 
 
 def youtube_auth():
@@ -91,12 +92,15 @@ def recent_vods(tw, login, published, days=4):
 def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
-        r = runner([C.ytdlp(), *youtube_auth(), "--sleep-requests", "1", "-f", "bv*+ba/b",
-                    "--merge-output-format", "mp4", "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
-                   capture_output=True, text=True)
+        try:
+            r = runner([C.ytdlp(), *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "30", "-f", "bv*+ba/b",
+                        "--merge-output-format", "mp4", "-o", str(out), f"https://www.youtube.com/shorts/{short_id}"],
+                       capture_output=True, text=True, timeout=SHORT_DL_TIMEOUT_S)
+        except subprocess.TimeoutExpired:   # YouTube throttling (429 retries): same as the bot check, try later
+            raise BotCheck(f"YouTube download of {short_id} hung > {SHORT_DL_TIMEOUT_S} s (throttled)")
         if r.returncode != 0:
             err = (r.stderr or "")[-400:]
-            if "not a bot" in err or "Sign in to confirm" in err:
+            if "not a bot" in err or "Sign in to confirm" in err or "429" in err:
                 raise BotCheck(f"YouTube bot check on {short_id}")
             raise RuntimeError(f"yt-dlp {short_id}: {err.strip()[-200:]}")
     return out
@@ -199,15 +203,11 @@ def _found(hits, n_min=2):
     return good if len(good) >= max(n_min, (len(hits) + 2) // 3) else None
 
 
-def find(short, work, con=None, tw=None, logins=()):
-    """Locate the Short in a VOD and download the video sections. Returns
-    {'vod_id', 'login', 'sections': [{'file', 'vod_s', 'vod_e'}], 'hits': [...]}; raises NotFound."""
-    work = Path(work)
-    short_audio = C.read_audio(work / "short.mp4", LOC_SR, highpass=120)
-    dur = len(short_audio) / LOC_SR
-    tried = []
-    hint = moment_hint(con, short["id"])
+def plans_for(short, con=None, tw=None, logins=()):
+    """VOD windows to search, best first: [(vod_id, login, start|None, end|None)]. Known before any download, so a
+    Short whose streamer has no Twitch VOD (YouTube streamers) is skipped without fetching anything."""
     plans = []
+    hint = moment_hint(con, short["id"])
     if hint:
         vod_id, off, login = hint
         plans.append((vod_id, login, max(0, off - HINT_PAD_S), off + HINT_PAD_S))
@@ -219,6 +219,17 @@ def find(short, work, con=None, tw=None, logins=()):
                     plans.append((v["id"], login, None, None))
             except Exception as e:  # unknown login, API hiccup: try the next
                 C.log(f"vods for {login}: {e}")
+    return plans
+
+
+def find(short, work, con=None, tw=None, logins=(), plans=None):
+    """Locate the Short in a VOD and download the video sections. Returns
+    {'vod_id', 'login', 'sections': [{'file', 'vod_s', 'vod_e'}], 'hits': [...]}; raises NotFound."""
+    work = Path(work)
+    short_audio = C.read_audio(work / "short.mp4", LOC_SR, highpass=120)
+    dur = len(short_audio) / LOC_SR
+    tried = []
+    plans = plans if plans is not None else plans_for(short, con, tw, logins)
     for vod_id, login, s, e in plans:
         if (vod_id, s) in tried:
             continue
