@@ -66,9 +66,11 @@ def candidates(market_data, con, now=None, twitch_names=None):
 
 
 def twitch_watchlist_names(wl_path=None):
+    """Watchlist streamers whose streams we can rebuild from: Twitch archives or YouTube live streams."""
     import yaml
     cfg = yaml.safe_load(Path(wl_path or source.WATCHLIST).read_text()) or {}
-    return {str(e["name"]) for e in cfg.get("streamers", []) if e.get("platform") == "twitch" and not e.get("disabled")}
+    return {str(e["name"]) for e in cfg.get("streamers", [])
+            if e.get("platform") in ("twitch", "youtube") and not e.get("disabled")}
 
 
 def done_today(con, now=None):
@@ -101,14 +103,16 @@ def same_moment_done(con, vod_id, a, b, share=0.5):
 def register(con, s, found, am, vm, cp, mp4, our_title):
     """Our remake becomes an edited clip (QC, visual check and Telegram take it from there)."""
     login = found["login"]
+    yt = source.is_yt(found["vod_id"])
     dur = vm["nfr"] / vm["fps"]
     secs = found["sections"]
     seg0 = am["segments"][0]
     vod_s = secs[seg0["sec"]]["vod_s"] + seg0["off"]
-    con.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, 'twitch', ?)",
-                (login, f"https://twitch.tv/{login}"))
+    con.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, ?, ?)",
+                (login, "youtube" if yt else "twitch",
+                 f"https://www.youtube.com/{login}" if yt else f"https://twitch.tv/{login}"))
     creator_id = con.execute("SELECT id FROM creators WHERE name=?", (login,)).fetchone()[0]
-    url = f"https://www.twitch.tv/videos/{found['vod_id']}?t={int(vod_s)}s"
+    url = source.vod_url(found["vod_id"]) + (f"&t={int(vod_s)}s" if yt else f"?t={int(vod_s)}s")
     con.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
                 (creator_id, url, s.get("title"), s.get("views")))
     source_id = con.execute("SELECT id FROM sources WHERE url=?", (url,)).fetchone()[0]
@@ -125,7 +129,7 @@ def register(con, s, found, am, vm, cp, mp4, our_title):
                 " view_count, clip_created_at, views_per_hour, status, clips_id, source)"
                 " VALUES (?,?,?,?,?,?,?,?,?,?, 'edited', ?, 'remake')",
                 (f"remake:{s['id']}", login, s.get("title"), f"https://www.youtube.com/shorts/{s['id']}",
-                 found["vod_id"], int(vod_s), dur, s.get("views") or 0, s.get("published") or "",
+                 str(found["vod_id"]).removeprefix("yt:"), int(vod_s), dur, s.get("views") or 0, s.get("published") or "",
                  s.get("vph") or 0, clip_id))
     con.commit()
     return clip_id
@@ -147,13 +151,16 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
     work = C.workdir(sid)
     _status(con, s, "working", last_error=None)
     try:
-        logins = source.twitch_logins([s.get("streamer", "")], f"{s.get('title', '')} {s.get('desc', '')}")
-        plans = source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins)
+        text = f"{s.get('title', '')} {s.get('desc', '')}"
+        logins = source.twitch_logins([s.get("streamer", "")], text)
+        handles = source.youtube_handles([s.get("streamer", "")], text)
+        plans = [] if (work / "found.json").exists() else \
+            source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles)
         if not plans and not (work / "found.json").exists():
-            raise source.NotFound(f"no Twitch VOD of {', '.join(logins) or s.get('streamer')} around it")
+            raise source.NotFound(f"no stream VOD of {', '.join(logins + handles) or s.get('streamer')} around it")
         short_path = source.download_short(sid, work)
         found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,
-                                                            tw=tw, logins=logins, plans=plans))
+                                                            tw=tw, logins=logins, plans=plans, handles=handles))
         am = _stage(work, "amap", lambda: amap.build(short_path, [x["file"] for x in found["sections"]]))
         if am["matched_share"] < MIN_AUDIO:
             raise Unsupported(f"only {am['matched_share']:.0%} of the audio is the stream")
@@ -183,7 +190,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
                                                         "moving": False}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
         names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
-        ours = title.make(s.get("title", ""), found["login"], said, ask, names=names)
+        ours = title.make(s.get("title", ""), found.get("owner") or found["login"], said, ask, names=names)
         C.save_json(work / "spec.json", {"short": s, "found": {k: v for k, v in found.items() if k != "hits"},
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},

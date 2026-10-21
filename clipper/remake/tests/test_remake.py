@@ -363,3 +363,31 @@ def test_daily_cap_counts_done_remakes():
         c.execute("INSERT INTO remakes (short_id, status, updated_at) VALUES (?, 'done', ?)",
                   (f"s{i}", (NOW - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")))
     assert run.done_today(c, NOW) == 3
+
+
+# ---------------- YouTube streams (IShowSpeed) ----------------
+def test_youtube_vods_have_their_own_urls():
+    assert source.vod_url("yt:abcdefghijk") == "https://www.youtube.com/watch?v=abcdefghijk"
+    assert source.vod_url("2904593598") == "https://www.twitch.tv/videos/2904593598"
+
+
+def test_youtube_live_streams_around_the_short_become_plans():
+    class R:
+        stdout = "AAAAAAAAAAA\nBBBBBBBBBBB\n"
+
+    class Sess:
+        def get(self, url, params, timeout):
+            class J:
+                def json(self):
+                    return {"items": [
+                        {"id": "AAAAAAAAAAA", "liveStreamingDetails": {"actualStartTime": "2026-10-21T01:00:00Z",
+                                                                       "actualEndTime": "2026-10-21T07:00:00Z"}},
+                        {"id": "BBBBBBBBBBB", "liveStreamingDetails": {"actualStartTime": "2026-10-10T01:00:00Z",
+                                                                       "actualEndTime": "2026-10-10T05:00:00Z"}}]}
+            return J()
+    pub = datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)
+    got = source.youtube_streams("@IShowSpeed", pub, key="k", runner=lambda *a, **k: R(), session=Sess())
+    assert [v["id"] for v in got] == ["yt:AAAAAAAAAAA"]
+    plans = source.plans_for({"id": "s", "published": "2026-10-21T12:00:00Z"}, None, None, (), ["@IShowSpeed"],
+                             yt_streams=lambda h, p: got)
+    assert plans == [("yt:AAAAAAAAAAA", "@IShowSpeed", None, None)]

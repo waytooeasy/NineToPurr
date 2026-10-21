@@ -1,7 +1,8 @@
-"""Where a clipper Short's footage lives in the streamer's own Twitch VOD (D58), and download it.
+"""Where a clipper Short's footage lives in the streamer's own stream VOD (D58), and download it.
 
 1. Candidate VODs: the VOD of the streamer's own clip matched to this Short (moment_matches, D54), else the
-   streamer's (and any watchlist streamer named in the title) archives that overlap the 4 days before it posted.
+   streamer's (and any watchlist streamer named in the title) Twitch archives and YouTube live streams that overlap
+   the 4 days before it posted. YouTube VOD ids carry a "yt:" prefix (IShowSpeed, Kai's YouTube channel).
 2. Coarse locate: loud 2 s snippets of the Short's audio, normalised cross-correlation over the VOD audio.
 3. Download only the VOD video around the found seconds (1080p60 sections); the exact map runs on those files.
 """
@@ -56,6 +57,48 @@ def youtube_auth():
     return ["--cookies", p] if p and Path(p).is_file() else []
 
 
+def is_yt(vod_id):
+    return str(vod_id).startswith("yt:")
+
+
+def vod_url(vod_id):
+    v = str(vod_id)
+    return f"https://www.youtube.com/watch?v={v[3:]}" if is_yt(v) else f"https://www.twitch.tv/videos/{v}"
+
+
+def yt_flags():
+    """YouTube requests: IPv4 only while the VM has no IPv6 route, Lucas's cookie file (D59), polite pacing."""
+    return [*([] if has_ipv6() else ["-4"]), *youtube_auth(), "--sleep-requests", "1", "--socket-timeout", "20"]
+
+
+def watchlist_ids(platform, names, text="", wl_path=None):
+    """Watchlist ids on `platform` for these names, plus any watchlist streamer named in `text` (title/description)."""
+    cfg = yaml.safe_load(Path(wl_path or WATCHLIST).read_text()) or {}
+    by_name = {}
+    for e in cfg.get("streamers", []):
+        if e.get("platform") == platform and not e.get("disabled"):
+            by_name.setdefault(str(e["name"]), []).append(str(e["id"]))
+    out = [i for n in names for i in by_name.get(n, [])]
+    low = (text or "").lower()
+    for n, ids in by_name.items():
+        if re.search(r"\b" + re.escape(n.lower()) + r"\b", low) or any(
+                re.search(r"\b" + re.escape(i.lower().lstrip("@")) + r"\b", low) for i in ids):
+            out += ids
+    return list(dict.fromkeys(out))
+
+
+def youtube_handles(names, text="", wl_path=None):
+    return watchlist_ids("youtube", names, text, wl_path)
+
+
+def name_for(platform, ident, wl_path=None):
+    cfg = yaml.safe_load(Path(wl_path or WATCHLIST).read_text()) or {}
+    for e in cfg.get("streamers", []):
+        if e.get("platform") == platform and str(e["id"]).lower() == str(ident).lower():
+            return str(e["name"])
+    return str(ident)
+
+
 def twitch_logins(names, text="", wl_path=None):
     """Twitch logins for watchlist names, plus any watchlist streamer named in `text` (title/description)."""
     cfg = yaml.safe_load(Path(wl_path or WATCHLIST).read_text()) or {}
@@ -76,13 +119,16 @@ def moment_hint(con, short_id):
     if con is None:
         return None
     try:
-        row = con.execute("SELECT r.video_id, r.vod_offset, r.creator FROM moment_matches m"
+        row = con.execute("SELECT r.video_id, r.vod_offset, r.creator, r.source FROM moment_matches m"
                           " JOIN radar_candidates r ON r.clip_id = m.clip_id"
-                          " WHERE m.short_id = ? AND r.video_id IS NOT NULL AND r.source = 'twitch'",
+                          " WHERE m.short_id = ? AND r.video_id IS NOT NULL AND r.source IN ('twitch', 'youtube')",
                           (short_id,)).fetchone()
     except Exception:
         return None
-    return (str(row[0]), int(row[1] or 0), row[2]) if row else None
+    if not row:
+        return None
+    vod = f"yt:{row[0]}" if row[3] == "youtube" else str(row[0])
+    return (vod, int(row[1] or 0), row[2])
 
 
 def _dur(s):
@@ -99,6 +145,31 @@ def recent_vods(tw, login, published, days=4):
         dur = _dur(v.get("duration"))
         if start <= published and start + timedelta(seconds=dur) >= published - timedelta(days=days):
             out.append({"id": str(v["id"]), "login": login, "dur": dur, "start": start})
+    return sorted(out, key=lambda x: x["start"], reverse=True)
+
+
+def youtube_streams(handle, published, days=4, key=None, runner=subprocess.run, session=None):
+    """Past live streams of a YouTube channel that were live within `days` before `published` (newest first).
+    The channel's /streams tab via yt-dlp (one request), start/end times via the Data API (1 unit)."""
+    r = runner([C.ytdlp(), *yt_flags(), "--flat-playlist", "--playlist-end", "8", "--print", "%(id)s",
+                f"https://www.youtube.com/{handle}/streams"], capture_output=True, text=True, timeout=120)
+    ids = [x.strip() for x in (r.stdout or "").split() if re.fullmatch(r"[A-Za-z0-9_-]{11}", x.strip())]
+    key = key or os.environ.get("YOUTUBE_API_KEY")
+    if not ids or not key:
+        return []
+    import requests
+    sess = session or requests
+    data = sess.get("https://www.googleapis.com/youtube/v3/videos", params={
+        "part": "liveStreamingDetails,contentDetails", "id": ",".join(ids), "key": key}, timeout=30).json()
+    out = []
+    for it in data.get("items", []):
+        ls = it.get("liveStreamingDetails") or {}
+        if not ls.get("actualStartTime"):
+            continue
+        start = datetime.fromisoformat(ls["actualStartTime"].replace("Z", "+00:00"))
+        end = datetime.fromisoformat(ls["actualEndTime"].replace("Z", "+00:00")) if ls.get("actualEndTime") else published
+        if start <= published and end >= published - timedelta(days=days):
+            out.append({"id": f"yt:{it['id']}", "login": handle, "start": start, "dur": (end - start).total_seconds()})
     return sorted(out, key=lambda x: x["start"], reverse=True)
 
 
@@ -123,19 +194,23 @@ def download_short(short_id, out_dir, runner=subprocess.run):
 def download_audio(vod_id, out, start=None, end=None):
     out = Path(out)
     if not out.exists():
-        cmd = [C.ytdlp(), "-N", str(FRAGMENTS), "-f", "Audio_Only/audio_only/ba/worst", "-o", str(out)]
+        if is_yt(vod_id):
+            cmd = [C.ytdlp(), *yt_flags(), "-N", str(FRAGMENTS), "-f", "ba[ext=m4a]/ba", "-o", str(out)]
+        else:
+            cmd = [C.ytdlp(), "-N", str(FRAGMENTS), "-f", "Audio_Only/audio_only/ba/worst", "-o", str(out)]
         if start is not None:
             cmd += ["--download-sections", f"*{int(max(0, start))}-{int(end)}"]
-        subprocess.run(cmd + [f"https://www.twitch.tv/videos/{vod_id}"], check=True, capture_output=True)
+        subprocess.run(cmd + [vod_url(vod_id)], check=True, capture_output=True)
     return out
 
 
 def download_video(vod_id, start, end, out):
     out = Path(out)
     if not out.exists():
-        subprocess.run([C.ytdlp(), "-N", str(FRAGMENTS), "-f", "b[height<=1080]/b",
+        fmt = ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b"] if is_yt(vod_id) else ["-f", "b[height<=1080]/b"]
+        subprocess.run([C.ytdlp(), *(yt_flags() if is_yt(vod_id) else []), "-N", str(FRAGMENTS), *fmt,
                         "--download-sections", f"*{int(start)}-{int(end + 0.999)}",
-                        "--merge-output-format", "mp4", "-o", str(out), f"https://www.twitch.tv/videos/{vod_id}"],
+                        "--merge-output-format", "mp4", "-o", str(out), vod_url(vod_id)],
                        check=True, capture_output=True)
     return out
 
@@ -218,33 +293,40 @@ def _found(hits, n_min=2):
     return good if len(good) >= max(n_min, (len(hits) + 2) // 3) else None
 
 
-def plans_for(short, con=None, tw=None, logins=()):
+def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams):
     """VOD windows to search, best first: [(vod_id, login, start|None, end|None)]. Known before any download, so a
-    Short whose streamer has no Twitch VOD (YouTube streamers) is skipped without fetching anything."""
+    Short whose streamer has no stream VOD around it is skipped without fetching anything. Twitch archives first,
+    then YouTube live streams (IShowSpeed, Kai's YouTube channel)."""
     plans = []
     hint = moment_hint(con, short["id"])
     if hint:
         vod_id, off, login = hint
         plans.append((vod_id, login, max(0, off - HINT_PAD_S), off + HINT_PAD_S))
+    published = datetime.fromisoformat(short["published"].replace("Z", "+00:00")).astimezone(timezone.utc)
     if tw is not None:
-        published = datetime.fromisoformat(short["published"].replace("Z", "+00:00")).astimezone(timezone.utc)
         for login in logins:
             try:
                 for v in recent_vods(tw, login, published)[:3]:
                     plans.append((v["id"], login, None, None))
             except Exception as e:  # unknown login, API hiccup: try the next
                 C.log(f"vods for {login}: {e}")
+    for handle in handles:
+        try:
+            for v in yt_streams(handle, published)[:3]:
+                plans.append((v["id"], handle, None, None))
+        except Exception as e:  # noqa: BLE001 - yt-dlp / API hiccup: try the next
+            C.log(f"youtube streams for {handle}: {e}")
     return plans
 
 
-def find(short, work, con=None, tw=None, logins=(), plans=None):
+def find(short, work, con=None, tw=None, logins=(), plans=None, handles=()):
     """Locate the Short in a VOD and download the video sections. Returns
     {'vod_id', 'login', 'sections': [{'file', 'vod_s', 'vod_e'}], 'hits': [...]}; raises NotFound."""
     work = Path(work)
     short_audio = C.read_audio(work / "short.mp4", LOC_SR, highpass=120)
     dur = len(short_audio) / LOC_SR
     tried = []
-    plans = plans if plans is not None else plans_for(short, con, tw, logins)
+    plans = plans if plans is not None else plans_for(short, con, tw, logins, handles)
     for vod_id, login, s, e in plans:
         if (vod_id, s) in tried:
             continue
@@ -281,5 +363,7 @@ def find(short, work, con=None, tw=None, logins=(), plans=None):
         for k, (a, b) in enumerate(sections_for(offs, dur)):
             f = download_video(vod_id, a, b, work / f"sec{k}_{vod_id}_{int(a)}_{int(b)}.mp4")
             secs.append({"file": str(f), "vod_s": a, "vod_e": b})
-        return {"vod_id": vod_id, "login": login, "sections": secs, "hits": hits}
+        owner = name_for("youtube", login) if is_yt(vod_id) else login
+        return {"vod_id": vod_id, "login": login, "owner": owner, "platform": "youtube" if is_yt(vod_id) else "twitch",
+                "sections": secs, "hits": hits}
     raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)})")
