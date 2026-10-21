@@ -11,7 +11,8 @@
            blurred so no half chat shows up there. No chat overlay -> plain crop.
 - "stack": facecam on top, gameplay below, both full width (gaming with a corner facecam).
 No blurred letterbox bars: none of the top channels use them. Black borders in the source itself (a stream's
-black header bar, letterboxing) are measured with ffmpeg cropdetect and kept out of every panel (`content`):
+black header bar, letterboxing) are measured (rows/columns that are near-black in every sampled frame, by
+median, so a bar with a little text in it still counts) and kept out of every panel (`content`):
 Jynxzi's black stats bar ran across the seam of a stack as a black band (2026-10-21).
 
 `choose_layout()` is pure (tests need no OpenCV); `detect_layout()` samples frames with OpenCV's
@@ -43,7 +44,8 @@ MIN_FACE_SHARE = 0.35       # a face counts for framing when its area is >= 35 %
 OWN_CAPTION_CUT = 0.14      # bottom share of the source cut when the stream burns its captions there
 BORDER_MIN = 0.015          # a black border thinner than this share of the frame is left alone
 CONTENT_MIN = 0.7           # never trim a side to less than 70 % (a dark scene can fool cropdetect)
-CROP_RE = re.compile(r"crop=(\d+):(\d+):(\d+):(\d+)")
+BLACK = 24                  # a row/column whose median luma stays below this in every frame is border
+SMALL_W, SMALL_H = 480, 270 # border search works on downscaled grey frames
 CHAT_PANEL_MAX = 640        # chatstack: tallest chat panel (older lines above that are trimmed)
 CHAT_PANEL_MIN = 140        # a thinner panel is unreadable: plain crop instead
 CHAT_PAD = 0.015            # padding around the found chat box, share of the frame
@@ -490,25 +492,51 @@ def follow(lay, video, start, end, track=track_faces):
     return {**lay, "path": [[round(t, 2), round(x, 1)] for t, x in path]}
 
 
-def content_box(video, start, end, W, H, run=subprocess.run):
-    """(x, y, w, h) of the picture inside black borders (a stream's black header bar, letterboxing) from ffmpeg
-    cropdetect over the window's keyframes (reset=0: the union of what any frame shows). None when there is
-    nothing worth trimming or the result is implausible."""
+def grey_frames(video, times, w=SMALL_W, h=SMALL_H):
+    """Downscaled grey frames (bytes, row-major w*h) at `times`."""
+    out = []
+    for t in times:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1",
+                            "-vf", f"scale={w}:{h},format=gray", "-f", "rawvideo", "-"], capture_output=True, check=True)
+        if len(r.stdout) == w * h:
+            out.append(r.stdout)
+    return out
+
+
+def black_borders(frames, w, h, black=BLACK):
+    """(x, y, w, h) in small-frame pixels of what is not near-black in every frame, or None (all black).
+    Median per row/column: a black bar with a little text (viewer count, a chat line) stays a bar."""
+    if not frames:
+        return None
+    rows = [max(median(f[y * w:(y + 1) * w]) for f in frames) for y in range(h)]
+    cols = [max(median(f[y * w + x] for y in range(h)) for f in frames) for x in range(w)]
+    ys = [y for y, v in enumerate(rows) if v >= black]
+    xs = [x for x, v in enumerate(cols) if v >= black]
+    if not ys or not xs:
+        return None
+    return xs[0], ys[0], xs[-1] - xs[0] + 1, ys[-1] - ys[0] + 1
+
+
+def content_box(video, start, end, W, H, grab=grey_frames):
+    """(x, y, w, h) in source pixels of the picture inside black borders (a stream's black header bar,
+    letterboxing), from 3 frames of the window. None when there is nothing worth trimming or the result is
+    implausible (a dark scene)."""
     try:
-        r = run(["ffmpeg", "-hide_banner", "-skip_frame", "nokey", "-ss", f"{start:.2f}", "-t",
-                 f"{max(end - start, 1):.2f}", "-i", str(video), "-vf", "cropdetect=limit=24:round=2:reset=0",
-                 "-f", "null", "-"], capture_output=True, text=True, timeout=120)
-        found = CROP_RE.findall(r.stderr or "")
+        span = max(end - start, 0.1)
+        b = black_borders(grab(video, [start + span * f for f in (0.2, 0.5, 0.8)]), SMALL_W, SMALL_H)
     except Exception:  # noqa: BLE001 - no trimming is always fine
         return None
-    if not found:
+    if not b:
         return None
-    w, h, x, y = (int(v) for v in found[-1])
-    if w < CONTENT_MIN * W or h < CONTENT_MIN * H or x + w > W or y + h > H:
+    sx, sy = W / SMALL_W, H / SMALL_H
+    x0, y0 = _even(b[0] * sx), _even(b[1] * sy)
+    x1, y1 = min(W, _even(round((b[0] + b[2]) * sx))), min(H, _even(round((b[1] + b[3]) * sy)))
+    w, h = x1 - x0, y1 - y0
+    if w < CONTENT_MIN * W or h < CONTENT_MIN * H:
         return None
-    if max(x, W - x - w) < BORDER_MIN * W and max(y, H - y - h) < BORDER_MIN * H:
+    if max(x0, W - x1) < BORDER_MIN * W and max(y0, H - y1) < BORDER_MIN * H:
         return None
-    return x, y, w, h
+    return x0, y0, w, h
 
 
 def detect_layout(video, start, end, cut=0.0):

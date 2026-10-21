@@ -199,21 +199,33 @@ def test_chatstack_filtergraph_renders(tmp_path):
     assert dims[0] == "1080,1920" and abs(float(dims[-1]) - 2) < 0.2
 
 
-class _R:
-    def __init__(self, err):
-        self.stderr = err
+def _frame(w, h, bar_rows=(), text_rows=(), dark=False):
+    px = []
+    for y in range(h):
+        for x in range(w):
+            if y in bar_rows:
+                px.append(230 if (y in text_rows and x < w // 8) else 2)        # black bar, a little text
+            else:
+                px.append(20 if dark else 90)
+    return bytes(px)
 
 
-def test_black_borders_are_measured_with_cropdetect():
-    # Jynxzi 2026-10-21: a black stats bar on top and a player bar at the bottom of the source
-    run = lambda cmd, **kw: _R("[Parsed_cropdetect_0] x1:0 crop=1920:944:0:80\n... crop=1920:940:0:80\n")  # noqa: E731
-    assert L.content_box("v", 0, 10, 1920, 1080, run=run) == (0, 80, 1920, 940)
-    thin = lambda cmd, **kw: _R("crop=1920:1072:0:4")  # noqa: E731
-    assert L.content_box("v", 0, 10, 1920, 1080, run=thin) is None                      # 4 px: nothing to trim
-    dark = lambda cmd, **kw: _R("crop=1920:500:0:300")  # noqa: E731
-    assert L.content_box("v", 0, 10, 1920, 1080, run=dark) is None                      # implausible: a dark scene
-    assert L.content_box("v", 0, 10, 1920, 1080, run=lambda c, **k: _R("")) is None
-    assert L.content_box("v", 0, 10, 1920, 1080, run=lambda c, **k: 1 / 0) is None
+def test_black_borders_are_found_by_row_and_column_medians():
+    w, h = 48, 27
+    bar = _frame(w, h, bar_rows=range(0, 2), text_rows={1})                     # Jynxzi: stats bar on top
+    assert L.black_borders([bar, bar], w, h) == (0, 2, 48, 25)
+    assert L.black_borders([_frame(w, h, bar_rows=range(0, 2)), _frame(w, h)], w, h) == (0, 0, 48, 27)  # one frame shows it
+    assert L.black_borders([_frame(w, h, dark=True)], w, h) is None             # all near-black
+
+
+def test_content_box_scales_and_sanity_checks():
+    grab = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 20), text_rows={10})] * 3  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=grab) == (0, 80, 1920, 1000)
+    thin = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 1))]  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=thin) is None                # 4 px: nothing to trim
+    huge = lambda v, ts: [_frame(L.SMALL_W, L.SMALL_H, bar_rows=range(0, 120))]  # noqa: E731
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=huge) is None                # implausible
+    assert L.content_box("v", 0, 10, 1920, 1080, grab=lambda v, ts: 1 / 0) is None
 
 
 def test_no_panel_shows_the_black_borders():
