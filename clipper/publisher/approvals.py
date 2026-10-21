@@ -155,6 +155,9 @@ def needs_tap(row, env=None) -> bool:
     too: a music claim can block or demonetise a Short) or failed the visual check."""
     e = os.environ if env is None else env
     music_ok = str(e.get("AUTO_POST_MUSIC", "")).strip().lower() in ("1", "true", "yes", "on")
+    remake_ok = str(e.get("AUTO_POST_REMAKES", "")).strip().lower() in ("1", "true", "yes", "on")
+    if is_remake(row) and not remake_ok:   # Lucas checks each remake next to the original first (2026-10-21)
+        return True
     return (bool(row["music_risk"]) and not music_ok) or bool(vqa_issues(row))
 
 

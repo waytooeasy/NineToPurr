@@ -58,6 +58,9 @@ async def send_clip(bot, chat_id: int, row, auto: bool = False, same=None) -> No
     until the uploader takes it (next upload slot)."""
     kb = stop_keyboard(row["id"]) if auto else keyboard(row["id"], len(approvals.hooks_of(row)))
     path = row["file_path"]
+    sbs = os.path.splitext(path or "")[0] + ".sbs.mp4"
+    if path and approvals.is_remake(row) and os.path.isfile(sbs):
+        path = sbs          # remakes: the clipper's original | our remake, side by side (study copy, never uploaded)
     text = ("🚀 Auto-posting at the next upload slot.\n" if auto else "") + caption(row, same)
     if path and os.path.isfile(path) and os.path.getsize(path) <= MAX_UPLOAD_BYTES:
         with open(path, "rb") as f:

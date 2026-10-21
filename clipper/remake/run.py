@@ -187,6 +187,10 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
         render.render({"vmap": vm, "amap": am, "look": lk, "ass": cp["ass"]}, out, work)
+        try:   # Lucas reviews every remake next to the original (2026-10-21)
+            render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
+        except Exception as e:  # noqa: BLE001 - the remake itself is fine without it
+            C.log(f"side by side failed: {e}")
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
                                                         "moving": False}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
