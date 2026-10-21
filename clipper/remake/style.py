@@ -670,7 +670,16 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
         dy = (bb[2] + bb[3]) / 2 if bb else 0.0
     if box and looks.get("box") is not None:
         looks["box"]["present"] = True
-    pos = [[round(m["cx"], 4), round(m["cy"], 4)] if m else None for m in ms]   # where each caption sits
+    def reliable(m):
+        return bool(m and m["lines"] and 0.75 * line_h <= m["line_h"] <= 1.33 * line_h)
+    pos = [[round(m["cx"], 4), round(m["cy"], 4)] if reliable(m) else None for m in ms]   # where each caption sits
+    rel = [p for p in pos if p]
+    if rel:
+        mx, my = float(np.median([p[0] for p in rel])), float(np.median([p[1] for p in rel]))
+        off = [abs(p[0] - mx) > 0.08 or abs(p[1] - my) > 0.05 for p in rel]
+        if np.mean(off) < 0.3:          # their captions stay put: one place for all (noise can't move them)
+            pos = [None] * len(pos)
+            cx, cy = mx, my
     st = {"ok": fs is not None, "family": entry[0], "bold": entry[1], "italic": entry[2], "file": entry[3],
           "box_pad": box, "dy": dy, "pos": pos,
           "font_score": round(score, 3), "track": track, "fs": fs, "spacing": None if fs is None else track * fs,

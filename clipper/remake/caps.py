@@ -470,8 +470,7 @@ def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None, width=None
     width = width or _libass_width(st)
     outline = float(st.get("outline") or 0)
     pos = st.get("pos") or []
-    moves = len({(round(p[0], 2), round(p[1], 2)) for p in pos if p}) > 2 and \
-        np.std([p[0] for p in pos if p]) > 0.04          # their captions follow the speaker: place each one
+    moves = any(pos)          # style.build keeps per-caption places only when their captions follow the speaker
     for k, ev in enumerate(evs):
         cols = (st.get("colours") or [])[k] if k < len(st.get("colours") or []) else [w["c"] for w in ev["words"]]
         cy = (st.get("y") or ev.get("y", 0.5)) * out_h
