@@ -75,28 +75,37 @@ def test_frames_grabs_three_jpegs(tmp_path):
 
 
 def test_double_captions_teach_the_streamer_and_rerender_once(con, monkeypatch, tmp_path):
-    # Valkyrae shows live captions too: found by the check on 2026-10-20, not by hand.
+    # Valkyrae's live captions were found this way on 2026-10-20 (now in the watchlist); here a streamer
+    # the watchlist doesn't know.
     monkeypatch.setenv("VISUAL_QA", "1")
     con.execute("INSERT INTO radar_candidates (clip_id, creator, title, url, view_count, clip_created_at,"
-                " views_per_hour, clips_id) VALUES ('a', 'Valkyrae', '', 'u', 1, '2026-10-20T00:00:00Z', 1, 1)")
+                " views_per_hour, clips_id) VALUES ('a', 'Freshstreamer', '', 'u', 1, '2026-10-20T00:00:00Z', 1, 1)")
     con.execute("UPDATE clips SET visual_qa='{\"ok\": true}' WHERE id=2")
     con.commit()
     dbl = lambda imgs: '{"ok": false, "issues": [{"code": "double_captions", "frame": 2}]}'   # noqa: E731
     res = V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])
     assert res["rerender"] == [1]
     assert con.execute("SELECT state, visual_qa FROM clips WHERE id=1").fetchone() == ("needs_rerender", None)
-    assert con.execute("SELECT creator, own_captions FROM creator_flags").fetchall() == [("valkyrae", 1)]
+    assert con.execute("SELECT creator, own_captions FROM creator_flags").fetchall() == [("freshstreamer", 1)]
     import clip
     db = tmp_path / "c.db"
     disk = sqlite3.connect(db)
     con.backup(disk)
     disk.close()
-    assert "valkyrae" in clip.own_caption_logins(db=str(db))                   # the Editor now skips ours
-    # after the re-render: still double captions -> no second automatic retry, it waits for a tap
+    assert "freshstreamer" in clip.own_caption_logins(db=str(db))                   # the Editor now skips ours
+    # after the re-render we draw no captions for her: captions on screen are hers -> passes, no tap needed
+    # (Stable Ronaldo's re-render waited for a tap on 2026-10-21 because of this)
     con.execute("UPDATE clips SET state='qc_passed' WHERE id=1")
     con.commit()
     res = V.run(con, vision=dbl, grab=lambda v: [b"a", b"b", b"c"])
-    assert res["failed"] == {1: ["double_captions"]} and res["rerender"] == []
+    assert res["passed"] == [1] and res["rerender"] == [] and res["failed"] == {}
+    assert json.loads(con.execute("SELECT visual_qa FROM clips WHERE id=1").fetchone()[0])["ignored"] == ["double_captions"]
+    # any other problem still counts
+    con.execute("UPDATE clips SET visual_qa=NULL WHERE id=1")
+    con.commit()
+    both = lambda imgs: '{"ok": false, "issues": [{"code": "double_captions"}, {"code": "blurry_panel"}]}'   # noqa: E731
+    assert V.run(con, vision=both, grab=lambda v: [b"a", b"b", b"c"])["failed"] == {1: ["blurry_panel"]}
+    assert "NO caption line of ours" in V.prompt_for({"hook": "h", "own_captions": True})
 
 
 def test_prompt_names_our_own_header_so_it_is_not_double_captions():

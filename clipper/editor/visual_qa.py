@@ -8,7 +8,8 @@ rendered file (hook at 1 s, ~45 %, ~80 %) with Claude Haiku (vision) against a f
   white header box "double captions"; Sykkuno's real double captions were flagged every time)
 - pass  -> the clip goes on as before (auto-post)
 - double captions on a streamer not known to caption their stream -> learned (creator_flags), the clip is
-  re-rendered without our captions and checked again (Sykkuno, Valkyrae)
+  re-rendered without our captions and checked again (Sykkuno, Valkyrae). For a streamer we draw no captions
+  for, captions on screen are theirs: never "double" (Stable Ronaldo's re-render waited for a tap, 2026-10-21)
 - fail  -> it waits in Telegram for ✅ Post / ❌ Kill with the issues listed (approvals.needs_tap)
 - error (no key, API down) -> {"ok": null}: the clip goes on; the check never blocks the channel
 Stored as JSON in clips.visual_qa (migration 010); a re-render clears it so the new file is checked.
@@ -83,6 +84,9 @@ def prompt_for(expected=None):
              "text": "as a title line that stays in every frame",
              "none": "in frame 1 only"}.get(header, "in frame 1 only")
     own = f"OUR hook/title text on this clip is \"{hook}\", shown {where}. " if hook else ""
+    if expected.get("own_captions"):
+        own += ("This clip has NO caption line of ours: the speech captions you see are the streamer's own live "
+                "captions, which is fine; report double_captions only if two different caption tracks show at once. ")
     return PROMPT.replace("Check each frame carefully", own + "Everything else that transcribes speech "
                           "is NOT ours. Check each frame carefully", 1)
 
@@ -172,6 +176,22 @@ def learn_own_captions(con, creator, clip_id):
     return cur.rowcount == 1
 
 
+def has_own_captions(con, creator):
+    """True when the Editor draws no captions for this creator (their stream shows live captions)."""
+    if not creator:
+        return False
+    try:
+        if con.execute("SELECT 1 FROM creator_flags WHERE creator=? AND own_captions=1", (creator.lower(),)).fetchone():
+            return True
+    except Exception:  # noqa: BLE001 - table missing on an old DB
+        pass
+    try:
+        import clip
+        return creator.lower() in clip.own_caption_logins()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def run(con, vision=None, grab=frames):
     """Check every qc_passed clip that has no result yet. -> {"passed": [ids], "failed": {id: codes},
     "rerender": [ids]}. Double captions on a streamer we did not know shows live captions: learn it and
@@ -183,9 +203,15 @@ def run(con, vision=None, grab=frames):
                        " LEFT JOIN radar_candidates r ON r.clips_id = c.id"
                        " WHERE c.state='qc_passed' AND c.visual_qa IS NULL ORDER BY c.id").fetchall()
     for cid, path, creator, hook in rows:
-        expected = {"hook": hook, "header": _header_for(creator)}
+        theirs = has_own_captions(con, creator)
+        expected = {"hook": hook, "header": _header_for(creator), "own_captions": theirs}
         r = check(path, vision, grab, expected) if path and os.path.isfile(path) else \
             {"ok": None, "issues": [], "error": "file missing"}
+        if theirs and r["ok"] is False:          # we drew no captions: what's on screen is theirs, not double
+            left = [i for i in r["issues"] if i.get("code") != "double_captions"]
+            r = {**r, "issues": left, "ok": not left or False}
+            if not left:
+                r["ignored"] = ["double_captions"]
         codes = {i.get("code") for i in r.get("issues") or []}
         if r["ok"] is False and "double_captions" in codes and learn_own_captions(con, creator, cid) \
                 and codes == {"double_captions"}:

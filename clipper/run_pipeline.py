@@ -235,25 +235,45 @@ def match_step(con, now=None, ask=None, clips_for=None):
     return f"matched {r['matches']} moments ({r['streamers']} streamers)"
 
 
-def same_footage(a, b, ids=None):
-    """Same streamer, same stretch of stream: Twitch with VOD offsets on both sides -> the offsets overlap;
-    otherwise (Kick, or no offset) the [created_at - duration, created_at] spans overlap. YouTube VOD
-    windows never count (their created_at is not the moment)."""
+SAME_SHARE = 0.5   # two clips are one moment when they share at least half of the shorter one's footage
+
+
+def _span(c, vod):
+    d = float(c.get("duration_s") or 0)
+    if vod:
+        return float(c["vod_offset"]), float(c["vod_offset"]) + d
+    end = top_clips.parse_ts(c["created_at"]).timestamp()
+    return end - d, end
+
+
+def same_footage(a, b, ids=None, share=SAME_SHARE):
+    """Same streamer and mostly the same stretch of stream: at least `share` of the shorter clip overlaps.
+    Twitch with VOD offsets on both sides -> same VOD and the offsets; otherwise (Kick, or no offset) the
+    [created_at - duration, created_at] spans. YouTube VOD windows never count (their created_at is not the
+    moment). Any overlap was too loose: Stable Ronaldo's "Jason asks Ron out" (VOD 2872-2932 s) counted as
+    the fry clip next to it (2840-2890 s), so the fry clip was posted as the matched moment (2026-10-21)."""
     sa, sb = a.get("source") or "twitch", b.get("source") or "twitch"
     if "youtube" in (sa, sb):
         return False
+    who = lambda c: (ids or {}).get(c["creator"].lower(), c["creator"]).lower()  # noqa: E731
     try:
-        if sa == sb == "twitch" and top_clips._has_vod(a) and top_clips._has_vod(b):
-            return top_clips._same_moment(a, b)
-        return kicksrc.same_moment(a, b, ids)
+        if who(a) != who(b):
+            return False
+        vod = sa == sb == "twitch" and top_clips._has_vod(a) and top_clips._has_vod(b)
+        if vod and str(a["video_id"]) != str(b["video_id"]):
+            return False
+        (a0, a1), (b0, b1) = _span(a, vod), _span(b, vod)
     except (KeyError, TypeError, ValueError):
         return False
+    shorter = min(a1 - a0, b1 - b0)
+    return shorter > 0 and min(a1, b1) - max(a0, b0) >= share * shorter
 
 
 def same_moments_first(con, cands, now, allowed=None, ids=None):
-    """Moments a top clipper's Short is popping with go first (D54). A matched stream clip (radar/match.py)
-    marks the candidate showing the same footage, or joins the list when Radar didn't pull it. Matched ones
-    rank by that Short's views/hour, the rest after them by their own views/hour."""
+    """Moments a top clipper's Short is popping with go first (D54). The matched stream clip (radar/match.py)
+    itself is posted: if Radar pulled it, it is marked; if not, it joins the list and other clips of the same
+    footage leave it (the model picked this one; the other may start or end elsewhere). Matched ones rank by
+    that Short's views/hour, the rest after them by their own views/hour."""
     from radar import match
     try:
         matched = match.candidates(con, now)
@@ -263,12 +283,16 @@ def same_moments_first(con, cands, now, allowed=None, ids=None):
     for m in matched:
         if allowed is not None and not top_clips.filter_allowed([m["creator"]], allowed):
             continue
-        hit = next((c for c in out if c["clip_id"] == m["clip_id"] or same_footage(c, m, ids)), None)
-        if hit is None:
-            m["views_per_hour"] = top_clips.score(m, now)
-            out.append(m)
-        elif (hit.get("match") or {}).get("vph", -1) < m["match"]["vph"]:
-            hit["match"] = m["match"]
+        exact = next((c for c in out if c["clip_id"] == m["clip_id"]), None)
+        if exact is not None:
+            if (exact.get("match") or {}).get("vph", -1) < m["match"]["vph"]:
+                exact["match"] = m["match"]
+            continue
+        if any(c.get("match") and same_footage(c, m, ids) for c in out):
+            continue                         # a more popping Short's match already covers this footage
+        out = [c for c in out if not same_footage(c, m, ids)]
+        m["views_per_hour"] = top_clips.score(m, now)
+        out.append(m)
     return sorted(out, key=lambda c: (0, -c["match"]["vph"]) if c.get("match") else (1, -c["views_per_hour"]))
 
 
