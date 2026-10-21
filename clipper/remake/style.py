@@ -696,39 +696,50 @@ def refine_y(short_path, base_path, fps, nfr, size, y, samples=24):
 
 def caption_states(short_path, base_path, fps, nfr, size, y, band=0.1, chunk=120):
     """[(n0, n1)] frame ranges in which their caption shows the same text (a new word, a new caption or no caption
-    starts a new range), found on |their - base| fill masks at SEG_W wide."""
+    starts a new range), found on |their - base| fill masks at SEG_W wide. Frames whose 'caption' is far taller
+    than their text (a flash or a cut the map missed lights up the whole band) keep the current state."""
     W0, H0 = size
     w, h = SEG_W, int(round(SEG_W * H0 / W0 / 2) * 2)
     k3 = np.ones((3, 3), np.uint8)
-    segs, cur, prev = [], None, None
+    masks, heights = [], []
     for k in range(0, nfr, chunk):
         a = C.read_frames(short_path, k, min(chunk, nfr - k), fps, (w, h))
         b = C.read_frames(base_path, k, min(chunk, nfr - k), fps, (w, h))
         for i in range(min(len(a), len(b))):
-            n = k + i
             _, fill, _ = caption_masks(a[i], b[i], y, band)
             ls = lines_of(fill, min_rows=3, near=y * h, k=3)
-            if ls:
-                keep = np.zeros(h, bool)
-                keep[max(0, ls[0][0] - 2):ls[-1][1] + 2] = True
-                fill = fill & keep[:, None]
-            else:
-                fill = np.zeros_like(fill)
-            m = cv2.dilate(fill.astype(np.uint8), k3) > 0 if fill.sum() >= 40 else None
-            if m is None:
-                if cur is not None:
-                    segs.append((cur, n))
-                    cur = None
-            elif cur is None:
+            if not ls or fill.sum() < 40:
+                masks.append(None)
+                heights.append(None)
+                continue
+            keep = np.zeros(h, bool)
+            keep[max(0, ls[0][0] - 2):ls[-1][1] + 2] = True
+            m = cv2.dilate((fill & keep[:, None]).astype(np.uint8), k3) > 0
+            masks.append(np.packbits(m))
+            heights.append(max(r1 - r0 for r0, r1 in ls))
+    hs = [x for x in heights if x]
+    typical = float(np.median(hs)) if hs else 0
+    segs, cur, prev = [], None, None
+    shape = (h, w)
+    for n, (pm, ht) in enumerate(zip(masks, heights)):
+        if pm is not None and typical and ht > 1.6 * typical:
+            continue                                  # flash / missed cut: not a caption change
+        m = None if pm is None else np.unpackbits(pm)[:h * w].reshape(shape).astype(bool)
+        if m is None:
+            if cur is not None:
+                segs.append((cur, n))
+                cur = None
+        elif cur is None:
+            cur = n
+        else:
+            inter, union = (m & prev).sum(), (m | prev).sum()
+            if union and inter / union < SEG_IOU:
+                segs.append((cur, n))
                 cur = n
-            else:
-                inter, union = (m & prev).sum(), (m | prev).sum()
-                if union and inter / union < SEG_IOU:
-                    segs.append((cur, n))
-                    cur = n
+        if m is not None:
             prev = m
     if cur is not None:
-        segs.append((cur, nfr))
+        segs.append((cur, len(masks)))
     return [(a, b) for a, b in segs if b - a >= 2]
 
 
@@ -782,7 +793,7 @@ def state_events(segs, texts, fps, y):
             p["words"] += [{"w": w, "c": DEFAULT_WHITE, "t": round(a / fps, 3)} for w in words[len(pk):]]
             p["end"], p["lines"] = round(b / fps, 3), [len(ln) for ln in lines]
             continue
-        if p and abs(p["end"] - a / fps) < 1.5 / fps and nk == pk:
+        if p and a / fps - p["end"] < 0.4 and nk == pk:      # same caption, lost for a moment (flash, pop)
             p["end"] = round(b / fps, 3)
             continue
         evs.append({"start": round(a / fps, 3), "end": round(b / fps, 3), "y": y, "lines": [len(ln) for ln in lines],
