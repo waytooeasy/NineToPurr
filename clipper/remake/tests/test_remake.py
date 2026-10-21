@@ -71,6 +71,31 @@ def test_short_download_uses_the_cookie_file_only_when_present(tmp_path, monkeyp
     assert seen[-1][seen[-1].index("--cookies") + 1] == str(c)
 
 
+def test_hung_download_fails_this_short_throttling_stops_the_run(tmp_path):
+    import subprocess as sp
+
+    def hang(*a, **k):
+        raise sp.TimeoutExpired("yt-dlp", 240)
+
+    class R429:
+        returncode, stderr = 1, "ERROR: Unable to download webpage: HTTP Error 429: Too Many Requests"
+    with pytest.raises(RuntimeError) as e:          # one unreachable video server: this Short fails, next one
+        source.download_short("x", tmp_path, runner=hang)
+    assert not isinstance(e.value, source.BotCheck)
+    with pytest.raises(source.BotCheck):            # YouTube throttling us: stop the run, try later
+        source.download_short("y", tmp_path, runner=lambda *a, **k: R429())
+
+
+def test_no_twitch_vod_means_skip_before_any_download(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLIPPER_REMAKE", str(tmp_path))
+    c = db()
+    monkeypatch.setattr(source, "download_short", lambda *a, **k: pytest.fail("downloaded a Short it cannot remake"))
+    s = {"id": "SPEED1", "streamer": "IShowSpeed", "title": "t", "published": "2026-10-21T10:00:00Z"}
+    with pytest.raises(source.NotFound):
+        run.remake_one(c, s, str(tmp_path / "out"), tw=None)
+    assert c.execute("SELECT status FROM remakes WHERE short_id='SPEED1'").fetchone()[0] == "skipped"
+
+
 def test_bot_check_is_reported_not_worked_around(tmp_path):
     class R:
         returncode, stderr = 1, "ERROR: [youtube] x: Sign in to confirm you're not a bot. Use --cookies"

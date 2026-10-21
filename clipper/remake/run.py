@@ -145,10 +145,13 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
     work = C.workdir(sid)
     _status(con, s, "working", last_error=None)
     try:
-        short_path = source.download_short(sid, work)
         logins = source.twitch_logins([s.get("streamer", "")], f"{s.get('title', '')} {s.get('desc', '')}")
+        plans = source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins)
+        if not plans and not (work / "found.json").exists():
+            raise source.NotFound(f"no Twitch VOD of {', '.join(logins) or s.get('streamer')} around it")
+        short_path = source.download_short(sid, work)
         found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,
-                                                            tw=tw, logins=logins))
+                                                            tw=tw, logins=logins, plans=plans))
         am = _stage(work, "amap", lambda: amap.build(short_path, [x["file"] for x in found["sections"]]))
         if am["matched_share"] < MIN_AUDIO:
             raise Unsupported(f"only {am['matched_share']:.0%} of the audio is the stream")
