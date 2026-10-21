@@ -6,7 +6,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 
 ## Clipper (active)
 - One YouTube Shorts channel, multi-streamer brand; the Heat Index picks streamers daily. No ties to streamers. Paid by YouTube Shorts ads.
-- **Follow the market (D36):** copy what works for the top clip channels today; don't invent rules. Every clip: hook + story captions in today's style + our title. **Structure = the clipper's (D56):** layout (full / wide shot over blur / face-on-top stack), captions, length and title are copied from the clippers of that moment or streamer, never our own invention. Market length ≤60 s. Max 5/day, posted as soon as Lucas taps ✅ Post. Streamer audio, no raw re-uploads.
+- **Follow the market (D36):** copy what works for the top clip channels today; don't invent rules. Every clip: hook + story captions in today's style + our title. **Structure = the clipper's (D56):** layout (full / wide shot over blur / face-on-top stack), captions, length and title are copied from the clippers of that moment or streamer, never our own invention. **Remakes (D58):** every Short is a frame-faithful remake of a popping clipper Short, rebuilt from the streamer's own VOD (their seconds, cuts, zooms, captions, look); our title, no music, never their pixels. Market length ≤60 s. Max 5/day, posted as soon as Lucas taps ✅ Post. Streamer audio, no raw re-uploads.
 - Stack: Python + systemd timers + SQLite + Telegram approval bot. Per-clip LLM = **Claude Haiku 5.5** (Anthropic API); daily Analyst = Sonnet 5.5. Runtime n8n/agent team only after the gate in STRATEGY.md.
 - **Anthropic API = Lucas's own account only. Never a second account.** `ANTHROPIC_API_KEY` lives in GitHub secrets and `/opt/clipper/.env`, never in git or logs.
 - Build agents run via the Claude GitHub Action: Lucas comments `@claude` on an issue → agent builds → opens a PR. Agents never merge, never edit `.github/workflows/`, never touch secrets.
@@ -31,7 +31,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 - **Build loop:** agent finishes → PR opens itself → CI → if red, the agent is asked to fix it (max 2) → **Lucas merges** → the next ready issue starts. Keep CI green; never weaken or skip tests.
 - Issues run in order via the agent queue. Put `Depends on: #N` at the top of an issue body to sequence it. Labels: `agent` (queue it), `hold` (stop), `in-progress` (running), `needs-hq` (decision needed).
 - Every PR: tests for new code (`pytest`, sample data, no network), module README updated, `DECISIONS.md` untouched (HQ only).
-- Sources = streamers' own footage (Twitch clips, Twitch/YouTube live VODs). Competitor Shorts = format research only; never download or re-upload them. See `.claude/skills/shorts-format`.
+- Sources = streamers' own footage (Twitch clips, Twitch/YouTube live VODs). Competitor Shorts: download them to **study and imitate** their edit (which parts of the stream, cuts, zooms, captions, layout), **never re-upload or reuse their footage** (D57). See `.claude/skills/shorts-format`.
 - Subagents in `.claude/agents/` (builder-radar/editor/publisher, reviewer, security). Read only what the task needs to save tokens.
 - Lucas wants short, direct answers and the whole system in mind; ask when unsure instead of assuming.
 - **Keep `clipper/docs/STATUS.md` current:** if your PR changes what runs, what's next or who something waits on, update it in the same PR.

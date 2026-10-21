@@ -3,7 +3,7 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-20 23:30 UTC_
+_Last updated: 2026-10-21 13:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
@@ -18,6 +18,7 @@ _Last updated: 2026-10-20 23:30 UTC_
 | Access for Claude | ✅ SSH from moon's local shell, `/vm` on issue #58, scoped sudo for restarting `clipper-*` services |
 
 ## The format today (follow the market, D36)
+- **Remakes (D58, from 2026-10-21):** every Short becomes a frame-faithful remake of a popping clipper Short, rebuilt from the streamer's own VOD (their seconds, cuts, crops/zooms/pans, wide-over-blur, flashes, captions, grade, aspect, audio cut timing; our title; no music). Proof of concept: Ron date remake v2 (study scripts in `/opt/clipper/study/ron-date/` on the VM). Until the remake engine is live, the pipeline below keeps running.
 - **Streamers:** picked by **Shorts demand** (what's popping about them on Shorts in 48 h, any channel) × fresh footage (D48). 2026-10-20: Jynxzi, Lacy, Stable Ronaldo, CaseOh on top; Speed/Kai have the most demand but no footage we can get.
 - **Moments (D54, Lucas: "same clips"):** the moments the top clippers' Shorts are popping with go first: each popping Short is matched to the streamer's own Twitch/Kick clip of that moment (Haiku on titles + times). Our title paraphrases theirs with synonyms (never identical); cut to their length. One moment is never posted twice.
 - **Sources:** Twitch clips + **Kick clips** (D45): Heat Index picks from the ~36-streamer watchlist (Adin Ross, N3on, Clavicular, Ice Poseidon on Kick; xQc on both). YouTube footage blocked (YouTube answers 429 to the home IP), see #64.
@@ -41,6 +42,7 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
 
 ## Next for Claude
+- **Build the remake engine (D58):** pick a popping Short → find the streamer's VOD + seconds (Twitch clip `vod_offset` from the moment match, else audio fingerprint over the VOD's audio) → download those VOD sections → frame-exact shot map (SIFT) → fit crops/zooms/pans, grade, overlays → OCR their captions → render → our title → visual check → Telegram. Start from the study scripts (`remake2.py`, `align_v.py`, `audio3.py`, `lut.py`).
 - Day-3 check (D53): views per Short + stayed % → keep/raise 6/day if stayed ≥ 60 %, cut to 3 strong slots if 0-view Shorts persist.
 - Check the first same-moment matches (`select streamer, short_title, clip_id, confidence from moment_matches`) against the clips: tune `MIN_CONF` if a match is wrong.
 - Feed views per streamer / format back into the Heat Index and the Writer (learning loop).
