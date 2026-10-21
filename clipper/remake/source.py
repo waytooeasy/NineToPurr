@@ -21,6 +21,7 @@ SNIP_S = 2.0           # snippet length
 MIN_NC = 0.7           # a snippet counts as found at this normalised correlation
 HINT_PAD_S = 600       # audio searched around a moment-match hint
 MAX_SECTION_S = 720    # longest single video section downloaded
+DENSE_PAD_S = 300      # dense audio pass: this far around the snippet hits
 WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
 
 
@@ -252,8 +253,11 @@ def find(short, work, con=None, tw=None, logins=(), plans=None):
         offs = [h["vod_t"] - h["short_t"] for h in good]
         try:   # every part of the Short, not only its loud snippets (a clipper jumps across minutes)
             from . import amap as A
-            rows = A.dense(short_audio, [C.read_audio(audio, LOC_SR, highpass=120)], sr=LOC_SR)
-            dense = [base + o for t, k, o, nc in rows if k is not None and nc >= A.MIN_NC]
+            # only around what the snippets found: a whole VOD's audio (10 h) would not fit in memory
+            w0 = max(0.0, min(offs) - base - DENSE_PAD_S)
+            w1 = max(offs) - base + dur + DENSE_PAD_S
+            rows = A.dense(short_audio, [C.read_audio(audio, LOC_SR, start=w0, dur=w1 - w0, highpass=120)], sr=LOC_SR)
+            dense = [base + w0 + o for t, k, o, nc in rows if k is not None and nc >= A.MIN_NC]
             votes = {}
             for o in dense:
                 votes[round(o)] = votes.get(round(o), 0) + 1
