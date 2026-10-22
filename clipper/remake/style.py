@@ -613,6 +613,17 @@ def measure_all(short_path, base_path, evs, fps, size, at=(0.4, 0.6, 0.85)):
     return out
 
 
+def merge_colour(pixel, ocr):
+    """A word's colour: the pixels' when they found a colour; the OCR's when the pixels say white (or nothing) but
+    the OCR saw a highlight colour (a highlight read as white is the usual pixel miss); else white."""
+    ocr = ocr if ocr and re.fullmatch(r"#[0-9A-Fa-f]{6}", str(ocr)) else DEFAULT_WHITE
+    if pixel and pixel != DEFAULT_WHITE:
+        return pixel
+    if ocr.upper() != DEFAULT_WHITE and min(int(ocr[i:i + 2], 16) for i in (1, 3, 5)) < 200:
+        return ocr.upper()
+    return pixel or DEFAULT_WHITE
+
+
 def vote_colour(cs):
     """White if any reading says white or the readings disagree; else their median colour."""
     cs = [c for c in cs if c]
@@ -640,7 +651,7 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
     # real word colours (pixels beat OCR's guess)
     colours = []
     for ev, m in zip(evs, ms):
-        colours.append([(m["colours"][i] if m and m["colours"][i] else w["c"]) for i, w in enumerate(ev["words"])])
+        colours.append([merge_colour(m["colours"][i] if m else None, w["c"]) for i, w in enumerate(ev["words"])])
     sample_idx = [i for i, e in enumerate(evs) if e in pick_samples(evs)]
     lines = [(ln["mask"], ln["text"]) for i in sample_idx if ms[i] for ln in ms[i]["lines"]
              if ln["mask"].size and len(ln["text"]) >= 3]
@@ -692,7 +703,10 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
         looks["box"]["present"] = True
     def reliable(m):
         return bool(m and m["lines"] and 0.75 * line_h <= m["line_h"] <= 1.33 * line_h)
-    pos = [[round(m["cx"], 4), round(m["cy"], 4)] if reliable(m) else None for m in ms]   # where each caption sits
+    if sum(1 for e in evs if "x" in e) >= 0.6 * len(evs):     # their caption's place, per state from the pixels
+        pos = [[e["x"], e["y"]] if "x" in e else None for e in evs]
+    else:
+        pos = [[round(m["cx"], 4), round(m["cy"], 4)] if reliable(m) else None for m in ms]   # where each sits
     rel = [p for p in pos if p]
     if rel:
         mx, my = float(np.median([p[0] for p in rel])), float(np.median([p[1] for p in rel]))
@@ -736,10 +750,65 @@ def with_font(st, alt_index, fonts_dir=None):
 # ---------------- caption states from their pixels (exact timing) ----------------
 SEG_W = 540
 SEG_IOU = 0.6
+SEG_WIDTH = 0.12        # the caption's width changing more than this between two frames = new words
+EDGED = 0.35            # share of fill pixels hugging a box / outline that makes captions findable anywhere
 OCR_PROMPT = ("Each image is a crop of one YouTube Short frame around its big burned-in caption. For each image, in "
-              "order, read the caption exactly as shown (keep punctuation, $, *asterisks*, case). Return JSON only: a "
-              "list with one object per image: {{\"lines\": [[\"WORD\", ...], ...]}} (lines top to bottom, words "
-              "left to right); an image without a caption: {{\"lines\": []}}. There are {n} images.")
+              "order, read the caption exactly as shown (keep punctuation, $, *asterisks*, case) and the fill colour "
+              "of each word. Return JSON only: a list with one object per image: "
+              "{{\"lines\": [[[\"WORD\", \"#RRGGBB\"], ...], ...]}} (lines top to bottom, words left to right; "
+              "white is #FFFFFF); an image without a caption: {{\"lines\": []}}. There are {n} images.")
+
+
+def _near_dark(th, k):
+    return cv2.dilate((th.max(2) < DARK_V).astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+
+
+def text_lines(th, base, y=0.5, edged=True, near=None):
+    """(rows, fill) of their caption in this frame: the text-like line(s) anywhere in the frame (fill hugging a box /
+    outline) when their captions are `edged`, else the line(s) nearest `near` (fraction). rows = [(r0, r1)]."""
+    H = th.shape[0]
+    _, fill, _ = caption_masks(th, base, 0.5, 0.42)
+    runs = _line_runs(fill, 3)
+    if not runs:
+        return [], fill
+    if edged:
+        best, score = None, 0.0
+        nd = _near_dark(th, max(3, int(th.shape[1] / 90) | 1))
+        for i, (r0, r1) in enumerate(runs):
+            f = fill[r0:r1]
+            px = int(f.sum())
+            if px < 30 or (r1 - r0) > 0.14 * H:
+                continue
+            hug = float((f & nd[r0:r1]).sum()) / px
+            s = hug * np.sqrt(px)
+            if hug >= EDGED and s > score:
+                best, score = i, s
+        if best is None:
+            return [], fill
+        r0, r1 = runs[best]
+        sel = [runs[best]]
+        for j in (best - 1, best + 1, best - 2, best + 2):          # the caption's other lines, close above/below
+            if 0 <= j < len(runs):
+                q0, q1 = runs[j]
+                gap = q0 - sel[-1][1] if q0 > r0 else sel[0][0] - q1
+                if 0 <= gap < 0.9 * (r1 - r0) and 0.6 <= (q1 - q0) / (r1 - r0) <= 1.6:
+                    sel.append(runs[j])
+                    sel.sort()
+        return sel, fill
+    ls = lines_of(fill, min_rows=3, near=(near if near is not None else y) * H, k=3)
+    return ls, fill
+
+
+def captions_edged(short_path, base_path, fps, nfr, size, samples=24):
+    """Do their captions sit in a box / outline (findable anywhere in the frame)?"""
+    hugs = []
+    for n in np.linspace(0, max(0, nfr - 1), samples).astype(int):
+        a, b = frame(short_path, n, fps, size), frame(base_path, n, fps, size)
+        if a is None or b is None:
+            continue
+        ls, _ = text_lines(a, b, edged=True)
+        hugs.append(1.0 if ls else 0.0)
+    return bool(hugs) and float(np.mean(hugs)) >= 0.4
 
 
 def refine_y(short_path, base_path, fps, nfr, size, y, samples=24):
@@ -756,64 +825,110 @@ def refine_y(short_path, base_path, fps, nfr, size, y, samples=24):
     return float(np.median(ys)) if len(ys) >= 3 else y
 
 
-def caption_states(short_path, base_path, fps, nfr, size, y, band=0.1, chunk=120):
-    """[(n0, n1)] frame ranges in which their caption shows the same text (a new word, a new caption or no caption
-    starts a new range), found on |their - base| fill masks at SEG_W wide. Frames whose 'caption' is far taller
-    than their text (a flash or a cut the map missed lights up the whole band) keep the current state."""
+def caption_states(short_path, base_path, fps, nfr, size, y, edged=False, chunk=120):
+    """[{'n0', 'n1', 'box': [x0, x1, y0, y1] (fractions), 'iou': [...]}]: frame ranges in which their caption shows
+    the same text. A new range starts when the caption's pixels change shape (IoU), its width jumps (a word swapped
+    for one of similar shape) or it disappears. Frames whose 'caption' is far taller than their text (a flash or a
+    cut the map missed) keep the current state."""
     W0, H0 = size
     w, h = SEG_W, int(round(SEG_W * H0 / W0 / 2) * 2)
     k3 = np.ones((3, 3), np.uint8)
-    masks, heights = [], []
+    masks, boxes = [], []
     for k in range(0, nfr, chunk):
         a = C.read_frames(short_path, k, min(chunk, nfr - k), fps, (w, h))
         b = C.read_frames(base_path, k, min(chunk, nfr - k), fps, (w, h))
         for i in range(min(len(a), len(b))):
-            _, fill, _ = caption_masks(a[i], b[i], y, band)
-            ls = lines_of(fill, min_rows=3, near=y * h, k=3)
-            if not ls or fill.sum() < 40:
+            ls, fill = text_lines(a[i], b[i], y, edged, near=y)
+            if not ls:
                 masks.append(None)
-                heights.append(None)
+                boxes.append(None)
                 continue
             keep = np.zeros(h, bool)
             keep[max(0, ls[0][0] - 2):ls[-1][1] + 2] = True
-            m = cv2.dilate((fill & keep[:, None]).astype(np.uint8), k3) > 0
-            masks.append(np.packbits(m))
-            heights.append(max(r1 - r0 for r0, r1 in ls))
-    hs = [x for x in heights if x]
+            m = fill & keep[:, None]
+            m = main_block(m) if len(ls) == 1 else m
+            xs = np.where(m.any(0))[0]
+            if m.sum() < 40 or not len(xs):
+                masks.append(None)
+                boxes.append(None)
+                continue
+            masks.append(np.packbits(cv2.dilate(m.astype(np.uint8), k3) > 0))
+            boxes.append((int(xs.min()), int(xs.max()) + 1, ls[0][0], ls[-1][1], max(r1 - r0 for r0, r1 in ls)))
+    hs = [bx[4] for bx in boxes if bx]
     typical = float(np.median(hs)) if hs else 0
-    segs, cur, prev = [], None, None
-    shape = (h, w)
-    for n, (pm, ht) in enumerate(zip(masks, heights)):
-        if pm is not None and typical and ht > 1.6 * typical:
+    segs, cur, prev, pbox, ious = [], None, None, None, []
+
+    def close(n_end):
+        if cur is not None and n_end - cur >= 2:
+            bs = [bx for bx in boxes[cur:n_end] if bx]
+            box = [float(np.median([bx[j] for bx in bs])) / (w if j < 2 else h) for j in range(4)] if bs else None
+            segs.append({"n0": cur, "n1": n_end, "box": box, "iou": ious[:]})
+    for n, (pm, bx) in enumerate(zip(masks, boxes)):
+        if pm is not None and typical and bx[4] > 1.6 * typical:
             continue                                  # flash / missed cut: not a caption change
-        m = None if pm is None else np.unpackbits(pm)[:h * w].reshape(shape).astype(bool)
+        m = None if pm is None else np.unpackbits(pm)[:h * w].reshape(h, w).astype(bool)
         if m is None:
-            if cur is not None:
-                segs.append((cur, n))
-                cur = None
+            close(n)
+            cur, ious = None, []
         elif cur is None:
-            cur = n
+            cur, ious = n, [1.0]
         else:
             inter, union = (m & prev).sum(), (m | prev).sum()
-            if union and inter / union < SEG_IOU:
-                segs.append((cur, n))
-                cur = n
+            iou = inter / union if union else 1.0
+            wd = (bx[1] - bx[0]) / max(1, pbox[1] - pbox[0])
+            if iou < SEG_IOU or abs(wd - 1) > SEG_WIDTH:
+                close(n)
+                cur, ious = n, [1.0]
+            else:
+                ious.append(float(iou))
         if m is not None:
-            prev = m
-    if cur is not None:
-        segs.append((cur, len(masks)))
-    return [(a, b) for a, b in segs if b - a >= 2]
+            prev, pbox = m, bx
+    close(len(masks))
+    return segs
 
 
-def read_states(short_path, segs, fps, size, y, vision, band=0.12, batch=12):
-    """Text lines of each caption state (one frame 70 % of the way in, cropped to the caption rows)."""
+def _crop(f, box, size):
+    """Their caption with room around it (the OCR sees the words, not the whole frame)."""
     W0, H0 = size
-    r0, r1 = max(0, int((y - band) * H0)), min(H0, int((y + band) * H0))
+    if box is None:
+        return f
+    x0, x1, y0, y1 = box
+    hh = max(0.04, y1 - y0)
+    r0, r1 = max(0, int((y0 - 1.2 * hh) * H0)), min(H0, int((y1 + 1.2 * hh) * H0))
+    c0, c1 = max(0, int((x0 - 0.15) * W0)), min(W0, int((x1 + 0.15) * W0))
+    return f[r0:r1, c0:c1]
+
+
+def _parse_lines(it):
+    """[[(word, colour)]] from the OCR's lines (words as "W" or ["W", "#RRGGBB"])."""
+    lines = []
+    for ln in (it or {}).get("lines") or []:
+        if not isinstance(ln, list):
+            continue
+        out = []
+        for wd in ln:
+            if isinstance(wd, (list, tuple)) and wd:
+                w, c = str(wd[0]).strip(), (str(wd[1]) if len(wd) > 1 else DEFAULT_WHITE)
+            else:
+                w, c = str(wd).strip(), DEFAULT_WHITE
+            if w:
+                c = c.upper() if re.fullmatch(r"#[0-9A-Fa-f]{6}", c) else DEFAULT_WHITE
+                out.append((w, c))
+        if out:
+            lines.append(out)
+    return lines
+
+
+def ocr_frames(short_path, reqs, fps, size, vision, batch=12):
+    """reqs: [(frame, box)] -> [[[(word, colour)]]] one caption per request."""
     imgs = []
-    for a, b in segs:
-        f = frame(short_path, a + int(0.7 * (b - a)), fps, size)
-        crop = f[r0:r1] if f is not None else np.zeros((r1 - r0, W0, 3), np.uint8)
-        crop = cv2.resize(crop, (720, int(720 * crop.shape[0] / crop.shape[1])))
+    for n, box in reqs:
+        f = frame(short_path, n, fps, size)
+        crop = _crop(f, box, size) if f is not None else np.zeros((64, 64, 3), np.uint8)
+        if crop.size == 0:
+            crop = f
+        s = 720 / max(1, crop.shape[1])
+        crop = cv2.resize(crop, (720, max(16, int(crop.shape[0] * s))))
         imgs.append(cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 90])[1].tobytes())
     out = []
     for k in range(0, len(imgs), batch):
@@ -829,11 +944,37 @@ def read_states(short_path, segs, fps, size, y, vision, band=0.12, batch=12):
             if isinstance(items, list) and len(items) == len(part):
                 break
             items = None
-        for it in items or [{}] * len(part):
-            lines = [[str(wd).strip() for wd in ln if str(wd).strip()] for ln in (it or {}).get("lines") or []
-                     if isinstance(ln, list)]
-            out.append([ln for ln in lines if ln])
+        out += [_parse_lines(it) for it in (items or [{}] * len(part))]
     return out
+
+
+def read_states(short_path, segs, fps, size, y, vision, long_f=8):
+    """Text of each caption state; a long state is read near its start and its end, and split where its pixels
+    changed most when the two readings differ (two words of the same shape in a row). Returns (segs, texts)."""
+    reqs, owner = [], []
+    for i, s in enumerate(segs):
+        a, b = s["n0"], s["n1"]
+        pts = [a + int(0.3 * (b - a)), a + int(0.85 * (b - a))] if b - a >= long_f else [a + int(0.7 * (b - a))]
+        for n in pts:
+            reqs.append((n, s.get("box")))
+            owner.append(i)
+    reads = ocr_frames(short_path, reqs, fps, size, vision)
+    by = {}
+    for i, r in zip(owner, reads):
+        by.setdefault(i, []).append(r)
+    out_s, out_t = [], []
+    for i, s in enumerate(segs):
+        rs = by.get(i, [[]])
+        k0 = [_key(w) for ln in rs[0] for w, _ in ln]
+        k1 = [_key(w) for ln in rs[-1] for w, _ in ln]
+        if len(rs) == 2 and k0 != k1 and k0 and k1 and len(s["iou"]) > 3:
+            j = 1 + int(np.argmin(s["iou"][1:]))            # the frame whose pixels changed most
+            out_s += [{**s, "n1": s["n0"] + j}, {**s, "n0": s["n0"] + j}]
+            out_t += [rs[0], rs[1]]
+        else:
+            out_s.append(s)
+            out_t.append(rs[-1])
+    return out_s, out_t
 
 
 def _key(w):
@@ -842,34 +983,42 @@ def _key(w):
 
 def state_events(segs, texts, fps, y):
     """Caption events from the states: a state whose words continue the previous state's (right after it) adds
-    its new words to that event at its first frame; anything else starts a new event."""
+    its new words to that event at its first frame; anything else starts a new event. Each event carries where
+    their caption sat (x, y) and each word's colour as read."""
     evs = []
-    for (a, b), lines in zip(segs, texts):
+    for s, lines in zip(segs, texts):
+        a, b = (s["n0"], s["n1"]) if isinstance(s, dict) else s
+        box = s.get("box") if isinstance(s, dict) else None
+        lines = [[(w, DEFAULT_WHITE) if isinstance(w, str) else tuple(w) for w in ln] for ln in lines]
         words = [w for ln in lines for w in ln]
         if not words:
             continue
         p = evs[-1] if evs else None
         pk = [_key(w["w"]) for w in p["words"]] if p else []
-        nk = [_key(w) for w in words]
+        nk = [_key(w) for w, _ in words]
         if p and abs(p["end"] - a / fps) < 1.5 / fps and nk[:len(pk)] == pk and len(nk) >= len(pk):
-            p["words"] += [{"w": w, "c": DEFAULT_WHITE, "t": round(a / fps, 3)} for w in words[len(pk):]]
+            p["words"] += [{"w": w, "c": c, "t": round(a / fps, 3)} for w, c in words[len(pk):]]
             p["end"], p["lines"] = round(b / fps, 3), [len(ln) for ln in lines]
             continue
         if p and a / fps - p["end"] < 0.4 and nk == pk:      # same caption, lost for a moment (flash, pop)
             p["end"] = round(b / fps, 3)
             continue
-        evs.append({"start": round(a / fps, 3), "end": round(b / fps, 3), "y": y, "lines": [len(ln) for ln in lines],
-                    "words": [{"w": w, "c": DEFAULT_WHITE, "t": round(a / fps, 3)} for w in words]})
+        e = {"start": round(a / fps, 3), "end": round(b / fps, 3), "y": y, "lines": [len(ln) for ln in lines],
+             "words": [{"w": w, "c": c, "t": round(a / fps, 3)} for w, c in words]}
+        if box:
+            e["x"], e["y"] = round((box[0] + box[1]) / 2, 4), round((box[2] + box[3]) / 2, 4)
+        evs.append(e)
     return evs
 
 
 def pixel_events(short_path, base_path, fps, nfr, size, y, vision):
+    edged = captions_edged(short_path, base_path, fps, nfr, size)
     y = refine_y(short_path, base_path, fps, nfr, size, y)
-    segs = caption_states(short_path, base_path, fps, nfr, size, y)
+    segs = caption_states(short_path, base_path, fps, nfr, size, y, edged=edged)
     if not segs:
         return []
-    texts = read_states(short_path, segs, fps, size, y, vision)
+    segs, texts = read_states(short_path, segs, fps, size, y, vision)
     evs = state_events(segs, texts, fps, y)
-    C.log(f"captions from pixels: {len(segs)} states -> {len(evs)} events, "
+    C.log(f"captions from pixels ({'anywhere: box/outline' if edged else 'at one height'}): {len(segs)} states -> {len(evs)} events, "
           f"{sum(len(e['words']) for e in evs)} words")
     return evs

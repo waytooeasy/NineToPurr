@@ -235,3 +235,31 @@ def test_a_render_one_frame_late_is_measured(tmp_path):
     late = _video(tmp_path / "o.mp4", frames[0:58])        # ours n + 1 shows their n
     assert match.frame_shift(T, late, step=3) == 1
     assert match.frame_shift(T, T, step=3) == 0
+
+
+def test_states_carry_place_and_word_colours_and_ocr_highlights_win_over_a_white_pixel_read():
+    segs = [{"n0": 0, "n1": 15, "box": [0.4, 0.6, 0.70, 0.76], "iou": [1.0] * 15}]
+    evs = style.state_events(segs, [[[("RESPECT", "#FFE600")]]], 30, 0.5)
+    assert evs[0]["x"] == 0.5 and evs[0]["y"] == 0.73 and evs[0]["words"][0]["c"] == "#FFE600"
+    assert style.merge_colour("#FFFFFF", "#FFE600") == "#FFE600"
+    assert style.merge_colour("#00FF00", "#FFFFFF") == "#00FF00"
+    assert style.merge_colour(None, "#FFFFFF") == "#FFFFFF"
+
+
+def test_a_long_state_read_twice_is_split_where_its_pixels_changed(tmp_path, monkeypatch):
+    seg = {"n0": 0, "n1": 20, "box": None, "iou": [1.0] * 9 + [0.62] + [1.0] * 10}
+    reads = iter([[[("YOU", "#FFFFFF"), ("KNOW", "#FFFFFF")]], [[("MONKEY", "#00FFFF")]]])
+    monkeypatch.setattr(style, "ocr_frames", lambda *a, **k: [next(reads), next(reads)])
+    segs, texts = style.read_states("x.mp4", [seg], 30, (1080, 1920), 0.5, None)
+    assert [(s["n0"], s["n1"]) for s in segs] == [(0, 9), (9, 20)]
+    assert texts[1][0][0][0] == "MONKEY"
+
+
+def test_boxed_caption_is_found_away_from_the_usual_height():
+    rng = np.random.default_rng(6)
+    base = cv2.GaussianBlur(rng.integers(60, 200, (960, 540, 3), dtype=np.uint8), (0, 0), 5)
+    th = base.copy()
+    th[690:750, 150:390] = 5                           # their box, low in the frame
+    cv2.putText(th, "RESPECT", (165, 735), cv2.FONT_HERSHEY_DUPLEX, 1.4, (255, 255, 255), 3, cv2.LINE_8)
+    rows, _ = style.text_lines(th, base, y=0.5, edged=True)
+    assert rows and 690 <= rows[0][0] and rows[-1][1] <= 750
