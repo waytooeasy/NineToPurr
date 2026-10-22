@@ -902,7 +902,10 @@ def _crop(f, box, size):
 def _parse_lines(it):
     """[[(word, colour)]] from the OCR's lines (words as "W" or ["W", "#RRGGBB"])."""
     lines = []
-    for ln in (it or {}).get("lines") or []:
+    raw = it.get("lines") if isinstance(it, dict) else it      # the model sometimes answers the lines bare
+    if raw and isinstance(raw, list) and raw and not isinstance(raw[0], list):
+        raw = [raw]                                             # one line given flat
+    for ln in raw or []:
         if not isinstance(ln, list):
             continue
         out = []

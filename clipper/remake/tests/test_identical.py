@@ -263,3 +263,10 @@ def test_boxed_caption_is_found_away_from_the_usual_height():
     cv2.putText(th, "RESPECT", (165, 735), cv2.FONT_HERSHEY_DUPLEX, 1.4, (255, 255, 255), 3, cv2.LINE_8)
     rows, _ = style.text_lines(th, base, y=0.5, edged=True)
     assert rows and 690 <= rows[0][0] and rows[-1][1] <= 750
+
+
+def test_ocr_answers_in_any_shape_are_read():
+    assert style._parse_lines({"lines": [[["YOU", "#FFFFFF"], ["KNOW", "#00FFFF"]]]}) == [[("YOU", "#FFFFFF"), ("KNOW", "#00FFFF")]]
+    assert style._parse_lines([[["HI", "#FFE600"]]]) == [[("HI", "#FFE600")]]
+    assert style._parse_lines(["HELLO", "THERE"]) == [[("HELLO", "#FFFFFF"), ("THERE", "#FFFFFF")]]
+    assert style._parse_lines({"lines": []}) == [] and style._parse_lines(None) == []
