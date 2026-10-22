@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-21",
+  "updated": "2026-10-22",
   "sample": [
+    "NDFE8W8wQ-Y",
     "bs0XsXVW7vs",
     "iPjKK-KJ9iU",
-    "WsxRjmuT5ZQ",
+    "AmmDYr4HquA",
     "PdwI12r3kg4",
     "J8yVbmmSSy8",
     "YMxYa1qwO8g",
-    "JUe6rF3kEbE",
-    "AmmDYr4HquA"
+    "JUe6rF3kEbE"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#E8201E",
+    "highlight": "#FF2A2A",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,10 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#E8201E",
-      "#1EC8F0"
+      "#FF2A2A",
+      "#00E5FF",
+      "#FFE600"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear mid-frame in bold uppercase, emphasis colours red and cyan; some use black tag backgrounds."
+  "notes": "Captions appear as bold uppercase words with black outlines, mostly mid-to-lower frame, emphasis in colored words."
 }

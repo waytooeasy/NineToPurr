@@ -1,9 +1,10 @@
 {
-  "updated": "2026-10-21",
+  "updated": "2026-10-22",
   "sample": 40,
-  "title_share": 0.232,
+  "title_share": 0.411,
   "title_tags": 1,
   "generic": [
+    "#viral",
     "#edit"
   ],
   "streamers": {
@@ -15,9 +16,9 @@
     "case",
     "funny",
     "gaming",
+    "streamer",
     "horror",
     "horror gaming",
-    "jumpscare",
-    "scary"
+    "jumpscare"
   ]
 }
