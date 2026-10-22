@@ -19,9 +19,13 @@ the normal flow as an `edited` clip: QC → visual check → Telegram ✅ Post.
 | locate | `source.find` | VOD of the matched moment (D54 hint) or the streamer's archives; audio snippets + a dense audio pass find every part; only those VOD sections are downloaded (1080p60) |
 | audio map | `amap.build` | every 0.2 s of the Short placed in the sections; offsets to the sample, gain per piece, exact switch points, bass hits and music bed reported |
 | video map | `vmap.build` | SIFT + RANSAC per frame → exact crop; cuts where the mapping jumps; smooth camera path per shot; layout full / fit (+ fitted blur background) |
-| look | `look.build` | grade (cubic colour polynomial on low-passed aligned frames), sharpening amount, colour washes (flashes) per frame, caption-band energy |
-| captions | `caps.build` | Haiku vision OCR at 10 fps → caption events, word reveal times, colours; one position per Short; start/end refined on the pixels; ASS in their style (Montserrat Black, glow + shadow, words fade/blur in) |
-| render | `render.render` | frames composed at their aspect (1080 wide) and fps, look applied, libass captions, stream audio crossfaded at their switch points, our own boom on their bass hits |
+| look | `look.build` | grade (cubic colour polynomial on low-passed aligned frames), sharpening amount, **per-frame colour transform** for their effects (green wash, red flash, black & white, fades; `overlay.mats`), caption-band energy |
+| captions | `caps.build` | Haiku vision OCR at 10 fps → caption events, word reveal times; one position per Short; start/end refined on the pixels |
+| base | `render.render(ass=None)` | the remake without captions (their colour effects included): `base.mp4` |
+| caption look | `style.build` | measured on their frames vs `base` (D61): font by glyph shape (39 fonts in `style.FONTS`, fetched to `/opt/clipper/fonts`) + letter spacing, size by libass width, each word's real colour, position, outline, animation (pop / fade / none); shadow, glow, box from one Sonnet call → `style.json` |
+| best captions | `run.build_best` | burns caption candidates on `base` (measured look, the next 2 fonts, the study look), scores each with `match.score`, stops at captions ≥ 92 %, keeps the best |
+| render | `render.render` | frames composed at their aspect (1080 wide) and fps, look + per-frame effects applied, stream audio crossfaded at their switch points, our own boom only on isolated bass hits (never a music bed) |
+| match | `match.score` | per frame vs their Short: picture (outside the caption rows) and captions (our caption error vs their caption's own pixels); % of matching frames + the worst stretches. In the render sidecar json and in Telegram ("📐 match vs original") |
 | title | `title.make` | Haiku: same hook, their names, never their wording |
 | register | `run.register` | creators/sources/clips (`edited`, `caption_style='remake'`, `music_risk=0`, no `context_line`: it is the public description, so the clipper is never named there) + radar_candidates (`source='remake'`). Telegram shows the source Short from `remakes` |
 
@@ -39,8 +43,8 @@ pytest -q remake/tests                         # offline
 
 ## Limits / next
 - Layouts: full and fit. A stacked layout (face cam on top of gameplay) is skipped (`layout not supported yet`).
-- Font: always Montserrat Black (the study clipper's). Other clippers' fonts are next.
-- Caption colours come from OCR (median per word); a pixel colour read is next.
+- Fonts: only the 39 free fonts in `style.FONTS`; a clipper's paid font (e.g. DIN, Gotham) gets the closest one by shape.
+- Picture mismatches (frames the map missed) are scored and shown, not rebuilt yet.
 - 1080-wide output; the study clipper uploads 2160x2880 (YouTube encodes 4K uploads better).
 - A hook edit from Telegram (`needs_rerender`) does not apply to remakes yet.
 - Needs YouTube to let the VM download the Short; while the bot check (#64) blocks, the timer just retries.

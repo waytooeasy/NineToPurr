@@ -14,6 +14,9 @@ OVERLAY_MIN = 0.04         # per-frame washes weaker than this are not stored
 CORE_MIN = 0.15            # a wash's core frames are at least this strong
 PEAK_MIN = 0.2             # a flash peaks at least this strong
 SAT_MIN = 100              # ... in a saturated colour (max - min channel of its colour)
+MAT_MIN_ERR = 7.0          # per-frame colour transform: only frames this far off after the grade (0-255) ...
+MAT_KEEP = 0.6             # ... that the transform brings below this share of the error ...
+MAT_MIN_DROP = 4.0         # ... by at least this much (a wrong-content frame is not "fixed" by a colour change)
 
 
 def _pairs(short_path, vm, ns, width):
@@ -102,6 +105,7 @@ def overlays(short_path, vm, W, width=270):
     OW, OH = vm["out_w"], vm["out_h"]
     w, h = width, int(round(width * OH / OW / 2) * 2)
     alpha, colour, cols = {}, {}, []
+    mats = {}                        # n -> 3x4 colour transform ours -> theirs (flash, wash, black & white, fade)
     bands = {}                       # n -> mean |their - ours| in 16 horizontal bands (captions show up here)
     for shot in vm["shots"]:
         n0, n1 = shot["n0"], shot["n1"]
@@ -121,6 +125,10 @@ def overlays(short_path, vm, W, width=270):
             bands[n] = [round(float(diff[int(j * h / 16):int((j + 1) * h / 16)].mean()), 2) for j in range(16)]
             m = np.ones((h, w), bool)
             m[int(CAP_BAND[0] * h):int(CAP_BAND[1] * h)] = False
+            # every frame, also those the map missed (a white flash hides the picture): wrong content is refused
+            M = frame_transform(b[m].reshape(-1, 3), a[m].reshape(-1, 3))
+            if M is not None:
+                mats[n] = M
             d, o = (a - b)[m].reshape(-1, 3), b[m].reshape(-1, 3)
             A = np.zeros((d.size, 4))
             A[0::3, 0] = 1
@@ -134,8 +142,9 @@ def overlays(short_path, vm, W, width=270):
                 alpha[n] = round(min(al, 0.9), 3)
                 colour[n] = c
                 cols.append(c)
+    mats = {str(n): v for n, v in mats.items()}
     if not cols:
-        return {"alpha": {}, "color": [0, 0, 255], "bands": {str(n): v for n, v in bands.items()}}
+        return {"alpha": {}, "color": [0, 0, 255], "bands": {str(n): v for n, v in bands.items()}, "mats": mats}
     # a wash is a short, strong, saturated colour event (red flash on the punch line); grade mismatch on a shot is
     # weak, long and grey-ish. Cores: >= CORE_MIN; grown while the same colour fades out (or in).
     bd = {str(n): v for n, v in bands.items()}
@@ -163,10 +172,27 @@ def overlays(short_path, vm, W, width=270):
         keep.update({n: alpha[n] for n in range(lo, hi + 1) if n in alpha})
         keep_cols.append(c)
     if not keep:
-        return {"alpha": {}, "color": [0, 0, 255], "bands": bd}
+        return {"alpha": {}, "color": [0, 0, 255], "bands": bd, "mats": mats}
     col = np.median(np.array(keep_cols), 0)
     return {"alpha": {str(n): a for n, a in keep.items()}, "color": [float(np.clip(x, 0, 255)) for x in col],
-            "bands": bd}
+            "bands": bd, "mats": mats}
+
+
+def frame_transform(ours, theirs, step=3):
+    """3x4 colour transform (BGR, 0-255) that turns our graded frame into theirs, when their frame has an effect
+    the Short-wide grade can't explain (green wash, red flash, black & white, fade to white...). None otherwise."""
+    P, Q = ours[::step].astype(np.float64), theirs[::step].astype(np.float64)
+    if len(P) < 50:
+        return None
+    err0 = float(np.abs(Q - P).mean())
+    if err0 < MAT_MIN_ERR:
+        return None
+    X = np.c_[P, np.ones(len(P))]
+    sol, *_ = np.linalg.lstsq(X, Q, rcond=None)
+    err1 = float(np.abs(X @ sol - Q).mean())
+    if err1 > MAT_KEEP * err0 or err0 - err1 < MAT_MIN_DROP:
+        return None
+    return [round(float(x), 4) for x in sol.T.ravel()]
 
 
 def build(short_path, vm, samples=36):
@@ -177,6 +203,6 @@ def build(short_path, vm, samples=36):
     amount = float(np.clip((ratio - 1.0) * 1.25, 0.0, 1.5))
     ov = overlays(short_path, vm, W)
     C.log(f"look: grade mae {mae if mae is None else round(mae, 1)}, detail x{ratio:.2f} -> sharpen {amount:.2f}, "
-          f"overlay frames {len(ov['alpha'])}")
+          f"overlay frames {len(ov['alpha'])}, colour-effect frames {len(ov.get('mats', {}))}")
     return {"poly": None if W is None else W.tolist(), "grade_mae": mae,
             "sharpen": {"sigma": 1.5 * vm["out_w"] / 1080, "amount": amount, "ratio": ratio}, "overlay": ov}

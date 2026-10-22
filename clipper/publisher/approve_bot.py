@@ -45,6 +45,12 @@ def caption(row, same=None) -> str:
     text = f"Clip #{row['id']}: {row['title'] or '-'}\n{row['context_line'] or ''}".rstrip()
     if same and same.get("title"):
         text += f"\n🎯 same moment as a popping Short: \"{same['title']}\" ({int(same.get('vph') or 0):,} views/h)"
+    m = approvals.remake_match(row) if approvals.is_remake(row) else None
+    if m:
+        text += f"\n📐 match vs original: picture {m['picture']:.0f}% · captions {m['captions']:.0f}%"
+        off = [f"{b[0]:.1f}-{b[1]:.1f}s {b[2]}" for b in (m.get("bad") or [])[:4]]
+        if m.get("overall", 100) < 90 and off:
+            text += "\n⚠️ differs at " + ", ".join(off)
     if row["music_risk"]:
         text += "\n⚠️ music risk"
     issues = approvals.vqa_issues(row)

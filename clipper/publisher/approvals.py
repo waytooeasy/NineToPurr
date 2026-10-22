@@ -30,6 +30,17 @@ def pending_to_send(con):
     ).fetchall()
 
 
+def remake_match(row):
+    """The remake's match score vs the clipper's original (remake/match.py, in the render sidecar json), or None."""
+    try:
+        f = os.path.splitext(row["file_path"] or "")[0] + ".json"
+        with open(f) as fh:
+            m = json.load(fh).get("match")
+    except (OSError, ValueError, IndexError, KeyError, TypeError, AttributeError):
+        return None
+    return m if isinstance(m, dict) and "picture" in m else None
+
+
 def is_remake(row) -> bool:
     """A remake (D58) is the clipper's edit rebuilt frame for frame: never re-cut in our caption style."""
     try:

@@ -51,12 +51,23 @@ def wrong_names(t, theirs, streamer, names=()):
             and not re.search(r"\b" + re.escape(n.lower()) + r"\b", th) and n.lower() != (streamer or "").lower()]
 
 
+REFUSAL = ("i can't", "i cannot", "i can not", "i'm not able", "i won't", "as framed", "i'd rather not")
+
+
+def refused(t):
+    """The model answered about the request instead of writing a title."""
+    low = (t or "").lower()
+    return any(r in low for r in REFUSAL)
+
+
 def make(theirs, streamer, captions="", ask=anthropic_ask, names=()):
     extra = ""
     best = ""
     for _ in range(3):
         t = clean(ask(PROMPT.format(title=theirs, streamer=streamer, captions=captions or "-", max_len=MAX_LEN,
                                     extra=extra)))
+        if refused(t):
+            t = ""
         bad = wrong_names(t, theirs, streamer, names) if t else []
         if t and not too_close(t, theirs) and not bad:
             return t

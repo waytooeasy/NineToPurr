@@ -6,3 +6,5 @@ pyyaml
 requests
 numpy
 opencv-python-headless   # remake engine tests (D58)
+pillow   # remake caption look (D61)
+fonttools

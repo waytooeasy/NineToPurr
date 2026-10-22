@@ -14,7 +14,9 @@ import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import amap, caps, look, render, source, title, vmap
+import numpy as np
+
+from . import align, amap, caps, look, match, render, source, style, title, tune, vmap
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
@@ -25,6 +27,7 @@ MIN_VPH = 1500            # views/hour to count as popping
 MAX_ATTEMPTS = 2
 PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
+CAPTIONS_GOOD = 92.0      # caption match (%) that ends the search for a better caption look
 MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
 LOCK = "/opt/clipper/remake.lock"
 
@@ -146,7 +149,114 @@ def _stage(work, name, fn):
     return out
 
 
-def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False):
+def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
+               channel=""):
+    """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
+    study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}."""
+    OW, OH, fps, nfr = vm["out_w"], vm["out_h"], vm["fps"], vm["nfr"]
+    base = work / "base.mp4"
+    if not base.exists():
+        render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
+        s = match.frame_shift(short_path, base)
+        if s:      # ours n + s shows their frame n: show it at n
+            C.log(f"render runs {s:+d} frame(s) off theirs: re-rendered in step")
+            vm = {**vm, "frame_shift": int(vm.get("frame_shift", 0)) + s}
+            C.save_json(work / "frame_shift.json", {"shift": vm["frame_shift"]})
+            render.render({"vmap": vm, "amap": am, "look": lk, "ass": None}, base, work, crf=10)
+    elif (work / "frame_shift.json").exists():
+        vm = {**vm, "frame_shift": C.load_json(work / "frame_shift.json")["shift"]}
+    # their caption states, frame-exact from the pixels (a new word / caption / no caption), one OCR per state
+    y0 = float(np.median([e["y"] for e in cp["events"]])) if cp["events"] else 0.5
+    pe = _stage(work, "pixcaps", lambda: {"events": style.pixel_events(short_path, base, fps, nfr, (OW, OH), y0,
+                                                                         vision)})
+    evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
+    st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
+    known = load_channel_style(channel)
+    if known and (not st.get("ok") or st.get("font_score", 0) < known.get("font_score", 0) - 0.1):
+        # this Short's captions measured poorly: start from this clipper's look fitted on an earlier Short
+        keep = {k: st[k] for k in ("colours", "pos", "x", "y") if st.get(k) is not None}
+        st = {**known, **keep, "ok": True, "from_channel": channel}
+        C.log(f"style: {channel}'s known look ({known.get('family')}) replaces a weak measurement")
+    if st.get("ok"):         # fitted on their pixels: size, spacing, position, box, font
+        def fit():
+            tdir = work / "tune"
+            tdir.mkdir(exist_ok=True)
+            try:
+                s, e = tune.tune(st, tune.Scorer(short_path, base, evs, st, fps, (OW, OH), work=tdir))
+            finally:
+                shutil.rmtree(tdir, ignore_errors=True)
+            return {**s, "tune_err": e}
+        st = _stage(work, "style_tuned", fit)
+    if st.get("colours"):     # word colours read from their pixels beat the OCR's guess
+        evs = [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cols)]}
+               for e, cols in zip(evs, st["colours"])]
+    pos = st.get("pos") or []
+    sevs = [{**e, "y": (pos[k][1] if k < len(pos) and pos[k] else st.get("y") or e.get("y", 0.5))}
+            for k, e in enumerate(evs)]           # caption rows to score: where each of their captions is
+
+    def score(k, name, s_, events=None):
+        ass = work / f"cap_{k}.ass"
+        if s_ is not None:
+            caps.write_ass_style(evs, ass, OW, OH, s_, mark=mark, dur=sp["dur"])
+        else:
+            caps.write_ass(events or evs, ass, OW, OH, mark=mark, dur=sp["dur"])
+        cand = match.burn(base, ass, work / f"cand_{k}.mp4")
+        m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base)
+        m.pop("per_frame", None)
+        C.log(f"captions '{name}': {match.summary(m)}")
+        return {"path": cand, "match": m, "name": name}
+
+    # (name, measured style or None for the study look, caption events for the study look)
+    cands = [(f"measured: {st['family']}", st, None)] if st.get("ok") else []
+    if st.get("ok"):
+        cands += [(f"next font: {alt['family']}", alt, None) for alt in (style.with_font(st, i) for i in range(2))
+                  if alt and alt["family"] != st["family"]]
+    cands.append(("study look", None, None))
+    if evs is not cp["events"]:      # the study look as first built: OCR words and timing (glow captions read best so)
+        cands.append(("study look, OCR captions", None, cp["events"]))
+    tried, best = [], None
+    for k, (name, s_, events) in enumerate(cands):
+        if best and best["match"]["captions"] >= CAPTIONS_GOOD:
+            break
+        r = score(k, name, s_, events)
+        tried.append({"name": name, **{x: r["match"][x] for x in ("picture", "captions", "overall")}})
+        if best is None or r["match"]["captions"] > best["match"]["captions"]:
+            best = r
+    best["tried"] = tried
+    if best["name"].startswith("measured") and st.get("ok"):
+        save_channel_style(channel, st, best["match"]["captions"])
+    return best
+
+
+STYLE_KEYS = ("family", "bold", "italic", "file", "track", "fs", "spacing", "dy", "box_pad", "llm", "anim", "outline",
+              "line_h", "font_score", "alternatives")
+
+
+def _style_file(channel):
+    import re
+    slug = re.sub(r"[^a-z0-9]+", "-", (channel or "").lower()).strip("-")
+    return (C.root() / "_styles" / f"{slug}.json") if slug else None
+
+
+def load_channel_style(channel):
+    f = _style_file(channel)
+    return C.load_json(f) if f and f.exists() else None
+
+
+def save_channel_style(channel, st, captions_pct):
+    """Remember a clipper's caption look when it matched their Short better than the one we had."""
+    f = _style_file(channel)
+    if not f:
+        return
+    old = load_channel_style(channel)
+    if old and old.get("captions_pct", 0) >= captions_pct:
+        return
+    f.parent.mkdir(parents=True, exist_ok=True)
+    C.save_json(f, {**{k: st.get(k) for k in STYLE_KEYS}, "captions_pct": captions_pct})
+
+
+def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False,
+               vision_style=None):
     """Rebuild one clipper Short. Returns our clip id; raises Unsupported / other errors (status recorded)."""
     sid = s["id"]
     work = C.workdir(sid)
@@ -170,6 +280,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             raise Unsupported(f"only {vm['mapped']}/{vm['nfr']} frames found in the stream")
         if any(sh["layout"] == "other" for sh in vm["shots"]):
             raise Unsupported("layout not supported yet (stack / overlay)")
+        vm = _stage(work, "vmap_aligned", lambda: align.refine(short_path, vm))   # their framing, frame by frame
         secs = found["sections"]
         a = min(secs[g["sec"]]["vod_s"] + g["t0"] + g["off"] for g in am["segments"])
         b = max(secs[g["sec"]]["vod_s"] + g["t1"] + g["off"] for g in am["segments"])
@@ -182,17 +293,17 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         cp = _stage(work, "caps", lambda: caps.build(short_path, sp["dur"], sp["h"] / sp["w"], work / "captions.ass",
                                                      vm["out_w"], vm["out_h"], vision, mark=mark,
                                                      bands=lk.get("overlay", {}).get("bands"), fps=vm["fps"]))
-        if not Path(cp["ass"]).exists():
-            caps.write_ass(cp["events"], cp["ass"], vm["out_w"], vm["out_h"], mark=mark, dur=sp["dur"])
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
-        render.render({"vmap": vm, "amap": am, "look": lk, "ass": cp["ass"]}, out, work)
+        best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style, vision, s.get("channel", ""))
+        shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
         except Exception as e:  # noqa: BLE001 - the remake itself is fine without it
             C.log(f"side by side failed: {e}")
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
-                                                        "moving": False}))
+                                                        "moving": False, "match": best["match"],
+                                                        "caption_look": best["name"]}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
         names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
         ours = title.make(s.get("title", ""), found.get("owner") or found["login"], said, ask, names=names)
@@ -200,7 +311,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
                                          "amap": am, "vmap": {k: v for k, v in vm.items() if k != "frames"},
                                          "look": {k: v for k, v in lk.items() if k != "overlay"},
                                          "overlay_frames": len(lk.get("overlay", {}).get("alpha", {})),
-                                         "captions": cp["events"], "title": ours})
+                                         "captions": cp["events"], "title": ours, "match": best["match"],
+                                         "caption_look": best["name"], "tried": best["tried"]})
         clip_id = register(con, s, found, am, vm, cp, out, ours)
         _status(con, s, "done", clip_id=clip_id)
         C.log(f"{sid}: done -> clip {clip_id} '{ours}'")
@@ -224,7 +336,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             for p in work.iterdir():
                 if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
                     p.unlink(missing_ok=True)
-            for name in ("found", "amap", "vmap"):   # they point at the deleted media
+            for name in ("found", "amap", "vmap", "vmap_aligned", "frame_shift"):   # they point at the deleted media
                 (work / f"{name}.json").unlink(missing_ok=True)
 
 
@@ -272,6 +384,7 @@ def main(argv=None):
     ap.add_argument("--streamer", default="", help="watchlist name for --short")
     ap.add_argument("--published", default=None, help="ISO time --short was published (VOD search window)")
     ap.add_argument("--title", default="")
+    ap.add_argument("--channel", default="", help="the clipper's channel for --short (their caption look is remembered)")
     ap.add_argument("--max", type=int, default=1)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--keep", action="store_true", help="keep downloaded media in the work dir")
@@ -282,7 +395,7 @@ def main(argv=None):
     out_dir = os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")
     short = None
     if a.short:
-        short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": "",
+        short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": a.channel,
                  "published": a.published or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     import fcntl
     with open(os.environ.get("CLIPPER_REMAKE_LOCK", LOCK), "w") as fh:

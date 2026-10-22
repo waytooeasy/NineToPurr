@@ -24,6 +24,7 @@ JUMP = 0.012          # per-frame change of zoom or centre (fraction) above this
 MIN_SHOT_F = 3        # shorter runs are mapping noise, not shots
 BG_RMSE_MAX = 38.0    # a 'fit' shot whose surround is not a blurred copy is another layout (stack...)
 WORKERS = int(os.environ.get("REMAKE_WORKERS", "5"))
+SYNC_D = 3            # frames the video may sit off the audio map
 
 _sift = None
 
@@ -76,7 +77,7 @@ def _job(args):
     m_of = {n: int(round((n / fps + off) * sfps)) for n in range(n0, n0 + len(th))}
     if not m_of:
         return []
-    m_lo, m_hi = min(m_of.values()) - 1, max(m_of.values()) + 1
+    m_lo, m_hi = min(m_of.values()) - 1 - SYNC_D, max(m_of.values()) + 1 + SYNC_D
     if m_hi < 0:
         return []
     m_lo = max(0, m_lo)
@@ -106,7 +107,30 @@ def _job(args):
                 break
         if best is not None:
             out.append((n, seg_i, best[1], best[2].tolist(), best[0]))
-    return out
+    return resync(out, th, n0, sec, m_lo)
+
+
+def resync(out, th, n0, sec, m_lo, samples=16):
+    """The audio puts the video a frame or so off (AAC encoder delay, their own J/L cuts): over this run of frames,
+    the section frame offset (-SYNC_D..SYNC_D) whose pixels match theirs best, applied to every frame."""
+    if len(out) < 4:
+        return out
+    pick = out[::max(1, len(out) // samples)][:samples]
+    score = {}
+    for d in range(-SYNC_D, SYNC_D + 1):
+        s = []
+        for n, _, m, M, _ in pick:
+            j = m + d - m_lo
+            if 0 <= j < len(sec):
+                s.append(warp_ncc(th[n - n0], sec[j], np.asarray(M, np.float64)))
+        if len(s) == len(pick):
+            score[d] = float(np.mean(s))
+    if not score:
+        return out
+    d = max(score, key=score.get)
+    if d == 0 or score[d] - score.get(0, -1) < 0.002:
+        return out
+    return [(n, seg, m + d, M, c) for n, seg, m, M, c in out]
 
 
 def _roll(x, w, fn):
