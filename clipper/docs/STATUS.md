@@ -3,13 +3,13 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-21 21:30 UTC_
+_Last updated: 2026-10-22 00:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
 |---|---|
 | Pipeline (`clipper-pipeline.timer`, every 20 min) | ✅ live: formats → metrics → **market scan (daily, D48; top 8 streamers re-scanned every 6 h, D54)** → **streamer styles (daily, D49)** → **same moments as the top clippers (after each scan, D54)** → radar (**off since D60: remakes only**) → capture → Writer → render → QC → re-render → visual check (D47) |
-| Remake engine (`clipper-remake.timer`, every 30 min, D58) | ✅ live since 2026-10-21: one popping clipper Short per run rebuilt from the streamer's Twitch VOD → `edited` clip → QC → visual check → Telegram/auto-post. **The only source of Shorts (D60)**; our own cuts are off. Skips streamers with no Twitch VOD (Speed, Ludwig: YouTube streams). Downloads the Short with the cookie file `/opt/clipper/youtube_cookies.txt` (D59); the VM has IPv6 since 2026-10-21 (some YouTube servers only answer on IPv6) |
+| Remake engine (`clipper-remake.timer`, every 30 min, D58) | ✅ live since 2026-10-21, **identical-remake engine (D61, PR #112) live since 2026-10-22 00:30 UTC** (caption look measured + fitted per clipper, remembered per channel in `/opt/clipper/remake/_styles/`; per-frame colour effects; framing aligned; frame sync checked; match % in Telegram). Remakes wait for Lucas's ✅ (`AUTO_POST_REMAKES` unset): one popping clipper Short per run rebuilt from the streamer's Twitch VOD → `edited` clip → QC → visual check → Telegram/auto-post. **The only source of Shorts (D60)**; our own cuts are off. Skips streamers with no Twitch VOD (Speed, Ludwig: YouTube streams). Downloads the Short with the cookie file `/opt/clipper/youtube_cookies.txt` (D59); the VM has IPv6 since 2026-10-21 (some YouTube servers only answer on IPv6) |
 | Channel | ✅ **Peakz Recaps**, `@Peakz.Recaps` (`UCwGp40UYVYzw1GkyZ7_lOpg`), profile picture + banner up |
 | Telegram bot `@PRM_Clips_BOT` | ✅ live, **auto-post on** (`AUTO_POST=1`, D44): each new clip is approved by itself and Lucas gets an FYI with **🛑 Stop** (works until the next upload slot). Music-risk clips and clips that fail the visual check (with the reason) still wait for ✅ Post / ❌ Kill. Re-renders first if made in an older style |
 | Uploader (`clipper-upload.timer`) | ✅ live: approved clips go up **as soon as approved**, any hour, ≥30 min apart, max 6/day (D52) (`.env`: UTC window 00:00–23:59) |
@@ -38,7 +38,6 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 
 ## Waiting on Lucas
 - **Edit the description of [GSiO8GujwEs](https://youtube.com/shorts/GSiO8GujwEs) in YouTube Studio:** delete the first line (`Remake of : "Jason And Ron…"`). The upload token only has the `youtube.upload` scope, so Claude can't edit it.
-- Merge the "identical remakes" PR (D61): their caption look measured per clipper, their colour effects per frame, match score vs the original in Telegram.
 - AdSense signup + W-8BEN.
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
 
