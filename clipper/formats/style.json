@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-22",
+  "updated": "2026-10-23",
   "sample": [
-    "NDFE8W8wQ-Y",
     "bs0XsXVW7vs",
-    "iPjKK-KJ9iU",
+    "NDFE8W8wQ-Y",
     "AmmDYr4HquA",
+    "iPjKK-KJ9iU",
     "PdwI12r3kg4",
-    "J8yVbmmSSy8",
     "YMxYa1qwO8g",
-    "JUe6rF3kEbE"
+    "EGeUtjaRi-4",
+    "RH686tddwYw"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FF2A2A",
+    "highlight": "#E8140C",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,11 +22,12 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FF2A2A",
-      "#00E5FF",
-      "#FFE600"
+      "#E8140C",
+      "#00D8F0",
+      "#3DDC24",
+      "#FFD400"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear as bold uppercase words with black outlines, mostly mid-to-lower frame, emphasis in colored words."
+  "notes": "Captions appear in most frames with bold sans-serif text; emphasis colors vary per clip (red, cyan, green, yellow)."
 }

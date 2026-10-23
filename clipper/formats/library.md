@@ -1,39 +1,36 @@
-# Format Library (updated 2026-10-22)
-Copy structure, never competitor footage. Source only from material we are cleared to use.
+# Format Library (updated 2026-10-23)
 
-## Title formula
-`{hook phrase} {1 emoji} #{streamer}`. Lowercase-casual, under ~60 chars, one emoji (😭 🤯 🥶 ☠️).
+## Hook title templates (ranked by vph)
+1. What if this {thing} is actually {dangerous}? {emoji} #{S} | 442k vph
+2. {S} vs {big creator/brand} GAUNTLET! | 387k vph
+3. Bro does it smoothly at the end {emoji} #{S} | 109k vph
+4. {Challenge}, but {rule escalates}.. | 100k vph
+5. That little girl has so much AURA {emoji} #{S} | 73k vph
+6. No way his siblings came on stream {emoji} #{S} | 54k vph (wholesome or family)
+7. {S}'s {quirk} is crazy {emoji}{emoji} | 51k vph
+8. {S} can't wait for {event} {emoji} | 23k vph (Kai, short)
+9. {S}'s last {sound/bit} {emoji} | 17k vph
 
-## Hook templates (ranked by VPH)
-1. `{S} vs {creator/brand} GAUNTLET!` (challenge/crossover)
-2. `What if this {animal/object} is actually {danger}? ☠️ #{S}` (suspense)
-3. `{Guest/kid}'s AURA has {S} shocked 😭` (aura reaction)
-4. `No way {person} came on stream ❤️‍🩹 #{S}` (surprise guest)
-5. `{S} explains why he never {quirk} 🤯` (short explainer)
-- Also working: `{S}'s last {X} 😭🙏`, `Bro does it smoothly at the end 🥶`.
+## Length
+- Speed: 45-58s (best avg vph).
+- Kai Cenat: 11-21s reaction clips work.
+- Others: 16-30s default.
+- Avoid >60s unless it's a trailer.
 
 ## Structure
-- First 1-2s: the punchline setup or reaction face. No intro.
-- Suspense or reaction clips: 40-58s, payoff held to the end. Title teases it.
-- Quick-gag clips: 8-20s, cut right after the punchline, loop-friendly.
-- Default 16-30s. Run A/B tests of 46-60s vs 16-30s per streamer before changing the default.
+- Hook in the first 2s (the question or the rule).
+- Payoff or twist in the last 5-10s. Use 'at the end' titles to hold viewers.
+- Title: 1 emoji, plus #{streamer} tag on Speed clips.
 
-## Posting windows
-- Primary: 12:00-14:30 UTC (09:00-11:30 Asuncion).
-- Secondary: ~09:00 UTC (06:00 Asuncion).
-- Avoid 21:00-05:00 UTC (avg 10-15k VPH).
+## Post windows
+- UTC 14:00 (Asuncion 11:00): best.
+- UTC 12:00-13:00 (Asuncion 09:00-10:00): strong.
+- UTC 16:00 (Asuncion 13:00): secondary.
+- Skip 02:00-05:00 UTC.
 
-## Streamers
-- IShowSpeed: test slot, highest volume.
-- Kai Cenat: best short-clip performer, less clipper competition.
-- CaseOh: low-priority test.
+## Watchlist
+- #yourrage: single channel, not confirmed.
+- Kai Cenat and CaseOh: add to tracking.
 
-## Avoid
-- Long (>60s) trailer-style clips: 21k VPH.
-- Titles with no emotional hook or no streamer tag.
-- Judging a clip on VPH in its first hours. Compare at equal age.
-
-## Open tests
-- 46-60s vs 16-30s on the same streamer.
-- 12 UTC vs 14 UTC posting.
-- Whether #yourrage grows beyond one channel.
+## Rules
+- Metadata-driven only. Never download or re-upload competitor videos.
