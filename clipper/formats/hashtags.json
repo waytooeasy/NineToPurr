@@ -1,11 +1,12 @@
 {
-  "updated": "2026-10-23",
+  "updated": "2026-10-24",
   "sample": 40,
-  "title_share": 0.535,
+  "title_share": 0.496,
   "title_tags": 1,
   "generic": [
     "#viral",
-    "#edit"
+    "#edit",
+    "#football"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",
@@ -16,9 +17,9 @@
     "case",
     "funny",
     "gaming",
-    "streamer",
     "horror",
     "horror gaming",
-    "jumpscare"
+    "jumpscare",
+    "scary"
   ]
 }

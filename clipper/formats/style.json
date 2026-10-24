@@ -1,33 +1,33 @@
 {
-  "updated": "2026-10-23",
+  "updated": "2026-10-24",
   "sample": [
     "bs0XsXVW7vs",
     "NDFE8W8wQ-Y",
     "AmmDYr4HquA",
     "iPjKK-KJ9iU",
     "PdwI12r3kg4",
-    "YMxYa1qwO8g",
     "EGeUtjaRi-4",
+    "H_kEnMJXSew",
     "RH686tddwYw"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#E8140C",
+    "highlight": "#FF0000",
     "outline": "#000000",
-    "words": 2,
+    "words": 3,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#E8140C",
-      "#00D8F0",
-      "#3DDC24",
-      "#FFD400"
+      "#FF0000",
+      "#00E5FF",
+      "#39FF14",
+      "#FFD700"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear in most frames with bold sans-serif text; emphasis colors vary per clip (red, cyan, green, yellow)."
+  "notes": "Captions appear over fullbleed vertical video; highlight colors vary per clip (red, cyan, green, yellow)."
 }
