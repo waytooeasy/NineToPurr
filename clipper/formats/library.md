@@ -1,43 +1,41 @@
-# Format Library (updated 2026-10-24)
-Copy the structure, not the footage. Source clips ourselves; never download or re-upload competitor videos.
-
-## Formats that work
-| Format | Evidence (vph) | Length | Notes |
-|---|---|---|---|
-| What-if / suspense | 458k | ~58s | Pose a risky "what if", pay off at the end |
-| Versus / gauntlet | 423k | ~49s | Streamer vs known challenger or creator |
-| Payoff-at-end | 110k | ~51s | Caption promises a smooth or clean finish; hold it to the last seconds |
-| Wholesome / aura moment | 67k | ~47s | A kid or fan reacting to the streamer |
-| One-gag quirk | 55k | ~23s | A whistle, bark or sound bite; no setup needed |
-| Fail / humiliation | 30k, 9k | 35-47s | "Imagine cheating and still losing TWICE" |
-| Anticipation / holiday (Kai) | 19k | ~15s | Short, low ceiling but steady |
-
-## Title rules
-- One hook line, then 1-2 emoji (😭 💀 🥶 🤯 ☠️), then `#{streamer}` on Speed clips.
-- Casual speech: "Bro...", "Imagine...", "What if...".
-- Name the streamer in the title or hashtag, except for generic gag clips.
-- Don't use "Official Trailer" or other long-form framing (17k vph).
+# Format Library (updated 2026-10-25)
 
 ## Length
-- Default 45-58s for Speed (best avg, skewed by top clips).
-- 20-30s for single-gag clips.
-- Under 15s only for Kai Cenat one-liners.
+- Target 46-60s for the main slot. Best avg vph, but based on a small sample.
+- 16-30s works for quick quirk or sound bits.
+- Avoid <=15s (lowest avg vph).
 
-## Hook templates
-1. `What if {thing} is actually {twist}? ☠️ #{S}`
-2. `{S} vs {challenger} GAUNTLET!`
-3. `Bro does it smoothly at the end 🥶 #{S}`
-4. `That {little girl / kid / random} has so much AURA 🤯 #{S}`
-5. `{S}'s {sound/quirk} is crazy 💀💀`
+## Title/hook formulas (swap in the streamer and moment)
+1. What if {object} is actually {twist}? {emoji} #{streamer}  (curiosity hypothetical, top performer)
+2. {Streamer} vs {big name} {challenge}!  (matchup/challenge)
+3. Bro does it smoothly at the end {emoji} #{streamer}  (payoff tease)
+4. {Streamer}'s {quirk/sound} is crazy {emoji}{emoji}  (short bit)
+5. Imagine {doing X} and still {failing} TWICE {emoji}  (reaction/fail)
 
-## Post windows
-- Primary: 12:00-14:59 UTC (09:00-11:59 Asuncion).
-- Secondary: 16:00-16:59 UTC (13:00-13:59 Asuncion).
-- Late test: 23:00 UTC (20:00 Asuncion).
+## Also working (secondary)
+- Bystander or aura moment: "That {person} has so much AURA"
+- Relatable question: "Do kids even watch X anymore?"
+- Fan/celebrity cameo: "{Name} is also a huge {streamer} fan"
+- Cliffhanger lesson: "{Streamer} was about to learn the real lesson"
 
-## Streamer priority
-IShowSpeed > Kai Cenat > CaseOh. Watch: Jynxzi, Valkyrae, Caedrel.
+## Style rules
+- 1-2 emoji at the end of the title.
+- Add #{streamer} on streamer-specific clips.
+- Open on the funniest or most visual beat, and keep the payoff at the end.
+- Short, lowercase-friendly, casual voice ("bro", "crazy").
 
-## Open questions
-- Is the 46-60s advantage real, or just the snake and gauntlet outliers?
-- Does Kai or CaseOh beat 10k avg vph with a better hook?
+## Post slots
+- Prime: 12:00-14:59 UTC (09:00-11:59 Asuncion).
+- Test: 18:00 UTC (15:00 Asuncion).
+- Avoid: 02:00-09:00 UTC.
+
+## Source priority
+1. IShowSpeed (challenges, vs-formats, reactions)
+2. Kai Cenat (live-stream moments)
+3. CaseOh
+
+## Watchlist
+- #yourrage: 1 channel only, so unconfirmed.
+
+## Rules
+- Metadata only for competitor research. Cut our own clips from sources; never download or re-upload competitor videos.

@@ -1,12 +1,11 @@
 {
-  "updated": "2026-10-24",
+  "updated": "2026-10-25",
   "sample": 40,
-  "title_share": 0.496,
+  "title_share": 0.505,
   "title_tags": 1,
   "generic": [
     "#viral",
-    "#edit",
-    "#football"
+    "#edit"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",
