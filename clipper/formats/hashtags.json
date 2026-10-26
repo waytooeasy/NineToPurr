@@ -1,24 +1,25 @@
 {
-  "updated": "2026-10-25",
+  "updated": "2026-10-26",
   "sample": 40,
-  "title_share": 0.505,
+  "title_share": 0.466,
   "title_tags": 1,
   "generic": [
     "#viral",
-    "#edit"
+    "#edit",
+    "#funny"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
   "keywords": [
-    "kai live",
     "case",
     "funny",
     "gaming",
     "horror",
     "horror gaming",
     "jumpscare",
-    "scary"
+    "scary",
+    "streamer"
   ]
 }
