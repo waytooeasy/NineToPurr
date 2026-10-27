@@ -469,9 +469,9 @@ def shift_job(args):
     """A run of frames missing one panel at the main panel's time, or matching it weakly (the clipper re-synced a
     facecam reaction...): the panel's own time offset dm, found on the run's middle frame within SHIFT_S, then
     the panel mapped at m + dm on every frame of the run where that beats its ncc at m (`old`) by SHIFT_GAIN.
-    -> [(n, M, ncc, dm)]."""
-    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, *rest = args
-    cands = rest[0] if rest else None
+    cands: offsets to try instead of a scan (neighbour_runs); step: the scan's coarse step (SHIFT_STEP, passed
+    in: workers are spawned and don't see the parent's module state). -> [(n, M, ncc, dm)]."""
+    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, cands, step = args
     nm = ns[len(ns) // 2]
     th = C.read_frames(short_path, nm, 1, fps, asz, gray=True)
     if not len(th):
@@ -496,10 +496,10 @@ def shift_job(args):
                     if c > best[0]:
                         best = (c, c0 + j)
         return best
-    c, mb = scan(m0 - S, m0 + S, SHIFT_STEP)
+    c, mb = scan(m0 - S, m0 + S, step)
     if mb is None or c < VM.MIN_NCC:
         return []
-    c, mb = scan(mb - SHIFT_STEP, mb + SHIFT_STEP, 1)
+    c, mb = scan(mb - step, mb + step, 1)
     if mb is None or c < max(VM.MIN_NCC, old.get(nm, -1.0) + SHIFT_GAIN) or abs(mb - m0) <= 2:
         return []
     return _remap(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, mb - m0, SHIFT_GAIN)

@@ -8,6 +8,7 @@ band across the frame over a blurred copy whose zoom, blur and brightness are fi
 Output coordinates are for an output frame OW wide with the Short's aspect: stream x = cx + (u - OW/2) * k,
 stream y = cy + (v - OH/2) * k (stream = the section file at native size).
 """
+import multiprocessing as mp
 import os
 from multiprocessing import Pool
 
@@ -27,6 +28,12 @@ WORKERS = int(os.environ.get("REMAKE_WORKERS", "5"))
 SYNC_D = 3            # frames the video may sit off the audio map
 
 _sift = None
+
+
+def spawn_pool(n):
+    """A worker pool started fresh, not forked: by the stack passes the parent has used OpenCV, and a fork of a
+    process with OpenCV's threads running can hang its children forever (2026-10-27, Ludwig remake)."""
+    return mp.get_context("spawn").Pool(max(1, n))
 
 
 def _feats(img):
@@ -517,7 +524,7 @@ def probe_stack(short_path, fps, asz, nfr, best, amap, sections, secp, shots, wo
                       n, seg, m, None if M is None else np.asarray(M).tolist()))
     if not picks:
         return []
-    with Pool(max(1, min(workers, len(picks)))) as pool:
+    with spawn_pool(min(workers, len(picks))) as pool:
         probes = [p for p in pool.map(PN.probe_job, picks) if p is not None]
     return PN.templates(probes, asz)
 
@@ -537,7 +544,7 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
             hints = {n: best[n][1] for n in range(n0, n1) if n in best and best[n][0] == i}
             jobs.append((i, str(short_path), fps, asz, sections[seg["sec"]]["file"], p["fps"], vsz, seg["off"],
                          n0, n1, tmasks, hints))
-    with Pool(max(1, workers)) as pool:
+    with spawn_pool(workers) as pool:
         res = [r for part in pool.map(PN.map_job, jobs) for r in part]
     recs = {}
     for r in res:              # a frame near a segment switch is tried in both: keep the better one
@@ -554,9 +561,9 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
         vsz = (VA, int(round(VA * sp["h"] / sp["w"] / 2) * 2))
         shift.append((str(short_path), fps, asz, sections[g["sec"]]["file"], sp["fps"], vsz, ns,
                       {n: by_n[n][2] for n in ns}, tmasks[t][p],
-                      {n: by_n[n][5][p] for n in ns if by_n[n][4][p] is not None}))
+                      {n: by_n[n][5][p] for n in ns if by_n[n][4][p] is not None}, None, PN.SHIFT_STEP))
     if shift:
-        with Pool(max(1, min(workers, len(shift)))) as pool:
+        with spawn_pool(min(workers, len(shift))) as pool:
             found = pool.map(PN.shift_job, shift)
         for p, res in zip(which, found):
             for n, M, c, dm in res:
@@ -571,9 +578,10 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
             sp = secp[g["sec"]]
             vsz = (VA, int(round(VA * sp["h"] / sp["w"] / 2) * 2))
             prop.append((str(short_path), fps, asz, sections[g["sec"]]["file"], sp["fps"], vsz, ns,
-                         {n: by_n[n][2] for n in ns}, tmasks[t][p], {n: by_n[n][5][p] for n in ns}, seen))
+                         {n: by_n[n][2] for n in ns}, tmasks[t][p], {n: by_n[n][5][p] for n in ns}, seen,
+                         PN.SHIFT_STEP))
         if prop:
-            with Pool(max(1, min(workers, len(prop)))) as pool:
+            with spawn_pool(min(workers, len(prop))) as pool:
                 found = pool.map(PN.shift_job, prop)
             for p, res in zip(which, found):
                 for n, M, c, dm in res:
