@@ -38,8 +38,10 @@ def _rows(evs, n, fps, h, line_h_frac=0.06, pad=1.6):
     return r
 
 
-def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=None):
-    """{'picture': %, 'captions': %, 'overall': %, 'per_frame': [(pic, cap|None)], 'bad': [[t0, t1, what]]}"""
+def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=None, colour_blind=False):
+    """{'picture': %, 'captions': %, 'overall': %, 'per_frame': [(pic, cap|None)], 'bad': [[t0, t1, what]]}
+    colour_blind (D62, our own word colours): captions compare where the text is (their caption pixels vs ours,
+    each against the caption-free `base`), not its colour: text, font, size, place and timing still count."""
     h = int(round(W * out_h / out_w / 2) * 2)
     lh = (line_h / out_h) if line_h else 0.06
     if y is not None:
@@ -60,6 +62,13 @@ def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=N
                 pf.append((float(d.mean()), None))
                 continue
             pic = float(d[~rows].mean()) if (~rows).any() else 0.0
+            if colour_blind and z is not None and i < len(z):
+                Z = blur(z[i])
+                ta = np.abs(A - Z).max(2)[rows] > STRONG          # their caption's pixels (fill + outline)
+                tb = np.abs(B - Z).max(2)[rows] > STRONG          # ours
+                err, theirs_px = text_xor(ta, tb, int(rows.sum())), int(ta.sum())
+                pf.append((pic, float(err / max(theirs_px, 0.02 * rows.sum() * W))))
+                continue
             err = (shifted_min(A, B, rows) > STRONG).sum()      # 1 px off (= 4 px at 1080) is not an error
             if z is not None and i < len(z):
                 theirs_px = (np.abs(A - blur(z[i])).max(2)[rows] > STRONG).sum()
@@ -78,6 +87,13 @@ def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=N
             "overall": round(float(min(picture, captions)), 1),
             "per_frame": [(round(p, 1), None if c is None else round(c, 3)) for p, c in pf],
             "bad": sorted(bad, key=lambda b: b[0])[:12]}
+
+
+def text_xor(ta, tb, nrows):
+    """Caption pixels only one side has, 1 px of slack: (rows' pixels flattened row by row, W wide)."""
+    a, b = ta.reshape(nrows, -1).astype(np.uint8), tb.reshape(nrows, -1).astype(np.uint8)
+    k = np.ones((3, 3), np.uint8)
+    return int((a & ~cv2.dilate(b, k).astype(bool)).sum() + (b & ~cv2.dilate(a, k).astype(bool)).sum())
 
 
 def shifted_min(A, B, rows, r=1):

@@ -157,6 +157,9 @@ def _stage(work, name, fn):
     return out
 
 
+OUR_COLOURS = os.environ.get("REMAKE_OUR_COLOURS", "1") != "0"   # D62: caption word colours are ours (0 = theirs)
+
+
 def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
                channel=""):
     """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
@@ -201,15 +204,22 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     pos = st.get("pos") or []
     sevs = [{**e, "y": (pos[k][1] if k < len(pos) and pos[k] else st.get("y") or e.get("y", 0.5))}
             for k, e in enumerate(evs)]           # caption rows to score: where each of their captions is
+    ours = OUR_COLOURS        # D62: our own word colours; captions then score where the text is, not its colour
+    cols = caps.our_colours(evs, work.name, st.get("colours")) if ours else None
+    evs_c = caps.with_colours(evs, cols) if ours else evs
+    ocr_c = caps.with_colours(cp["events"], caps.our_colours(cp["events"], work.name)) if ours else cp["events"]
 
     def score(k, name, s_, events=None):
         ass = work / f"cap_{k}.ass"
         if s_ is not None:
-            caps.write_ass_style(evs, ass, OW, OH, s_, mark=mark, dur=sp["dur"])
+            caps.write_ass_style(evs_c, ass, OW, OH, {**s_, "colours": cols} if ours else s_, mark=mark,
+                                 dur=sp["dur"])
         else:
-            caps.write_ass(events or evs, ass, OW, OH, mark=mark, dur=sp["dur"])
+            caps.write_ass((ocr_c if events is not None and ours else events) or evs_c, ass, OW, OH, mark=mark,
+                           dur=sp["dur"])
         cand = match.burn(base, ass, work / f"cand_{k}.mp4")
-        m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base)
+        m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base,
+                        colour_blind=ours)
         m.pop("per_frame", None)
         C.log(f"captions '{name}': {match.summary(m)}")
         return {"path": cand, "match": m, "name": name}
@@ -231,6 +241,7 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         if best is None or r["match"]["captions"] > best["match"]["captions"]:
             best = r
     best["tried"] = tried
+    best["colours"] = "ours (D62)" if ours else "theirs"
     if best["name"].startswith("measured") and st.get("ok"):
         save_channel_style(channel, st, best["match"]["captions"])
     return best
@@ -315,7 +326,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             C.log(f"side by side failed: {e}")
         out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
                                                         "moving": False, "match": best["match"],
-                                                        "caption_look": best["name"]}))
+                                                        "caption_look": best["name"],
+                                                        "caption_colours": best.get("colours", "theirs")}))
         said = " / ".join(" ".join(w["w"] for w in e["words"]) for e in cp["events"])[:400]
         names = sorted(twitch_watchlist_names() | {s.get("streamer", "")})
         ours = title.make(s.get("title", ""), found.get("owner") or found["login"], said, ask, names=names)
