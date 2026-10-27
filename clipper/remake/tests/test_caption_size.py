@@ -37,12 +37,22 @@ def test_a_big_word_next_to_normal_ones_is_measured_bigger():
 
 
 def test_word_sizes_are_relative_to_their_normal_words_and_skip_lower_case():
-    evs = [ev("ONE", "TWO"), ev("THREE", "FOUR"), ev("SO", "BIG"), ev("tiny", "Word")]
-    ms = [{"heights": [40, 41]}, {"heights": [39, 40]}, {"heights": [40, 80]}, {"heights": [20, 60]}]
+    evs = [ev("ONE", "TWO"), ev("THREE", "FOUR"), ev("SO", "BIG"), ev("tiny", "Word"), ev("ODD", "SPLIT"),
+           ev("A", "BIT", "TALLER")]
+    ms = [{"heights": [40, 41]}, {"heights": [39, 40]}, {"heights": [40, 80]}, {"heights": [20, 60]},
+          {"heights": [6, 134]}, {"heights": [40, 46, 48]}]
     sizes = style.word_sizes(evs, ms)
     assert sizes[0] is None and sizes[1] is None                  # normal captions: one size
     assert sizes[2] == [1.0, 2.0]                                 # the big word, sized on its own
     assert sizes[3] is None                                       # lower case: letter heights mean nothing
+    assert sizes[4] is None                                       # 6 px / 134 px "words": a mis-split line
+    assert sizes[5] is None                                       # 15 % off is measuring noise, not a size
+
+
+def test_a_height_the_frames_disagree_on_is_not_used():
+    assert style.steady([40, 41, 40]) == 40
+    assert style.steady([30, 40, 41]) is None                     # still popping in on one frame
+    assert style.steady([None, 44]) == 44 and style.steady([]) is None
 
 
 def test_reveals_read_from_letter_heights_and_brightness():
