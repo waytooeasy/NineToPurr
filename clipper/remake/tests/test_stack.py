@@ -12,7 +12,7 @@ import pytest
 
 CLIPPER = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(CLIPPER)]
-from remake import look, panels, render, vmap  # noqa: E402
+from remake import look, panels, render, run, vmap  # noqa: E402
 
 pytestmark = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg")
 
@@ -281,3 +281,10 @@ def test_facecam_shown_seconds_later_than_the_gameplay_gets_its_own_time_offset(
     d = np.abs(cv2.GaussianBlur(their[10].astype(np.float32), (0, 0), 1.5)
                - cv2.GaussianBlur(ours.astype(np.float32), (0, 0), 1.5)).max(2)
     assert np.mean(d < 18) > 0.97
+
+
+def test_a_cut_tail_in_no_known_layout_goes_to_the_gate_a_whole_shot_does_not():
+    vm = {"nfr": 1000, "shots": [{"n0": 0, "n1": 990, "layout": "stack"}, {"n0": 990, "n1": 1000, "layout": "other"}]}
+    assert run.other_frames(vm) == 10 <= run.MAX_OTHER * vm["nfr"]
+    vm["shots"] = [{"n0": 0, "n1": 500, "layout": "other"}, {"n0": 500, "n1": 1000, "layout": "full"}]
+    assert run.other_frames(vm) > run.MAX_OTHER * vm["nfr"]
