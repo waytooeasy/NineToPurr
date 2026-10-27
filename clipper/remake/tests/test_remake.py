@@ -420,22 +420,32 @@ def test_youtube_vods_have_their_own_urls():
 
 
 def test_youtube_live_streams_around_the_short_become_plans():
-    class R:
-        stdout = "AAAAAAAAAAA\nBBBBBBBBBBB\n"
+    calls = []
 
     class Sess:
         def get(self, url, params, timeout):
+            calls.append(url.rsplit("/", 1)[-1])
+            body = {
+                "channels": {"items": [{"contentDetails": {"relatedPlaylists": {"uploads": "UUx"}}}]},
+                "playlistItems": {"items": [{"contentDetails": {"videoId": "AAAAAAAAAAA"}},
+                                            {"contentDetails": {"videoId": "BBBBBBBBBBB"}},
+                                            {"contentDetails": {"videoId": "CCCCCCCCCCC"}}]},
+                "videos": {"items": [
+                    {"id": "AAAAAAAAAAA", "liveStreamingDetails": {"actualStartTime": "2026-10-21T01:00:00Z",
+                                                                   "actualEndTime": "2026-10-21T07:00:00Z"}},
+                    {"id": "BBBBBBBBBBB", "liveStreamingDetails": {"actualStartTime": "2026-10-10T01:00:00Z",
+                                                                   "actualEndTime": "2026-10-10T05:00:00Z"}},
+                    {"id": "CCCCCCCCCCC"}]},       # a normal upload, not a stream
+            }[calls[-1]]
+
             class J:
                 def json(self):
-                    return {"items": [
-                        {"id": "AAAAAAAAAAA", "liveStreamingDetails": {"actualStartTime": "2026-10-21T01:00:00Z",
-                                                                       "actualEndTime": "2026-10-21T07:00:00Z"}},
-                        {"id": "BBBBBBBBBBB", "liveStreamingDetails": {"actualStartTime": "2026-10-10T01:00:00Z",
-                                                                       "actualEndTime": "2026-10-10T05:00:00Z"}}]}
+                    return body
             return J()
     pub = datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)
-    got = source.youtube_streams("@IShowSpeed", pub, key="k", runner=lambda *a, **k: R(), session=Sess())
+    got = source.youtube_streams("@IShowSpeed", pub, key="k", session=Sess())
     assert [v["id"] for v in got] == ["yt:AAAAAAAAAAA"]
+    assert calls == ["channels", "playlistItems", "videos"]          # Data API only, no yt-dlp page scrape
     plans = source.plans_for({"id": "s", "published": "2026-10-21T12:00:00Z"}, None, None, (), ["@IShowSpeed"],
                              yt_streams=lambda h, p: got)
     assert plans == [("yt:AAAAAAAAAAA", "@IShowSpeed", None, None)]
