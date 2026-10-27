@@ -367,6 +367,13 @@ def measure_event(th, base, ev):
     rows = np.zeros(th.shape[0], bool)
     rows[max(0, lines[0][0] - 4):lines[-1][1] + 4] = True
     fill, dark = fill & rows[:, None], dark & rows[:, None]
+    lh0 = float(np.median([r1 - r0 for r0, r1 in lines]))
+    hal = halo(th, base, fill, lh0, outline_px(fill, dark, lh0))
+    if hal["glow"]:             # a glow lit up around the letters: those pixels are not letter (#125)
+        tight_fill = without_glow(th, fill)
+        tl = lines_of(tight_fill, near=ev.get("y", 0.5) * th.shape[0], k=len(shape))
+        if len(tl) == len(lines):
+            fill, lines = tight_fill, tl
     words = ev["words"]
     out = {"lines": [], "colours": [None] * len(words), "heights": [None] * len(words)}
     if len(lines) == 1 and len(shape) > 1:      # their caption sits on one line where the OCR saw a break
@@ -409,6 +416,7 @@ def measure_event(th, base, ev):
     cap = [ln["r1"] - ln["r0"] for ln in out["lines"]] or [lines[0][1] - lines[0][0]]
     out["line_h"] = float(np.median(cap))
     out["outline"] = outline_px(fill, dark, out["line_h"])
+    out["halo"] = hal
     return out
 
 
@@ -459,6 +467,132 @@ def outline_px(fill, dark, line_h):
     dt = cv2.distanceTransform((~fill).astype(np.uint8), cv2.DIST_L2, 3)
     ring = dark & (dt < 0.3 * line_h)
     return float(np.percentile(dt[ring], 90)) if ring.sum() > 30 else 0.0
+
+
+# ---------------- glow and drop shadow (#125) ----------------
+GLOW_MIN = 18           # mean brightening (0-255 luma) just beyond the outline that makes a glow
+SHADOW_MIN = 14         # mean darkening (0-255 luma) under the letters' shifted shape that makes a drop shadow
+CORE_NEAR = 28          # a fill pixel this far (max channel) from its letter's core colour is glow, not letter
+_LUMA = np.array([0.114, 0.587, 0.299], np.float32)
+
+
+def halo(th, base, fill, line_h, outline=0.0):
+    """Their glow and drop shadow, measured on the pixels around the letters: {'glow': {'present', 'size' (radius
+    beyond the outline / letter height), 'colour' ('text' or #RRGGBB), 'opacity'} | None, 'shadow': {'present',
+    'dx', 'dy' (/ letter height), 'opacity', 'colour'} | None}."""
+    out = {"glow": None, "shadow": None}
+    if fill.sum() < 80 or line_h < 6:
+        return out
+    ys, xs = np.where(fill)                    # work around the caption only
+    pad = int(max(outline + 8, min(1.5 * line_h, 90)) + 0.3 * line_h + 2)
+    y0, y1 = max(0, ys.min() - pad), min(fill.shape[0], ys.max() + pad + 1)
+    x0, x1 = max(0, xs.min() - pad), min(fill.shape[1], xs.max() + pad + 1)
+    th, base, fill = th[y0:y1, x0:x1], base[y0:y1, x0:x1], fill[y0:y1, x0:x1]
+    a, b = th.astype(np.float32), base.astype(np.float32)
+    lt, lb = a @ _LUMA, b @ _LUMA
+    fill = without_glow(th, fill)               # a glow close to the letters looks like letter: measure from the core
+    dt = cv2.distanceTransform((~fill).astype(np.uint8), cv2.DIST_L2, 3)
+    o = int(round(outline))
+    R = int(max(o + 8, min(1.5 * line_h, 90)))
+    core0 = cv2.erode(fill.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    ring0 = (dt > 2) & (dt <= R)
+    u = (np.median(a[core0], 0) - np.median(b[ring0], 0)) if core0.sum() > 10 and ring0.sum() > 10 else _LUMA
+    u = u / (np.linalg.norm(u) + 1e-6)
+    gain = np.maximum(lt - lb, (a - b) @ u.astype(np.float32))   # brighter, or turned toward the letters' colour
+    prof = []
+    for d in range(R):
+        ring = (dt > d) & (dt <= d + 1)
+        prof.append(float(np.median(gain[ring])) if ring.sum() > 30 else 0.0)
+    near = prof[o + 1:o + 5] if len(prof) > o + 6 else []
+    peak = max(near) if near else 0.0
+    far = float(np.mean(prof[o + 3:o + 6])) if near else 0.0   # anti-aliased edges brighten 1 px, a glow keeps going
+    if peak > GLOW_MIN and far > GLOW_MIN and prof[-1] < 0.5 * peak:
+        r = next((d for d in range(o + 1, R) if prof[d] < 0.25 * peak), R)
+        band = (dt > o + 1) & (dt <= o + 4) & (gain > 0.5 * peak)
+        core = cv2.erode(fill.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        if band.sum() > 20 and core.sum() > 20:
+            gc, fc = np.median(a[band], 0), np.median(a[core], 0)
+            gdir, fdir = gc - np.median(b[band], 0), fc - np.median(b[core], 0)
+            cos = float(gdir @ fdir / (np.linalg.norm(gdir) * np.linalg.norm(fdir) + 1e-6))
+            span = float(max(1.0, (fc @ _LUMA) - np.median(lb[band])))
+            out["glow"] = {"present": True, "size": round((r - o) / line_h, 3),
+                           "colour": "text" if cos > 0.9 else hex_of(gc), "opacity": round(float(np.clip(peak / span, 0.1, 1)), 2)}
+    # drop shadow: the darkening that follows the letters' shape, shifted
+    k = max(1, o + 1)
+    shape = cv2.dilate(fill.astype(np.uint8), np.ones((2 * k + 1, 2 * k + 1), np.uint8)) > 0
+    dark = np.clip(lb - lt, 0, None)
+    step = max(1, int(line_h / 20))
+    lim = int(0.3 * line_h)
+    best, at = 0.0, (0, 0)
+    H, W = shape.shape
+    for dy in range(-lim, lim + 1, step):
+        for dx in range(-lim, lim + 1, step):
+            if abs(dx) + abs(dy) < 2 * step:
+                continue
+            m = np.zeros_like(shape)
+            m[max(0, dy):H + min(0, dy), max(0, dx):W + min(0, dx)] = \
+                shape[max(0, -dy):H - max(0, dy), max(0, -dx):W - max(0, dx)]
+            m &= ~shape
+            if m.sum() < 50:
+                continue
+            v = float(dark[m].mean())
+            if v > best:
+                best, at = v, (dx, dy)
+    ring = (cv2.dilate(shape.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0) & ~shape
+    base_dark = float(dark[ring].mean()) if ring.sum() else 0.0
+    if best > SHADOW_MIN and best > 1.8 * base_dark:
+        sel = np.zeros_like(shape)
+        dx, dy = at
+        sel[max(0, dy):H + min(0, dy), max(0, dx):W + min(0, dx)] = \
+            shape[max(0, -dy):H - max(0, dy), max(0, -dx):W - max(0, dx)]
+        sel &= ~shape
+        out["shadow"] = {"present": True, "dx": round(dx / line_h, 3), "dy": round(dy / line_h, 3),
+                         "opacity": round(float(np.clip(best / max(1.0, float(lb[sel].mean())), 0.1, 1)), 2),
+                         "colour": "#000000"}
+    return out
+
+
+def without_glow(th, fill):
+    """The letters without the bright glow around them: fill pixels close to their letter's core colour."""
+    n, lab = cv2.connectedComponents(fill.astype(np.uint8), connectivity=8)
+    core = cv2.erode(fill.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    keep = np.zeros_like(fill)
+    a = th.astype(np.int16)
+    for i in range(1, n):
+        comp = lab == i
+        c = comp & core
+        if c.sum() < 10:
+            keep |= comp
+            continue
+        ref = np.median(a[c], 0)
+        keep |= comp & (np.abs(a - ref).max(2) < CORE_NEAR)
+    return keep
+
+
+def merge_halos(hs, looks):
+    """Glow / shadow from the pixels of several captions over the vision model's guess: present when most
+    measured captions show it, sizes and offsets their median; the model's guess stays where nothing is measured."""
+    looks = dict(looks or {})
+    for key, fields in (("glow", ("size", "opacity")), ("shadow", ("dx", "dy", "opacity"))):
+        got = [h[key] for h in hs if h]
+        seen = [g for g in got if g]
+        if len(got) < 2:
+            continue
+        if len(seen) >= 0.5 * len(got):
+            cur = dict(looks.get(key) or {})
+            cur["present"] = True
+            for f in fields:
+                cur[f] = round(float(np.median([g[f] for g in seen])), 3)
+            if key == "glow":
+                cols = [g["colour"] for g in seen]
+                cur["colour"] = max(set(cols), key=cols.count)
+            cur["measured"] = True
+            looks[key] = cur
+        elif not seen and (looks.get(key) or {}).get("present"):
+            if key == "shadow" and any(h.get("glow") for h in hs if h):
+                continue                # a glow over the shadow hides it from the pixels: keep the model's
+            looks[key] = {**looks[key], "present": False, "measured": True}
+    return looks
 
 
 # ---------------- animation ----------------
@@ -734,6 +868,7 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
             r0, r1 = max(0, int(top - line_h)), min(out_h, int(bot + line_h))
             crops.append(m["frame"][r0:r1])
     looks = ask_style(crops, line_h, outline, vision) if crops else {}
+    looks = merge_halos([m.get("halo") for m in good], looks)
     dy = 0.0
     if fs:   # \\an5 centres the line box; their measured centre is the letters' centre
         bb = libass_bbox(entry, "HELLO", fs, track * fs, fonts_dir)

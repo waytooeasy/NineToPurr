@@ -159,6 +159,7 @@ def tune(st, score, fonts_dir=None, rounds=2):
                 e = score(cand)
                 if e < err:
                     best, err = cand, e
+        steps += halo_steps(best)
         for name, fn, vals in steps:
             for v in vals:
                 cand = fn(best, v)
@@ -176,3 +177,33 @@ def tune(st, score, fonts_dir=None, rounds=2):
                         best, err = cand, e
                         C.log(f"tune: font {entry[0]} -> {err:.3f}")
     return best, err
+
+
+def _with(s, key, field, v, lo=None, hi=None):
+    """The style with llm[key][field] = v (clipped)."""
+    llm = dict(s.get("llm") or {})
+    part = dict(llm.get(key) or {})
+    part[field] = float(np.clip(v, lo if lo is not None else -np.inf, hi if hi is not None else np.inf))
+    llm[key] = part
+    return {**s, "llm": llm}
+
+
+def halo_steps(st):
+    """Glow size / opacity and drop shadow offset / opacity / softness, when their captions have them (#125)."""
+    llm = st.get("llm") or {}
+    out = []
+    if (llm.get("glow") or {}).get("present"):
+        g = lambda s: s["llm"]["glow"]  # noqa: E731
+        out += [("glow_size", lambda s, v: _with(s, "glow", "size", g(s).get("size", 0.25) * v, 0.02, 2.0),
+                 (0.6, 0.8, 1.25, 1.6)),
+                ("glow_opacity", lambda s, v: _with(s, "glow", "opacity", g(s).get("opacity", 0.6) + v, 0.05, 1.0),
+                 (-0.25, -0.12, 0.12, 0.25))]
+    if (llm.get("shadow") or {}).get("present"):
+        h = lambda s: s["llm"]["shadow"]  # noqa: E731
+        out += [("shadow_dx", lambda s, v: _with(s, "shadow", "dx", h(s).get("dx", 0.06) + v), (-0.04, -0.02, 0.02, 0.04)),
+                ("shadow_dy", lambda s, v: _with(s, "shadow", "dy", h(s).get("dy", 0.08) + v), (-0.04, -0.02, 0.02, 0.04)),
+                ("shadow_opacity", lambda s, v: _with(s, "shadow", "opacity", h(s).get("opacity", 0.8) + v, 0.05, 1.0),
+                 (-0.3, -0.15, 0.15, 0.3)),
+                ("shadow_blur", lambda s, v: _with(s, "shadow", "blur", h(s).get("blur", 0.3) + v, 0.0, 1.5),
+                 (-0.2, 0.2))]
+    return out
