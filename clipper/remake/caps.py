@@ -5,6 +5,7 @@ Size and tracking are calibrated on the rendered font (cap height and width meas
 import base64
 import difflib
 import json
+import random
 import re
 import subprocess
 
@@ -229,6 +230,46 @@ def refine_times(evs, bands, fps, nfr, back_s=1.0, fwd_s=0.5):
         for w in e["words"]:
             w["t"] = max(w["t"], e["start"])
     return evs
+
+
+# D62 (Lucas 2026-10-27: "copy the video, but the captions multicolour"): our own word colours, the rest theirs
+OUR_PALETTE = ["#2BFF5A", "#FF3B3B", "#FF4FD8", "#FFE14D", "#38E1FF", "#FF9A2E", "#B67CFF"]
+NEAR = 60                 # a palette colour within this (max channel, 0-255) of their word's colour is theirs
+
+
+def _rgb(c):
+    h = _hex(c)
+    return np.array([int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)], float)
+
+
+def our_colours(evs, seed, theirs=None, palette=OUR_PALETTE):
+    """Our word colours for their caption events (D62): words in groups of 1-2, each group one palette colour,
+    never the colour of the group before and never (close to) their colour for those words, so ours is
+    multicolour and never theirs. Same Short (seed) -> same colours. theirs: per event their word colours
+    (style.build's), else the words' own 'c'. -> [[hex per word] per event]."""
+    rng = random.Random(str(seed))
+    k, prev, out = rng.randrange(len(palette)), None, []
+    for e_i, ev in enumerate(evs):
+        th = theirs[e_i] if theirs and e_i < len(theirs) and theirs[e_i] else [w.get("c") for w in ev["words"]]
+        cols, i, n = [], 0, len(ev["words"])
+        while i < n:
+            grp = range(i, min(n, i + (1 if rng.random() < 0.6 else 2)))
+            c = palette[k % len(palette)]
+            for step in range(len(palette)):
+                c = palette[(k + step) % len(palette)]
+                if c != prev and all(np.abs(_rgb(c) - _rgb(th[j] if j < len(th) else WHITE)).max() >= NEAR
+                                     for j in grp):
+                    break
+            cols += [c] * len(grp)
+            prev, i = c, grp[-1] + 1
+            k = palette.index(c) + 1 + rng.randrange(len(palette) - 1)
+        out.append(cols)
+    return out
+
+
+def with_colours(evs, cols):
+    """The events with these word colours."""
+    return [{**e, "words": [{**w, "c": c} for w, c in zip(e["words"], cs)]} for e, cs in zip(evs, cols)]
 
 
 def ass_colour(hex_rgb):
