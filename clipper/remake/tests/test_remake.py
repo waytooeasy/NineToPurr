@@ -146,6 +146,43 @@ def test_similarity_recovers_their_crop():
     assert vmap.warp_ncc(their, sec, got) > 0.95
 
 
+def test_gap_plan_offers_both_neighbours_crops_at_a_cut_and_the_first_shot_at_the_opening():
+    A, B = [[0.5, 0, 10], [0, 0.5, 20]], [[0.6, 0, 300], [0, 0.6, 40]]
+    best = {3: (0, 103, A, 0.9), 4: (0, 104, A, 0.9), 8: (1, 500, B, 0.9)}
+    plan = vmap.gap_plan(10, best, 60.0, {0: 60.0, 1: 60.0})
+    assert set(plan) == {0, 1, 2, 5, 6, 7, 9}
+    assert plan[0] == [(0, 100, A)]                       # opening: the first shot's crop, footage runs back
+    assert [(s, m) for s, m, _ in plan[6]] == [(0, 106), (1, 498)]   # cut: the shot before and the one after
+    assert plan[9] == [(1, 501, B)]
+
+
+def test_gap_fill_finds_the_right_section_frame_under_motion_blur():
+    rng = np.random.default_rng(1)
+    base = cv2.GaussianBlur((rng.random((560, 980)) * 255).astype(np.uint8), (0, 0), 2)
+    sec = [base[0:540, i * 3:i * 3 + 960].copy() for i in range(8)]   # a pan: 3 px per frame
+    k = 300 / 540
+    M = np.array([[k, 0, 300], [0, k, 50]])
+    their = cv2.warpAffine(sec[5], M, (540, 720), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
+    their = cv2.blur(their, (9, 1))                       # motion blur: SIFT's weak spot
+    soft = [vmap._soft(f) for f in sec]
+    c, m = vmap.best_in_window(vmap._soft(their), soft, 0, 2, M.tolist(), 4)
+    assert m == 5 and c > vmap.MIN_NCC
+    c2, _ = vmap.best_in_window(vmap._soft(their), soft, 0, 2, [[k, 0, 100], [0, k, 50]], 4)
+    assert c2 < c                                         # a wrong crop scores lower
+
+
+def test_frame_shift_moves_whole_short_frames_even_on_a_30_in_60_section():
+    # their 60 fps frames n map to a 30 fps stream stored at 60 fps: section frames 0,0,2,2,4,4... (duplicates)
+    vm = {"fps": 60.0, "nfr": 10, "frame_shift": 1, "frames": {str(n): [0, 2 * (n // 2)] for n in range(10)},
+          "sections": [{"fps": 60.0}]}
+    shot = {"seg": 0, "sec": 0, "off": 0.0}
+    # shift 1 = render frame n as map frame n + 1 (shot, crop, section frame), never section index m + 1, which
+    # would be the same frame or two of theirs further on
+    assert [render.sec_frame_index(vm, shot, render.src_frame(vm, n)) for n in range(5)] == [0, 2, 2, 4, 4]
+    assert render.src_frame(vm, 9) == 9 and render.src_frame({**vm, "frame_shift": -2}, 1) == 0
+    assert render.sec_frame_index(vm, shot, 3) == 2      # the index itself is never shifted
+
+
 def test_to_out_converts_analysis_map_to_output_frame():
     # their 2160x2880, section 1920x1080; analysis map: their(540 wide) -> section(960 wide)
     M = [[0.75, 0, 200], [0, 0.75, 10]]

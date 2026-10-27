@@ -22,14 +22,21 @@ def shot_at(vm, n):
     return vm["shots"][-1]
 
 
+def src_frame(vm, n):
+    """Map frame rendered at output frame n. frame_shift (match.frame_shift on a render) is in THEIR frames: our
+    n + s showed their n, so output frame n is rendered as map frame n + s in everything: shot (cut), crop and
+    section frame. Adding s to the section index instead breaks on 30 fps streams stored at 60 fps (every other
+    section frame a duplicate): one section frame is 0 or 2 of their frames there, never 1 (#121)."""
+    return min(max(n + int(vm.get("frame_shift", 0)), 0), vm["nfr"] - 1)
+
+
 def sec_frame_index(vm, shot, n):
     """Section frame shown at output frame n (the map's own choice when it has one)."""
-    shift = int(vm.get("frame_shift", 0))        # measured on the rendered result (match.frame_shift)
     f = vm.get("frames", {}).get(str(n))
     if f is not None and f[0] == shot["seg"]:
-        return int(f[1]) + shift
+        return int(f[1])
     sec = vm["sections"][shot["sec"]]
-    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"])) + shift
+    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
 
 
 def compose(sec_img, vm, shot, n, size=None):
@@ -201,12 +208,13 @@ def render(spec, out_path, work, crf=17):
     readers = {}
     try:
         for n in range(vm["nfr"]):
-            shot = shot_at(vm, n)
+            ns = src_frame(vm, n)      # their colour effects below stay on their own frame n
+            shot = shot_at(vm, ns)
             sec = vm["sections"][shot["sec"]]
             rd = readers.get(shot["sec"])
             if rd is None:
                 rd = readers[shot["sec"]] = C.FrameReader(sec["file"], sec["fps"], (sec["w"], sec["h"]))
-            img = compose(rd.get(sec_frame_index(vm, shot, n)), vm, shot, n)
+            img = compose(rd.get(sec_frame_index(vm, shot, ns)), vm, shot, ns)
             img = apply_look(img, lut, look.get("sharpen"))
             if n in mats:      # their exact colour effect on this frame (replaces the single-colour wash)
                 img = apply_mat(img, mats[n])

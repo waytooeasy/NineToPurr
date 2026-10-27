@@ -133,6 +133,114 @@ def resync(out, th, n0, sec, m_lo, samples=16):
     return [(n, seg, m + d, M, c) for n, seg, m, M, c in out]
 
 
+FILL_S = 0.5          # unmapped frames: search this far around the predicted section frame (#121)
+FILL_STEP = 3         # coarse step of that search, then every frame around the best
+FILL_BLUR = 1.2       # analysis px: motion-blurred frames correlate better once both sides are softened
+
+
+def gap_plan(nfr, best, fps, sec_fps):
+    """For every frame the matcher missed: candidates (seg, predicted section frame, M) taken from the nearest
+    mapped frame before and after it (same crop, continuous footage). At a fast cut the frames before the next
+    shot's first match get that shot's crop as well as the previous one's; the openings get the first shot's.
+    best: {n: (seg, m, M, ncc)}; sec_fps: {seg: fps of its section}. -> {n: [(seg, m_pred, M), ...]}"""
+    mapped = sorted(best)
+    if not mapped:
+        return {}
+    plan = {}
+    j = 0
+    for n in range(nfr):
+        if n in best:
+            continue
+        while j < len(mapped) and mapped[j] < n:
+            j += 1
+        cands = []
+        for nb in ([mapped[j - 1]] if j > 0 else []) + ([mapped[j]] if j < len(mapped) else []):
+            seg, m, M, _ = best[nb]
+            mp = int(round(m + (n - nb) * sec_fps[seg] / fps))
+            if not any(c[0] == seg and abs(c[1] - mp) <= 1 and np.allclose(c[2], M) for c in cands):
+                cands.append((seg, mp, M))
+        plan[n] = cands
+    return plan
+
+
+def _soft(img):
+    return cv2.GaussianBlur(img, (0, 0), FILL_BLUR)
+
+
+def best_in_window(their, sec, m_lo, center, M, win):
+    """(ncc, m): the section frame around `center` (±win) that their frame matches best under the crop M.
+    sec: softened gray section frames starting at index m_lo."""
+    M = np.asarray(M, np.float64)
+    lo, hi = max(m_lo, center - win), min(m_lo + len(sec) - 1, center + win)
+    if lo > hi:
+        return -1.0, None
+    seen = {}
+
+    def score(m):
+        if m not in seen:
+            seen[m] = warp_ncc(their, sec[m - m_lo], M)
+        return seen[m]
+
+    coarse = list(range(lo, hi + 1, FILL_STEP)) + ([center] if lo <= center <= hi else [])
+    mb = max(coarse, key=score)
+    for m in range(max(lo, mb - FILL_STEP + 1), min(hi, mb + FILL_STEP - 1) + 1):
+        score(m)
+    m = max(seen, key=seen.get)
+    return seen[m], m
+
+
+def _fill_job(args):
+    """One run of consecutive unmapped frames: [(n, seg, m, M, ncc)] for those that match above MIN_NCC."""
+    short_path, fps, asz, n0, n1, plan, secs = args
+    th = C.read_frames(short_path, n0, n1 - n0, fps, asz, gray=True)
+    win = {seg: int(round(FILL_S * secs[seg][1])) for seg in secs}
+    need = {}
+    for n in range(n0, n0 + len(th)):
+        for seg, mp, _ in plan[n]:
+            a, b = need.get(seg, (mp, mp))
+            need[seg] = (min(a, mp - win[seg]), max(b, mp + win[seg]))
+    frames = {}
+    for seg, (a, b) in need.items():
+        path, sfps, vsz = secs[seg]
+        a = max(0, a)
+        frames[seg] = (a, [_soft(f) for f in C.read_frames(path, a, b - a + 1, sfps, vsz, gray=True)])
+    out = []
+    for i, n in enumerate(range(n0, n0 + len(th))):
+        their = _soft(th[i])
+        best = None
+        for seg, mp, M in plan[n]:
+            m_lo, sec = frames[seg]
+            c, m = best_in_window(their, sec, m_lo, mp, M, win[seg])
+            if m is not None and (best is None or c > best[4]):
+                best = (n, seg, m, M, c)
+        if best is not None and best[4] >= MIN_NCC:
+            out.append(best)
+    return out
+
+
+def fill_gaps(short_path, fps, asz, nfr, best, secs, workers=WORKERS):
+    """Frames SIFT missed (fast cuts, the first frames, motion blur): found by correlation around the predicted
+    section frame with a neighbour's crop (#121). secs: {seg: (section file, fps, analysis size)}.
+    Adds them to `best` in place; returns how many were filled."""
+    plan = gap_plan(nfr, best, fps, {s: v[1] for s, v in secs.items()})
+    runs, cur = [], []
+    for n in sorted(plan):
+        if cur and (n != cur[-1] + 1 or len(cur) >= 60):
+            runs.append(cur)
+            cur = []
+        cur.append(n)
+    if cur:
+        runs.append(cur)
+    jobs = [(str(short_path), fps, asz, r[0], r[-1] + 1, {n: plan[n] for n in r}, secs) for r in runs]
+    if not jobs:
+        return 0
+    with Pool(max(1, workers)) as pool:
+        res = [x for part in pool.map(_fill_job, jobs) for x in part]
+    for n, seg, m, M, c in res:
+        best[n] = (seg, m, M, c)
+    return len(res)
+
+
 def _roll(x, w, fn):
     h = w // 2
     return np.array([fn(x[max(0, i - h):i + h + 1]) for i in range(len(x))])
@@ -254,6 +362,11 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
     for n, seg_i, m, M, c in res:
         if c >= MIN_NCC and (n not in best or c > best[n][3]):
             best[n] = (seg_i, m, M, c)
+    sift_n = len(best)
+    segs = amap["segments"]
+    secs = {i: (sections[g["sec"]]["file"], secp[g["sec"]]["fps"],
+                (VA, int(round(VA * secp[g["sec"]]["h"] / secp[g["sec"]]["w"] / 2) * 2))) for i, g in enumerate(segs)}
+    filled = fill_gaps(short_path, fps, asz, nfr, best, secs, workers) if best else 0
     frames = []
     for n in sorted(best):
         seg_i, m, M, c = best[n]
@@ -289,10 +402,10 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
     for a, b in zip(shots, shots[1:]):
         a["n1"] = b["n0"]
     shots[-1]["n1"] = nfr
-    C.log(f"video map: {len(frames)}/{nfr} frames mapped, {len(shots)} shots "
+    C.log(f"video map: {len(frames)}/{nfr} frames mapped ({filled} filled after SIFT's {sift_n}), {len(shots)} shots "
           + ", ".join(f"{s['n0']}:{s['layout']}" for s in shots))
     return {"fps": fps, "w": W, "h": H, "out_w": out_wh[0], "out_h": out_wh[1], "nfr": nfr, "shots": shots,
-            "frames": {str(f["n"]): [f["seg"], f["m"]] for f in frames}, "mapped": len(frames),
+            "frames": {str(f["n"]): [f["seg"], f["m"]] for f in frames}, "mapped": len(frames), "filled": filled,
             "sections": [{"file": s["file"], "fps": p["fps"], "w": p["w"], "h": p["h"]} for s, p in zip(sections, secp)]}
 
 
