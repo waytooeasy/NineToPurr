@@ -34,6 +34,8 @@ MERGE_TOL = 0.015     # two templates whose refined edges agree this closely are
 SHIFT_S = 5.0         # a panel missing at the main panel's time is looked for this far (s) in the stream ...
 SHIFT_STEP = 10       # ... every this many section frames, then frame by frame around the best
 SHIFT_RUN = 120       # runs of frames missing a panel are searched in pieces of at most this many frames
+WEAK_NCC = 0.85       # a panel matching below this is also searched at other seconds ...
+SHIFT_GAIN = 0.04     # ... and moved there only when it matches this much better
 DENSE_N = 8000        # keypoints kept per section frame (a facecam corner keeps enough of its own)
 
 _dense = _masked = None
@@ -439,15 +441,16 @@ def map_job(args):
     return out
 
 
-def missing_runs(recs, tpls):
-    """Runs of consecutive frames where one panel is missing while another one maps (same template, same
-    footage): [(tpl, panel, seg, [n, ...])], each at most SHIFT_RUN frames."""
+def retime_runs(recs, tpls):
+    """Runs of consecutive frames where one panel is missing or matches weakly while another one maps (same
+    template, same footage): the clipper may show that crop at other seconds. [(tpl, panel, seg, [n, ...])],
+    each at most SHIFT_RUN frames."""
     out = []
     for t, tpl in enumerate(tpls):
         for p in range(len(tpl["rects"])):
             cur, seg = [], None
             for r in recs + [None]:
-                miss = (r is not None and r[3] == t and r[4][p] is None
+                miss = (r is not None and r[3] == t and (r[4][p] is None or r[5][p] < WEAK_NCC)
                         and any(M is not None for i, M in enumerate(r[4]) if i != p))
                 if miss and cur and r[0] == cur[-1] + 1 and r[1] == seg and len(cur) < SHIFT_RUN:
                     cur.append(r[0])
@@ -459,10 +462,11 @@ def missing_runs(recs, tpls):
 
 
 def shift_job(args):
-    """A run of frames missing one panel at the main panel's time (the clipper re-synced a facecam reaction...):
-    the panel's own time offset dm, found on the run's middle frame within SHIFT_S, then the panel mapped at
-    m + dm on every frame of the run. -> [(n, M, ncc, dm)]."""
-    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask = args
+    """A run of frames missing one panel at the main panel's time, or matching it weakly (the clipper re-synced a
+    facecam reaction...): the panel's own time offset dm, found on the run's middle frame within SHIFT_S, then
+    the panel mapped at m + dm on every frame of the run where that beats its ncc at m (`old`) by SHIFT_GAIN.
+    -> [(n, M, ncc, dm)]."""
+    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old = args
     nm = ns[len(ns) // 2]
     th = C.read_frames(short_path, nm, 1, fps, asz, gray=True)
     if not len(th):
@@ -485,7 +489,7 @@ def shift_job(args):
     if mb is None or c < VM.MIN_NCC:
         return []
     c, mb = scan(mb - SHIFT_STEP, mb + SHIFT_STEP, 1)
-    if mb is None or c < VM.MIN_NCC:
+    if mb is None or c < max(VM.MIN_NCC, old.get(nm, -1.0) + SHIFT_GAIN) or abs(mb - m0) <= 2:
         return []
     dm = mb - m0
     th = C.read_frames(short_path, ns[0], ns[-1] - ns[0] + 1, fps, asz, gray=True)
@@ -502,7 +506,7 @@ def shift_job(args):
     out = []
     for i, n in enumerate(ns[:len(th)]):
         m, Ms, cs = map_frame(th[i], sec_at, m_of[n] + dm, [mask])
-        if Ms[0] is not None and cs[0] >= VM.MIN_NCC:
+        if Ms[0] is not None and cs[0] >= max(VM.MIN_NCC, old.get(n, -1.0) + SHIFT_GAIN):
             out.append((n, Ms[0].tolist(), float(cs[0]), int(m - m_of[n])))
     return out
 

@@ -546,16 +546,16 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
             recs[r[0]] = (sc, r)
     recs = [v[1] for _, v in sorted(recs.items())]
     shift, which = [], []       # panels missing at the main panel's time: their own time offset (shift_job)
-    for t, p, seg_i, ns in PN.missing_runs(recs, tpls):
+    by_n = {r[0]: r for r in recs}
+    for t, p, seg_i, ns in PN.retime_runs(recs, tpls):
         which.append(p)
         g = amap["segments"][seg_i]
         sp = secp[g["sec"]]
         vsz = (VA, int(round(VA * sp["h"] / sp["w"] / 2) * 2))
-        by_n = {r[0]: r for r in recs}
         shift.append((str(short_path), fps, asz, sections[g["sec"]]["file"], sp["fps"], vsz, ns,
-                      {n: by_n[n][2] for n in ns}, tmasks[t][p]))
+                      {n: by_n[n][2] for n in ns}, tmasks[t][p],
+                      {n: by_n[n][5][p] for n in ns if by_n[n][4][p] is not None}))
     if shift:
-        by_n = {r[0]: r for r in recs}
         with Pool(max(1, min(workers, len(shift)))) as pool:
             found = pool.map(PN.shift_job, shift)
         for p, res in zip(which, found):
