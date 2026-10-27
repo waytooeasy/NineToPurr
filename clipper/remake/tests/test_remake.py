@@ -80,7 +80,15 @@ def test_short_download_uses_the_cookie_file_only_when_present(tmp_path, monkeyp
     monkeypatch.setenv("YTDLP_COOKIES", str(c))
     (tmp_path / "b").mkdir()
     source.download_short("b", tmp_path / "b", runner=runner)
-    assert seen[-1][seen[-1].index("--cookies") + 1] == str(c)
+    used = seen[-1][seen[-1].index("--cookies") + 1]
+    # yt-dlp gets a copy (it writes the jar back on exit): Lucas's file is never handed to it
+    assert used != str(c) and Path(used).read_text() == c.read_text()
+    source.drop_temp_cookies()
+    assert not Path(used).exists() and c.read_text() == "# Netscape HTTP Cookie File\n"
+    c.write_text("")
+    (tmp_path / "e").mkdir()
+    source.download_short("e", tmp_path / "e", runner=runner)
+    assert "--cookies" not in seen[-1]                     # an empty file is no cookies
 
 
 def test_hung_download_fails_this_short_throttling_stops_the_run(tmp_path):
@@ -401,3 +409,40 @@ def test_music_bed_is_not_turned_into_booms():
     assert render.real_hits([hit, {"t": 28.8, "dur": 0.5, "db": -10}]) == [hit, {"t": 28.8, "dur": 0.5, "db": -10}]
     assert render.real_hits([{"t": i, "dur": 1.0, "db": -15} for i in range(8)]) == []
     assert render.real_hits([{"t": 4.4, "dur": 4.4, "db": -7}]) == []
+
+
+def test_a_stopped_run_puts_its_short_back_in_the_queue(monkeypatch, tmp_path):
+    monkeypatch.setenv("CLIPPER_REMAKE", str(tmp_path))
+    c = db()
+    s = {"id": "S1", "title": "t", "published": "2026-10-21T00:00:00Z", "streamer": "Ludwig", "channel": "x"}
+
+    def stop(*a, **k):
+        raise SystemExit(143)                          # systemd's SIGTERM at the timeout
+    monkeypatch.setattr(source, "plans_for", stop)
+    with pytest.raises(SystemExit):
+        run.remake_one(c, s, tmp_path / "out")
+    row = c.execute("SELECT status, attempts, last_error FROM remakes WHERE short_id='S1'").fetchone()
+    assert row["status"] == "picked" and row["attempts"] == 0 and "stopped" in row["last_error"]
+
+
+def test_whole_vod_audio_is_cached_for_the_next_short(tmp_path, monkeypatch):
+    monkeypatch.setenv("CLIPPER_REMAKE", str(tmp_path))
+    calls = []
+
+    def fake_run(cmd, **k):
+        calls.append(cmd)
+        o = Path(cmd[cmd.index("-o") + 1])
+        o.parent.mkdir(parents=True, exist_ok=True)
+        o.write_bytes(b"audio")
+    monkeypatch.setattr(source.subprocess, "run", fake_run)
+    a = source.download_audio("2905313723", tmp_path / "w1" / "vod.m4a")
+    b = source.download_audio("2905313723", tmp_path / "w2" / "vod.m4a")
+    assert a == b == source.vod_cache("2905313723") and len(calls) == 1
+    w = source.download_audio("2905313723", tmp_path / "w3" / "part.m4a", 100, 200)    # windows are not cached
+    assert w == tmp_path / "w3" / "part.m4a" and len(calls) == 2
+
+
+def test_probe_numbers_survive_missing_values():
+    from remake import common as Cm
+    assert Cm._num("30000/1001") == pytest.approx(29.97, abs=0.01)
+    assert Cm._num("N/A") is None and Cm._num(None) is None and Cm._num("0/0") is None and Cm._num("60") == 60

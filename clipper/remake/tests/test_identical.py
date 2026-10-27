@@ -235,3 +235,56 @@ def test_a_render_one_frame_late_is_measured(tmp_path):
     late = _video(tmp_path / "o.mp4", frames[0:58])        # ours n + 1 shows their n
     assert match.frame_shift(T, late, step=3) == 1
     assert match.frame_shift(T, T, step=3) == 0
+
+
+def test_states_carry_place_and_word_colours_and_ocr_highlights_win_over_a_white_pixel_read():
+    segs = [{"n0": 0, "n1": 15, "box": [0.4, 0.6, 0.70, 0.76], "iou": [1.0] * 15}]
+    evs = style.state_events(segs, [[[("RESPECT", "#FFE600")]]], 30, 0.5)
+    assert evs[0]["x"] == 0.5 and evs[0]["y"] == 0.73 and evs[0]["words"][0]["c"] == "#FFE600"
+    assert style.merge_colour("#FFFFFF", "#FFE600") == "#FFE600"
+    assert style.merge_colour("#00FF00", "#FFFFFF") == "#00FF00"
+    assert style.merge_colour(None, "#FFFFFF") == "#FFFFFF"
+
+
+def test_a_long_state_read_twice_is_split_where_its_pixels_changed(tmp_path, monkeypatch):
+    seg = {"n0": 0, "n1": 20, "box": None, "iou": [1.0] * 9 + [0.62] + [1.0] * 10}
+    reads = iter([[[("YOU", "#FFFFFF"), ("KNOW", "#FFFFFF")]], [[("MONKEY", "#00FFFF")]]])
+    monkeypatch.setattr(style, "ocr_frames", lambda *a, **k: [next(reads), next(reads)])
+    segs, texts = style.read_states("x.mp4", [seg], 30, (1080, 1920), 0.5, None)
+    assert [(s["n0"], s["n1"]) for s in segs] == [(0, 9), (9, 20)]
+    assert texts[1][0][0][0] == "MONKEY"
+
+
+def test_boxed_caption_is_found_away_from_the_usual_height():
+    rng = np.random.default_rng(6)
+    base = cv2.GaussianBlur(rng.integers(60, 200, (960, 540, 3), dtype=np.uint8), (0, 0), 5)
+    th = base.copy()
+    th[690:750, 150:390] = 5                           # their box, low in the frame
+    cv2.putText(th, "RESPECT", (165, 735), cv2.FONT_HERSHEY_DUPLEX, 1.4, (255, 255, 255), 3, cv2.LINE_8)
+    rows, _ = style.text_lines(th, base, y=0.5, edged=True)
+    assert rows and 690 <= rows[0][0] and rows[-1][1] <= 750
+
+
+def test_ocr_answers_in_any_shape_are_read():
+    assert style._parse_lines({"lines": [[["YOU", "#FFFFFF"], ["KNOW", "#00FFFF"]]]}) == [[("YOU", "#FFFFFF"), ("KNOW", "#00FFFF")]]
+    assert style._parse_lines([[["HI", "#FFE600"]]]) == [[("HI", "#FFE600")]]
+    assert style._parse_lines(["HELLO", "THERE"]) == [[("HELLO", "#FFFFFF"), ("THERE", "#FFFFFF")]]
+    assert style._parse_lines({"lines": []}) == [] and style._parse_lines(None) == []
+
+
+def test_media_left_by_stopped_runs_is_swept_maps_kept(tmp_path):
+    import os
+    import time
+    from remake import run
+    old, new = tmp_path / "abc", tmp_path / "def"
+    for d in (old, new):
+        d.mkdir()
+        (d / "vod_1.m4a").write_bytes(b"x" * 1000)
+        (d / "caps.json").write_text("{}")
+        (d / "vmap.json").write_text("{}")
+    (tmp_path / "_styles").mkdir()
+    t = time.time() - 3 * 3600
+    os.utime(old / "vod_1.m4a", (t, t))
+    assert run.sweep(tmp_path) == 1000
+    assert not (old / "vod_1.m4a").exists() and (old / "caps.json").exists() and not (old / "vmap.json").exists()
+    assert (new / "vod_1.m4a").exists() and (new / "vmap.json").exists()        # a fresh run's files stay

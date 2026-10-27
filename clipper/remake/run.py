@@ -8,8 +8,10 @@ import argparse
 import json
 import os
 import shutil
+import signal
 import sqlite3
 import sys
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -26,6 +28,10 @@ MIN_DUR_S = 8
 MIN_VPH = 1500            # views/hour to count as popping
 MAX_ATTEMPTS = 2
 PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
+RUN_BUDGET_S = int(os.environ.get("REMAKE_RUN_BUDGET_S", "2400"))   # start no new Short after 40 min of a run
+MEDIA = (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts", ".ytdl")
+STALE_S = 2 * 3600
+VOD_CACHE_MAX = 8e9
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
 CAPTIONS_GOOD = 92.0      # caption match (%) that ends the search for a better caption look
 MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
@@ -331,13 +337,50 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
     except Exception as e:
         _status(con, s, "failed", last_error=f"{type(e).__name__}: {e}"[:500])
         raise
+    except (SystemExit, KeyboardInterrupt):     # the run was stopped (timeout): this Short goes back in the queue
+        _status(con, s, "picked", last_error="run stopped before it finished")
+        con.execute("UPDATE remakes SET attempts=MAX(0, attempts-1) WHERE short_id=?", (sid,))
+        con.commit()
+        raise
     finally:
+        source.drop_temp_cookies()
         if not keep:   # media go, the stage maps stay (a retry re-downloads only what it needs)
             for p in work.iterdir():
                 if p.suffix in (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts"):
                     p.unlink(missing_ok=True)
             for name in ("found", "amap", "vmap", "vmap_aligned", "frame_shift"):   # they point at the deleted media
                 (work / f"{name}.json").unlink(missing_ok=True)
+
+
+def sweep(root=None, stale_s=STALE_S, now=None):
+    """Downloaded media a killed run left behind (they filled the disk by 2026-10-27): deleted when older than
+    `stale_s`. Stage maps (json) stay. Returns bytes freed."""
+    root = Path(root or C.root())
+    now = now or time.time()
+    freed = 0
+    if not root.is_dir():
+        return 0
+    vods = root / "_vods"           # shared VOD audio: a day at most, 8 GB at most (oldest go first)
+    if vods.is_dir():
+        files = sorted((f for f in vods.iterdir() if f.is_file()), key=lambda f: f.stat().st_mtime)
+        total = sum(f.stat().st_size for f in files)
+        for f in files:
+            age = now - f.stat().st_mtime
+            if age > 24 * 3600 or (f.name.endswith((".part", ".ytdl")) and age > stale_s) or total > VOD_CACHE_MAX:
+                total -= f.stat().st_size
+                freed += f.stat().st_size
+                f.unlink(missing_ok=True)
+    for d in root.iterdir():
+        if not d.is_dir() or d.name.startswith("_"):
+            continue
+        for f in d.iterdir():
+            if f.is_file() and f.name.endswith(MEDIA) and now - f.stat().st_mtime > stale_s:
+                freed += f.stat().st_size
+                f.unlink(missing_ok=True)
+        for name in ("found", "amap", "vmap", "vmap_aligned", "frame_shift"):
+            if not any(f.name.endswith(MEDIA) for f in d.iterdir()):
+                (d / f"{name}.json").unlink(missing_ok=True)    # they point at media that is gone
+    return freed
 
 
 def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False):
@@ -362,8 +405,12 @@ def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, 
             tw = Twitch()
         except Exception as e:  # no Twitch credentials: only moment-match hints can locate VODs
             C.log(f"twitch client unavailable: {e}")
+    t0 = time.monotonic()
     for s in picks:
         if len(res["done"]) >= max_n:
+            break
+        if time.monotonic() - t0 > RUN_BUDGET_S:      # leave the rest for the next run (never killed mid-remake)
+            C.log(f"run budget used ({RUN_BUDGET_S // 60} min): the next run goes on")
             break
         try:
             res["done"].append(remake_one(con, s, out_dir, tw=tw))
@@ -404,6 +451,10 @@ def main(argv=None):
         except OSError:
             print("another remake run holds the lock")
             return
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))   # systemd stop/timeout: clean up, requeue
+        freed = sweep()
+        if freed:
+            C.log(f"swept {freed / 1e9:.1f} GB of media left by stopped runs")
         if short and a.keep:
             from radar.twitch import Twitch
             print(remake_one(con, short, out_dir, tw=Twitch(), keep=True))
