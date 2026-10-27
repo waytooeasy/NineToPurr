@@ -62,7 +62,9 @@ def test_reveals_read_from_letter_heights_and_brightness():
     assert fade["kind"] == "fade" and fade["ms"] > 30
     assert style.reveal_of([0] + [40] * 9, [0] + [250] * 9, 60)["kind"] == "none"
     assert style.reveal_of([0, 0, 0], [0, 0, 0], 60) is None
-    assert style.same_reveal(pop, {**pop, "from": pop["from"] + 0.05}) and not style.same_reveal(pop, fade)
+    # the caption before still on screen (4x taller) is not a pop that starts at 440 %
+    assert style.reveal_of([176, 176, 40, 40, 40, 40, 40, 40], [250] * 8, 60) is None
+    assert style.same_reveal(pop, {**pop, "from": pop["from"] + 0.1}) and not style.same_reveal(pop, fade)
 
 
 def test_ass_writes_each_words_size_and_each_captions_own_reveal(tmp_path):

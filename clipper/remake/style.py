@@ -493,6 +493,8 @@ def reveal_of(hs, vs, fps):
     if k0 is None:
         return None
     rel = np.array(hs[k0:]) / hf
+    if rel[0] > POP_MAX or rel.max() > POP_MAX:   # bigger than the caption itself: the one before / a flash, not a pop
+        return None
     settle = next((i for i in range(len(rel)) if all(abs(r - 1) < 0.05 for r in rel[i:])), len(rel))
     if rel[0] < 0.88 or rel.max() > 1.08:
         ip = int(np.argmax(rel))
@@ -504,7 +506,10 @@ def reveal_of(hs, vs, fps):
     return {"kind": "none", "ms": 0}
 
 
-def same_reveal(a, b, tol=0.08):
+POP_MAX = 1.6          # a caption measured taller than this x its settled height is something else on screen
+
+
+def same_reveal(a, b, tol=0.15):
     """Two reveals look alike (kind, and for pops their start / peak scale within tol)."""
     if a is None or b is None or a["kind"] != b["kind"]:
         return a is b
