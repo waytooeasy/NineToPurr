@@ -154,7 +154,9 @@ def find_panels(th, sec, secf=None, M0=None, max_panels=MAX_PANELS):
     free = np.ones((H, W), bool)
     out = []
     pending = [np.asarray(M0, np.float64)] if M0 is not None else []
-    while len(out) < max_panels:
+    for _ in range(max_panels + 3):
+        if len(out) >= max_panels or free.sum() < min_area:
+            break
         from_m0 = bool(pending)
         if from_m0:
             M = pending.pop()
@@ -167,17 +169,17 @@ def find_panels(th, sec, secf=None, M0=None, max_panels=MAX_PANELS):
             M = similarity(feats_in(th, mask), secf)
             if M is None:
                 break
+        cov = coverage(th, sec, M)
         if any(same_crop(M, p[1], (W, H)) for p in out):
-            break
-        rect, region = rect_of(coverage(th, sec, M) & free, min_area)
+            free &= ~cov                  # leftovers of a panel already found (flat spots, holes): look elsewhere
+            continue
+        rect, region = rect_of(cov & free, min_area)
         if rect is None:
             if from_m0:
                 continue                  # pass 1's crop explains too little here: look with SIFT instead
             break
         out.append((rect, M))
         free &= ~region
-        if free.sum() < min_area:
-            break
     order = canon([r for r, _ in out])
     return [out[i] for i in order]
 

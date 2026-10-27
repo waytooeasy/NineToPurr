@@ -18,7 +18,8 @@ the normal flow as an `edited` clip: QC → visual check → Telegram ✅ Post.
 | download | `source.download_short` | yt-dlp; a YouTube bot check stops the run and retries later (never worked around, #64) |
 | locate | `source.find` | VOD of the matched moment (D54 hint) or the streamer's archives; audio snippets + a dense audio pass find every part; only those VOD sections are downloaded (1080p60) |
 | audio map | `amap.build` | every 0.2 s of the Short placed in the sections; offsets to the sample, gain per piece, exact switch points, bass hits and music bed reported |
-| video map | `vmap.build` | SIFT + RANSAC per frame → exact crop; cuts where the mapping jumps; smooth camera path per shot; layout full / fit (+ fitted blur background) |
+| video map | `vmap.build` | SIFT + RANSAC per frame → exact crop; cuts where the mapping jumps; smooth camera path per shot; layout full / fit (+ fitted blur background, or their solid colour) |
+| stacks | `panels` | stacked / overlay layouts (#130): sample frames probed for panels (pass 1's crop explains one region, SIFT on the rest finds the next), agreeing samples → template, seams refined on the pixels; then every frame mapped per panel → `stack` shots (rect + smoothed path per panel, fill colour) |
 | look | `look.build` | grade (cubic colour polynomial on low-passed aligned frames), sharpening amount, **per-frame colour transform** for their effects (green wash, red flash, black & white, fades; `overlay.mats`), caption-band energy |
 | captions | `caps.build` | Haiku vision OCR at 10 fps → caption events, word reveal times; one position per Short; start/end refined on the pixels |
 | base | `render.render(ass=None)` | the remake without captions (their colour effects included): `base.mp4` |
@@ -50,7 +51,9 @@ pytest -q remake/tests                         # offline
 - yt-dlp gets a copy of `youtube_cookies.txt` (it rewrites the jar on exit; a full disk emptied the real file).
 
 ## Limits / next
-- Layouts: full and fit. A stacked layout (face cam on top of gameplay) is skipped (`layout not supported yet`).
+- Layouts: full, fit and stack (#130: two or three crops of the same stream frame, bands or a box). Skipped
+  (`layout not supported yet`) only when a region is not in the stream (their own cam, another source) or the
+  surround is neither a blurred copy nor one colour. Stack panels are not re-aligned by `align.refine` yet (full only).
 - Fonts: only the 39 free fonts in `style.FONTS`; a clipper's paid font (e.g. DIN, Gotham) gets the closest one by shape.
 - Frames SIFT misses are filled by correlation around the predicted section frame with a neighbour's crop (#121).
 - `frame_shift` moves whole output frames (cut, crop, section frame), never the section index: Twitch VODs are often
