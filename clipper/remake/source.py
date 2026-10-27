@@ -9,6 +9,7 @@
 import os
 import re
 import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -54,7 +55,26 @@ def youtube_auth():
     """Lucas's YouTube cookies for Short downloads (D59, Lucas: "use my cookies"), when the file is there.
     Only for the clipper Short itself (one download per remake); never logged."""
     p = os.environ.get("YTDLP_COOKIES", COOKIES)
-    return ["--cookies", p] if p and Path(p).is_file() else []
+    if not (p and Path(p).is_file() and Path(p).stat().st_size > 0):
+        return []
+    # yt-dlp writes the cookie jar back when it exits: give it a copy, so a killed run or a full disk can never
+    # empty Lucas's file (it did on 2026-10-27)
+    import shutil
+    import tempfile
+    fd, tmp = tempfile.mkstemp(prefix="ytc_", suffix=".txt")
+    os.close(fd)
+    shutil.copyfile(p, tmp)
+    os.chmod(tmp, 0o600)
+    _TEMP_COOKIES.append(tmp)
+    return ["--cookies", tmp]
+
+
+_TEMP_COOKIES = []
+
+
+def drop_temp_cookies():
+    while _TEMP_COOKIES:
+        Path(_TEMP_COOKIES.pop()).unlink(missing_ok=True)
 
 
 def is_yt(vod_id):
@@ -191,8 +211,24 @@ def download_short(short_id, out_dir, runner=subprocess.run):
     return out
 
 
+VOD_CACHE_S = 6 * 3600     # a whole VOD's audio is reused this long (several popping Shorts come from one stream)
+
+
+def vod_cache(vod_id):
+    return C.root() / "_vods" / (re.sub(r"[^A-Za-z0-9_-]", "_", str(vod_id)) + ".m4a")
+
+
 def download_audio(vod_id, out, start=None, end=None):
+    """The VOD's audio (a window of it with start/end). A whole VOD's audio goes to the shared cache
+    ($CLIPPER_REMAKE/_vods) and is reused by the next Short from the same stream. Returns the file to read."""
     out = Path(out)
+    if start is None:
+        cache = vod_cache(vod_id)
+        if cache.exists() and time.time() - cache.stat().st_mtime < VOD_CACHE_S:
+            return cache
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.unlink(missing_ok=True)
+        out = cache
     if not out.exists():
         if is_yt(vod_id):
             cmd = [C.ytdlp(), *yt_flags(), "-N", str(FRAGMENTS), "-f", "ba[ext=m4a]/ba", "-o", str(out)]
@@ -333,7 +369,7 @@ def find(short, work, con=None, tw=None, logins=(), plans=None, handles=()):
         tried.append((vod_id, s))
         audio = work / (f"vod_{vod_id}_{int(s)}.m4a" if s is not None else f"vod_{vod_id}.m4a")
         try:
-            download_audio(vod_id, audio, s, e)
+            audio = download_audio(vod_id, audio, s, e)
         except subprocess.CalledProcessError as err:
             C.log(f"audio download failed for VOD {vod_id}: {err.stderr[-300:] if err.stderr else err}")
             continue

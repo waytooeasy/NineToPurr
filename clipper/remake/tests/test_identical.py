@@ -270,3 +270,21 @@ def test_ocr_answers_in_any_shape_are_read():
     assert style._parse_lines([[["HI", "#FFE600"]]]) == [[("HI", "#FFE600")]]
     assert style._parse_lines(["HELLO", "THERE"]) == [[("HELLO", "#FFFFFF"), ("THERE", "#FFFFFF")]]
     assert style._parse_lines({"lines": []}) == [] and style._parse_lines(None) == []
+
+
+def test_media_left_by_stopped_runs_is_swept_maps_kept(tmp_path):
+    import os
+    import time
+    from remake import run
+    old, new = tmp_path / "abc", tmp_path / "def"
+    for d in (old, new):
+        d.mkdir()
+        (d / "vod_1.m4a").write_bytes(b"x" * 1000)
+        (d / "caps.json").write_text("{}")
+        (d / "vmap.json").write_text("{}")
+    (tmp_path / "_styles").mkdir()
+    t = time.time() - 3 * 3600
+    os.utime(old / "vod_1.m4a", (t, t))
+    assert run.sweep(tmp_path) == 1000
+    assert not (old / "vod_1.m4a").exists() and (old / "caps.json").exists() and not (old / "vmap.json").exists()
+    assert (new / "vod_1.m4a").exists() and (new / "vmap.json").exists()        # a fresh run's files stay

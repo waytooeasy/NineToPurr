@@ -41,6 +41,14 @@ python -m remake.run --short DNiycSAWihg --streamer "Stable Ronaldo" --published
 pytest -q remake/tests                         # offline
 ```
 
+## Keeping it running (2026-10-27)
+- A run starts no new Short after 40 min (`REMAKE_RUN_BUDGET_S`); systemd's stop (`TimeoutStartSec=75min`) sends
+  SIGTERM, which puts the Short back in the queue (not counted as an attempt) and cleans its media.
+- Every run first sweeps media older than 2 h left by stopped runs (they filled the 38 GB disk by 2026-10-27), and the
+  shared VOD audio cache `$CLIPPER_REMAKE/_vods` (24 h, 8 GB max): a whole VOD's audio is downloaded once and reused
+  by the next Short from the same stream.
+- yt-dlp gets a copy of `youtube_cookies.txt` (it rewrites the jar on exit; a full disk emptied the real file).
+
 ## Limits / next
 - Layouts: full and fit. A stacked layout (face cam on top of gameplay) is skipped (`layout not supported yet`).
 - Fonts: only the 39 free fonts in `style.FONTS`; a clipper's paid font (e.g. DIN, Gotham) gets the closest one by shape.

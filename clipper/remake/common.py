@@ -32,13 +32,33 @@ def log(msg):
 def probe(path):
     """{'w', 'h', 'fps', 'dur', 'audio'} of a media file."""
     out = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                          "stream=codec_type,width,height,r_frame_rate:format=duration", "-of", "json", str(path)],
+                          "stream=codec_type,width,height,r_frame_rate,avg_frame_rate,duration,nb_frames:"
+                          "format=duration", "-of", "json", str(path)],
                          capture_output=True, check=True, text=True).stdout
     d = json.loads(out)
     v = next(s for s in d["streams"] if s.get("codec_type") == "video")
-    num, den = v["r_frame_rate"].split("/")
-    return {"w": int(v["width"]), "h": int(v["height"]), "fps": float(num) / float(den or 1),
-            "dur": float(d["format"]["duration"]), "audio": any(s.get("codec_type") == "audio" for s in d["streams"])}
+    fps = _num(v.get("avg_frame_rate")) or _num(v.get("r_frame_rate")) or 30.0
+    if _num(v.get("r_frame_rate")) and abs(_num(v.get("r_frame_rate")) - fps) / fps < 0.02:
+        fps = _num(v["r_frame_rate"])          # the exact nominal rate when it agrees
+    # some downloads report no container duration ('N/A', 2026-10-22): the stream's, else frames / fps
+    dur = (_num(d.get("format", {}).get("duration")) or _num(v.get("duration"))
+           or ((_num(v.get("nb_frames")) or 0) / fps))
+    if not dur:
+        raise RuntimeError(f"no duration for {path}")
+    return {"w": int(v["width"]), "h": int(v["height"]), "fps": fps, "dur": float(dur),
+            "audio": any(s.get("codec_type") == "audio" for s in d["streams"])}
+
+
+def _num(x):
+    """'30000/1001', '29.97', 'N/A', None -> float or None."""
+    try:
+        if isinstance(x, str) and "/" in x:
+            a, b = x.split("/")
+            return float(a) / float(b) if float(b) else None
+        v = float(x)
+        return v if v > 0 else None
+    except (TypeError, ValueError):
+        return None
 
 
 def seek(index, fps):
