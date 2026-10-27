@@ -448,7 +448,7 @@ def test_youtube_live_streams_around_the_short_become_plans():
     assert calls == ["channels", "playlistItems", "videos"]          # Data API only, no yt-dlp page scrape
     plans = source.plans_for({"id": "s", "published": "2026-10-21T12:00:00Z"}, None, None, (), ["@IShowSpeed"],
                              yt_streams=lambda h, p: got)
-    assert plans == [("yt:AAAAAAAAAAA", "@IShowSpeed", None, None)]
+    assert plans == [("yt:AAAAAAAAAAA", "@IShowSpeed", None, None, (0.0, 6 * 3600.0))]   # ended before the Short: all of it
 
 
 def test_music_bed_is_not_turned_into_booms():
