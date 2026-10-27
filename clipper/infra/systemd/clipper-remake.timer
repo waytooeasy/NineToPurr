@@ -1,9 +1,9 @@
 [Unit]
-Description=Remake one popping clipper Short every 30 minutes (D58)
+Description=Remake popping clipper Shorts: next run 5 minutes after the last one ends (D58, D63)
 
 [Timer]
 OnBootSec=10min
-OnUnitInactiveSec=30min
+OnUnitInactiveSec=5min
 Persistent=true
 
 [Install]

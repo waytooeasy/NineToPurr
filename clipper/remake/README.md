@@ -8,7 +8,7 @@ their pixels (D57: their Short is only measured, never reused or re-uploaded).
 
 **Status.** Engine built and tested end to end on the study Short (SpecificMinds "Jason And Ron Goes On A Date",
 DNiycSAWihg): 8 shots / 7 cuts found frame-exact, 99.7 % of frames mapped, wide shots and red flash rebuilt.
-Runs from `clipper-remake.timer` (every 30 min, one Short per run, ≤ `REMAKES_PER_DAY`). Its output enters
+Runs from `clipper-remake.timer` (next run 5 min after the last ends, D63; one Short per run, ≤ `REMAKES_PER_DAY`). Its output enters
 the normal flow as an `edited` clip: QC → visual check → Telegram ✅ Post.
 
 ## How it works
