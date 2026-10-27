@@ -38,7 +38,12 @@ def _pairs(short_path, vm, ns, width):
 def _valid(vm, shot, n, w, h):
     """Rows/cols of our frame that show the stream itself (the panel of a 'fit' shot)."""
     m = np.ones((h, w), bool)
-    if shot["layout"] == "fit":
+    if shot["layout"] == "stack":            # the panels themselves, not the fill or 3 px around their edges
+        m[:] = False
+        for p in shot["panels"]:
+            v0, v1, u0, u1 = R.panel_px(p["rect"], w, h)
+            m[v0 + 3:v1 - 3, u0 + 3:u1 - 3] = True
+    elif shot["layout"] == "fit":
         k, cx, cy = R.VM.params_at(shot, n)
         OW, OH = vm["out_w"], vm["out_h"]
         sec = vm["sections"][shot["sec"]]

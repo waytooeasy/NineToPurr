@@ -36,12 +36,12 @@ def _feats(img):
     return _sift.detectAndCompute(img, None)
 
 
-def similarity(f1, f2):
+def similarity(f1, f2, matcher=None):
     """2x3 similarity mapping points of image 1 onto image 2, or None."""
     (kp1, d1), (kp2, d2) = f1, f2
     if d1 is None or d2 is None or len(kp1) < 8 or len(kp2) < 8:
         return None
-    pairs = cv2.BFMatcher(cv2.NORM_L2).knnMatch(d1, d2, k=2)
+    pairs = (matcher or cv2.BFMatcher(cv2.NORM_L2)).knnMatch(d1, d2, k=2)
     good = [p[0] for p in pairs if len(p) == 2 and p[0].distance < 0.75 * p[1].distance]
     if len(good) < 8:
         return None
@@ -373,8 +373,46 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
         sec_i = amap["segments"][seg_i]["sec"]
         k, cx, cy, rot = to_out(M, (W, H), (secp[sec_i]["w"], secp[sec_i]["h"]), out_w)
         frames.append({"n": n, "seg": seg_i, "sec": sec_i, "m": m, "k": k, "cx": cx, "cy": cy, "rot": rot, "ncc": c})
-    if not frames:
+    shots = single_shots(frames, short_path, fps, sections, secp, amap, out_wh)
+    stacked = 0
+    tpls = probe_stack(short_path, fps, asz, nfr, best, amap, sections, secp, shots, workers)
+    if tpls:      # stacked / overlay layout (#130): every frame mapped per panel, stacked frames become 'stack' shots
+        from . import panels as PN
+        kind, recs = map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, workers)
+        st_shots, st_frames = PN.stack_shots(kind, tpls, amap, secp, (W, H), out_w)
+        if st_shots:
+            singles = [f for f in frames if kind[f["n"]] is not None and kind[f["n"]][0] == "single"]
+            frames = singles + [{"n": n, "seg": v[0], "m": v[1]} for n, v in st_frames.items()]
+            frames.sort(key=lambda f: f["n"])
+            shots = st_shots
+            for run in _single_runs(singles, set(st_frames)):
+                shots += single_shots(run, short_path, fps, sections, secp, amap, out_wh)
+            stacked = len(st_frames)
+            C.log(f"stack: {len(tpls)} layout(s) " + "; ".join(
+                " | ".join("[" + ", ".join(f"{v:.3f}" for v in r) + "]" for r in t["rects"]) for t in tpls)
+                + f", {stacked} frames stacked")
+    if not shots:
         raise RuntimeError("video map: no frame of the Short matches the sections")
+    # cut frames: a shot runs until the next one starts (frames the matcher missed follow the shot before)
+    shots.sort(key=lambda s: s["n0"])
+    shots[0]["n0"] = 0
+    for a, b in zip(shots, shots[1:]):
+        a["n1"] = b["n0"]
+    shots[-1]["n1"] = nfr
+    C.log(f"video map: {len(frames)}/{nfr} frames mapped ({filled} filled after SIFT's {sift_n}, {stacked} stacked), "
+          f"{len(shots)} shots "
+          + ", ".join(f"{s['n0']}:{s['layout']}" for s in shots))
+    return {"fps": fps, "w": W, "h": H, "out_w": out_wh[0], "out_h": out_wh[1], "nfr": nfr, "shots": shots,
+            "frames": {str(f["n"]): [f["seg"], f["m"]] for f in frames}, "mapped": len(frames), "filled": filled,
+            "stacked": stacked,
+            "sections": [{"file": s["file"], "fps": p["fps"], "w": p["w"], "h": p["h"]} for s, p in zip(sections, secp)]}
+
+
+def single_shots(frames, short_path, fps, sections, secp, amap, out_wh):
+    """Shots of single-crop frames: split at jumps, smoothed path, layout 'full' / 'fit' (+ its surround) /
+    'other' (the surround is neither a blurred copy nor one colour)."""
+    if not frames:
+        return []
     sec_wh0 = (secp[0]["w"], secp[0]["h"])
     shots = []
     for run in split_shots(frames, sec_wh0):
@@ -394,23 +432,123 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
             samples = [(f["n"], f["m"], *shot["path"][str(f["n"])]) for f in idx]
             shot["bg"] = fit_bg(short_path, fps, sections[sec_i]["file"], secp[sec_i]["fps"], samples, out_wh, sec_wh)
             if shot["bg"]["rmse"] > BG_RMSE_MAX:
-                shot["layout"] = "other"
+                col = flat_bg(short_path, fps, samples, out_wh, sec_wh)
+                if col is not None:              # a solid background (black bars...) instead of a blurred copy
+                    shot["bg"]["color"] = col
+                else:
+                    shot["layout"] = "other"
         shots.append(shot)
-    # cut frames: a shot runs until the next one starts (frames the matcher missed follow the shot before)
-    shots.sort(key=lambda s: s["n0"])
-    shots[0]["n0"] = 0
-    for a, b in zip(shots, shots[1:]):
-        a["n1"] = b["n0"]
-    shots[-1]["n1"] = nfr
-    C.log(f"video map: {len(frames)}/{nfr} frames mapped ({filled} filled after SIFT's {sift_n}), {len(shots)} shots "
-          + ", ".join(f"{s['n0']}:{s['layout']}" for s in shots))
-    return {"fps": fps, "w": W, "h": H, "out_w": out_wh[0], "out_h": out_wh[1], "nfr": nfr, "shots": shots,
-            "frames": {str(f["n"]): [f["seg"], f["m"]] for f in frames}, "mapped": len(frames), "filled": filled,
-            "sections": [{"file": s["file"], "fps": p["fps"], "w": p["w"], "h": p["h"]} for s, p in zip(sections, secp)]}
+    return shots
+
+
+def _single_runs(frames, stacked):
+    """Single-crop frames grouped into runs that no stacked frame interrupts."""
+    runs, cur = [], []
+    st = sorted(stacked)
+    j = 0
+    for f in frames:
+        if cur:
+            while j < len(st) and st[j] <= cur[-1]["n"]:
+                j += 1
+            if j < len(st) and st[j] < f["n"]:
+                runs.append(cur)
+                cur = []
+        cur.append(f)
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+FLAT_MAD = 6.0        # a surround this even (mean |pixel - median|, 0-255) is a solid colour
+
+
+def flat_bg(short_path, fps, samples, out_wh, sec_wh, cap_band=(0.36, 0.64)):
+    """[b, g, r] when the surround of a 'fit' band is one colour on every sample, else None."""
+    (OW, OH), (SW, SH) = out_wh, sec_wh
+    rw, rh = OW // 4, OH // 4
+    px = []
+    for n, m, k, cx, cy in samples:
+        th = C.read_frames(short_path, n, 1, fps, (rw, rh))
+        if not len(th):
+            continue
+        top, bot = OH / 2 - cy / k, OH / 2 + (SH - cy) / k
+        mask = np.zeros((rh, rw), bool)
+        mask[2:max(2, int(top / 4) - 2)] = True
+        mask[min(rh - 2, int(bot / 4) + 2):rh - 2] = True
+        mask[int(cap_band[0] * rh):int(cap_band[1] * rh)] = False
+        if mask.sum() >= 200:
+            px.append(th[0][mask].astype(np.float32))
+    if not px:
+        return None
+    px = np.concatenate(px)
+    col = np.median(px, 0)
+    if float(np.abs(px - col).max(1).mean()) > FLAT_MAD:
+        return None
+    return [float(v) for v in col]
+
+
+def probe_stack(short_path, fps, asz, nfr, best, amap, sections, secp, shots, workers=WORKERS):
+    """Stack templates (panels.templates) found on sample frames outside 'fit' shots, [] for single-crop Shorts."""
+    from . import panels as PN
+    fit = [(s["n0"], s["n1"]) for s in shots if s["layout"] == "fit"]
+    picks, seen = [], set()
+    for t in np.linspace(0, nfr - 1, PN.PROBES).astype(int):
+        if any(a <= t < b for a, b in fit):
+            continue
+        near = [n for n in range(t - 15, t + 16) if n in best]
+        if near:
+            n = min(near, key=lambda x: abs(x - t))
+            seg, m, M, _ = best[n]
+        else:
+            seg = next((i for i, g in enumerate(amap["segments"]) if g["t0"] <= t / fps < g["t1"]), None)
+            if seg is None:
+                continue
+            g = amap["segments"][seg]
+            n, M = int(t), None
+            m = int(round((t / fps + g["off"]) * secp[g["sec"]]["fps"]))
+        if n in seen:
+            continue
+        seen.add(n)
+        p = secp[amap["segments"][seg]["sec"]]
+        vsz = (VA, int(round(VA * p["h"] / p["w"] / 2) * 2))
+        picks.append((str(short_path), fps, asz, sections[amap["segments"][seg]["sec"]]["file"], p["fps"], vsz,
+                      n, seg, m, None if M is None else np.asarray(M).tolist()))
+    if not picks:
+        return []
+    with Pool(max(1, min(workers, len(picks)))) as pool:
+        probes = [p for p in pool.map(PN.probe_job, picks) if p is not None]
+    return PN.templates(probes, asz)
+
+
+def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, workers=WORKERS):
+    """Pass 2 (#130): every frame of the Short against the stack templates. -> (panels.classify kinds, records)."""
+    from . import panels as PN
+    tmasks = [PN.masks_for(t["rects"], asz) for t in tpls]
+    jobs = []
+    for i, seg in enumerate(amap["segments"]):
+        p = secp[seg["sec"]]
+        vsz = (VA, int(round(VA * p["h"] / p["w"] / 2) * 2))
+        a = max(0, int((seg["t0"] - MARGIN_S) * fps))
+        b = min(nfr, int(np.ceil((seg["t1"] + MARGIN_S) * fps)))
+        for n0 in range(a, b, 90):
+            n1 = min(b, n0 + 90)
+            hints = {n: best[n][1] for n in range(n0, n1) if n in best and best[n][0] == i}
+            jobs.append((i, str(short_path), fps, asz, sections[seg["sec"]]["file"], p["fps"], vsz, seg["off"],
+                         n0, n1, tmasks, hints))
+    with Pool(max(1, workers)) as pool:
+        res = [r for part in pool.map(PN.map_job, jobs) for r in part]
+    recs = {}
+    for r in res:              # a frame near a segment switch is tried in both: keep the better one
+        sc = sum(max(c, 0) for c, M in zip(r[5], r[4]) if M is not None)
+        if r[0] not in recs or sc > recs[r[0]][0]:
+            recs[r[0]] = (sc, r)
+    recs = [v[1] for _, v in sorted(recs.items())]
+    single = {n for n in best}
+    return PN.classify(nfr, recs, single, asz), recs
 
 
 def params_at(shot, n):
-    """(k, cx, cy) for frame n of a shot: its own path, else the nearest mapped frame (held)."""
+    """(k, cx, cy) for frame n of a shot (or of a stack panel): its own path, else the nearest mapped frame."""
     p = shot["path"].get(str(n))
     if p is not None:
         return p

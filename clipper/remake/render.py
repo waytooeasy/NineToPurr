@@ -47,12 +47,22 @@ def compose(sec_img, vm, shot, n, size=None):
     r = w / OW
     sec = vm["sections"][shot["sec"]]
     q = sec_img.shape[1] / sec["w"]
+    flags = cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP
+    if shot["layout"] == "stack":
+        return compose_stack(sec_img, vm, shot, n, (w, h), q, r, flags)
     k, cx, cy = VM.params_at(shot, n)
     M = np.array([[q * k / r, 0, q * (cx - k * OW / 2)], [0, q * k / r, q * (cy - k * OH / 2)]])
-    flags = cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP
     if shot["layout"] == "full":
         return cv2.warpAffine(sec_img, M, (w, h), flags=flags, borderMode=cv2.BORDER_REPLICATE)
     bg = shot.get("bg") or {"rel": 0.97, "sigma": 20.0 * OW / 1080, "gain": 1.0}
+    if bg.get("color") is not None:          # a solid surround (black bars...), not a blurred copy
+        out = np.empty((h, w, 3), np.uint8)
+        out[:] = np.clip(np.round(bg["color"]), 0, 255).astype(np.uint8)
+        panel = cv2.warpAffine(sec_img, M, (w, h), flags=flags, borderMode=cv2.BORDER_CONSTANT)
+        ok = cv2.warpAffine(np.full(sec_img.shape[:2], 255, np.uint8), M, (w, h),
+                            flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP, borderValue=0) > 127
+        out[ok] = panel[ok]
+        return out
     kb = sec["h"] / OH * bg["rel"]
     sw, sh = max(8, w // 4), max(8, h // 4)
     # small px -> full output px: u = u_s * w / (sw * r); section x = SW/2 + (u - OW/2) * kb (blurred copy, centred)
@@ -67,6 +77,31 @@ def compose(sec_img, vm, shot, n, size=None):
     ok = cv2.warpAffine(np.full(sec_img.shape[:2], 255, np.uint8), M, (w, h),
                         flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP, borderValue=0) > 127
     out[ok] = panel[ok]
+    return out
+
+
+def panel_px(rect, w, h):
+    """[top, bottom, left, right] fractions -> (v0, v1, u0, u1) px of a w x h frame."""
+    t, b, lft, rgt = rect
+    return int(round(t * h)), int(round(b * h)), int(round(lft * w)), int(round(rgt * w))
+
+
+def compose_stack(sec_img, vm, shot, n, size, q, r, flags):
+    """Stacked / overlay layout (#130): each panel's own crop of the same section frame inside its rectangle, in
+    draw order; the rest of the frame in the measured fill colour."""
+    OW, OH = vm["out_w"], vm["out_h"]
+    w, h = size
+    out = np.empty((h, w, 3), np.uint8)
+    out[:] = np.clip(np.round(shot.get("fill") or (0, 0, 0)), 0, 255).astype(np.uint8)
+    for p in shot["panels"]:
+        v0, v1, u0, u1 = panel_px(p["rect"], w, h)
+        if v1 <= v0 or u1 <= u0:
+            continue
+        k, cx, cy = VM.params_at(p, n)
+        a = q * k / r
+        M = np.array([[a, 0, q * (cx - k * OW / 2) + a * u0], [0, a, q * (cy - k * OH / 2) + a * v0]])
+        out[v0:v1, u0:u1] = cv2.warpAffine(sec_img, M, (u1 - u0, v1 - v0), flags=flags,
+                                           borderMode=cv2.BORDER_REPLICATE)
     return out
 
 
