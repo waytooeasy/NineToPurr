@@ -428,6 +428,8 @@ def map_job(args):
 
     out = []
     for i, n in enumerate(range(n0, n0 + len(th))):
+        for m in [m for m in cache if m < m_of[n] - 2 - VM.SYNC_D]:   # ~4 MB of features per frame: keep few
+            del cache[m]
         best = None
         for t, masks in enumerate(tmasks):
             m, Ms, cs = map_frame(th[i], sec_at, m_of[n], masks)
@@ -505,6 +507,8 @@ def shift_job(args):
         return cache[m]
     out = []
     for i, n in enumerate(ns[:len(th)]):
+        for m in [m for m in cache if m < m_of[n] + dm - 2]:
+            del cache[m]
         m, Ms, cs = map_frame(th[i], sec_at, m_of[n] + dm, [mask])
         if Ms[0] is not None and cs[0] >= max(VM.MIN_NCC, old.get(n, -1.0) + SHIFT_GAIN):
             out.append((n, Ms[0].tolist(), float(cs[0]), int(m - m_of[n])))
