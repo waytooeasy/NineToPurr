@@ -28,6 +28,8 @@ MIN_DUR_S = 8
 MIN_VPH = 1500            # views/hour to count as popping
 MAX_ATTEMPTS = 2
 PER_DAY = int(os.environ.get("REMAKES_PER_DAY", "5"))
+MIN_PICTURE = float(os.environ.get("REMAKE_MIN_PICTURE", "80"))     # quality gate (Lucas 2026-10-27): below either,
+MIN_CAPTIONS = float(os.environ.get("REMAKE_MIN_CAPTIONS", "70"))   # the remake is skipped, never sent
 RUN_BUDGET_S = int(os.environ.get("REMAKE_RUN_BUDGET_S", "2400"))   # start no new Short after 40 min of a run
 MEDIA = (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts", ".ytdl")
 STALE_S = 2 * 3600
@@ -302,6 +304,10 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         out = Path(out_dir) / f"remake_{sid}.mp4"
         out.parent.mkdir(parents=True, exist_ok=True)
         best = build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style, vision, s.get("channel", ""))
+        m = best["match"]
+        if m["picture"] < MIN_PICTURE or m["captions"] < MIN_CAPTIONS:   # only remakes close to theirs reach Lucas
+            raise Unsupported(f"below the quality gate: picture {m['picture']:.0f}% (min {MIN_PICTURE:.0f}), "
+                              f"captions {m['captions']:.0f}% (min {MIN_CAPTIONS:.0f})")
         shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))

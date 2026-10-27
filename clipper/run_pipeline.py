@@ -521,6 +521,15 @@ def own_cuts():
     return os.environ.get("CLIPPER_OWN_CUTS", "0").strip() == "1"
 
 
+def health_step(con):
+    """Telegram alerts when something is broken (disk, cookies, failing or idle remakes): infra/health.py."""
+    from infra import health
+    sys.path.insert(0, str(HERE / "publisher"))
+    from upload import send_telegram
+    state = Path(os.environ.get("CLIPPER_DB", "/opt/clipper/db/clip.db")).with_name("health_alerts.json")
+    return health.check(con, send_telegram, state) or "ok"
+
+
 def run_pass(con, steps=None):
     """Run each stage; return {stage: result or 'error: ...'}. `steps` lets tests inject mocks."""
     model = os.environ.get("WHISPER_MODEL", "small")
@@ -536,6 +545,7 @@ def run_pass(con, steps=None):
         "qc": lambda: qc.run(con),
         "rerender": lambda: rerender.run(con, model, os.environ.get("CLIPPER_CLIPS", "/opt/clipper/clips")),
         "vqa": lambda: visual_qa.run(con),   # look at the finished Short before it can post
+        "health": lambda: health_step(con),  # alert Lucas when something breaks (2026-10-27)
     }
     report = {}
     for name, fn in steps.items():

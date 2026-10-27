@@ -3,7 +3,7 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-27 13:00 UTC_
+_Last updated: 2026-10-27 13:30 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
@@ -37,13 +37,14 @@ _Last updated: 2026-10-27 13:00 UTC_
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 
 ## Waiting on Lucas
-- 3 remakes waiting for ✅/❌ in Telegram since Oct 22-26 (clips 27, 30, 31).
 - After merging the refine PR: `sudo cp /opt/clipper/repo/clipper/infra/systemd/clipper-remake.service /etc/systemd/system/ && sudo systemctl daemon-reload` (75 min stop instead of 60).
 - **Edit the description of [GSiO8GujwEs](https://youtube.com/shorts/GSiO8GujwEs) in YouTube Studio:** delete the first line (`Remake of : "Jason And Ron…"`). The upload token only has the `youtube.upload` scope, so Claude can't edit it.
 - AdSense signup + W-8BEN.
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
 
 ## Next for Claude
+- **Ops (2026-10-27):** quality gate (picture ≥ 80 %, captions ≥ 70 %, env `REMAKE_MIN_*`) and Telegram health alerts (disk, cookies, failing/idle remakes) run every pipeline pass. Precision work is queued as GitHub issues (label `remake-precision`); add `agent` to one to start it.
+- **Learning loop:** after 2-3 weeks compare each remake's match % (render sidecar json) with its views: is more precision worth it, or is moment picking the lever?
 - **Remake engine (D58, D60, D61):** 2026-10-21: the two Agent00 remakes (clips 24, 25) came out with the wrong caption look and were deleted by Lucas (state `removed`). D61 build: caption look measured per clipper (68 fonts by glyph shape, size, box, colours, position, pop), caption states frame-exact from their pixels, per-frame colour effects, video resynced to their pixels, match score per remake. Next: picture misses where the map loses frames (fast cuts, punch-in zooms), stacked layouts, 4K export, hook edits for remakes. Ludwig `NlN2y6YvX0E` used both attempts; reset `attempts` to retry. See `clipper/remake/README.md`.
 - Day-3 check (D53): views per Short + stayed % → keep/raise 6/day if stayed ≥ 60 %, cut to 3 strong slots if 0-view Shorts persist.
 - Check the first same-moment matches (`select streamer, short_title, clip_id, confidence from moment_matches`) against the clips: tune `MIN_CONF` if a match is wrong.

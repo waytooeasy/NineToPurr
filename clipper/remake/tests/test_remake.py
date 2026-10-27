@@ -446,3 +446,7 @@ def test_probe_numbers_survive_missing_values():
     from remake import common as Cm
     assert Cm._num("30000/1001") == pytest.approx(29.97, abs=0.01)
     assert Cm._num("N/A") is None and Cm._num(None) is None and Cm._num("0/0") is None and Cm._num("60") == 60
+
+
+def test_quality_gate_defaults():
+    assert run.MIN_PICTURE == 80 and run.MIN_CAPTIONS == 70
