@@ -290,10 +290,12 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         text = f"{s.get('title', '')} {s.get('desc', '')}"
         logins = source.twitch_logins([s.get("streamer", "")], text)
         handles = source.youtube_handles([s.get("streamer", "")], text)
+        partners = [] if (work / "found.json").exists() else source.partner_logins(con, tw, s.get("streamer", ""), logins)
         plans = [] if (work / "found.json").exists() else \
-            source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles)
+            source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles, partners=partners)
         if not plans and not (work / "found.json").exists():
-            raise source.NotFound(f"no stream VOD of {', '.join(logins + handles) or s.get('streamer')} around it")
+            who = ", ".join(logins + handles + partners) or s.get("streamer")
+            raise source.NotFound(f"no stream VOD of {who} around it")
         short_path = source.download_short(sid, work)
         found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,
                                                             tw=tw, logins=logins, plans=plans, handles=handles))

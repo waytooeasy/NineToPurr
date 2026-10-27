@@ -25,6 +25,9 @@ HINT_PAD_S = 600       # audio searched around a moment-match hint
 MAX_SECTION_S = 720    # longest single video section downloaded
 DENSE_PAD_S = 300      # dense audio pass: this far around the snippet hits
 FRAGMENTS = 8          # parallel HLS fragments: a 10 h VOD's audio took 15+ min one fragment at a time
+SEARCH_BUDGET_S = int(os.environ.get("REMAKE_SEARCH_BUDGET_S", "600"))   # give up on a Short's source after this
+MAX_VODS = 4           # stream VODs searched per streamer (newest first, within the budget)
+AFTER_FOUND_S = 1200   # once found, search this much more of the stream (a clipper jumps across minutes)
 WATCHLIST = Path(__file__).resolve().parents[1] / "radar" / "config" / "watchlist.yaml"
 
 
@@ -283,6 +286,37 @@ def snippets(audio, sr, n=8, win=SNIP_S):
     return sorted(out)
 
 
+def ncc_many(hay, needles, cache=None):
+    """[(index, score)] of each needle in `hay`, same as ncc_search per needle, with the haystack's FFT (and, via
+    `cache`, the needles' FFTs) done once: the whole-VOD search spent most of its time redoing them."""
+    if not needles:
+        return []
+    L = max(len(x) for x in needles)
+    if len(hay) < L or L == 0:
+        return [(0, -1.0)] * len(needles)
+    n = 1 << int(np.ceil(np.log2(len(hay) + L)))
+    H = np.fft.rfft(hay, n)
+    cs = np.concatenate([[0.0], np.cumsum(hay.astype(np.float64) ** 2)])
+    cache = {} if cache is None else cache
+    out, floors = [], {}
+    for j, nd in enumerate(needles):
+        Ln = len(nd)
+        if Ln == 0:
+            out.append((0, -1.0))
+            continue
+        F = cache.get((j, n))
+        if F is None:
+            F = cache[(j, n)] = np.conj(np.fft.rfft(nd, n))
+        c = np.fft.irfft(H * F, n)[:len(hay) - Ln + 1]
+        loc = cs[Ln:] - cs[:-Ln]
+        if Ln not in floors:
+            floors[Ln] = 0.02 * float(np.median(loc)) + 1e-9   # silence must not win on a tiny denominator
+        nc = c / (np.sqrt(np.maximum(loc, floors[Ln])) * (np.linalg.norm(nd) + 1e-9))
+        k = int(np.argmax(nc))
+        out.append((k, float(nc[k])))
+    return out
+
+
 def ncc_search(hay, needle):
     """(index, score): best normalised cross-correlation of `needle` inside `hay` (FFT)."""
     L = len(needle)
@@ -298,21 +332,39 @@ def ncc_search(hay, needle):
     return k, float(nc[k])
 
 
-def locate(short_audio, path, start=0.0, end=None, sr=LOC_SR, chunk_s=600.0):
-    """Coarse map of loud Short snippets inside the audio file: [{'short_t', 'file_t', 'nc'}]."""
+def locate(short_audio, path, start=0.0, end=None, sr=LOC_SR, chunk_s=600.0, deadline=None, clock=time.monotonic,
+           after_found_s=AFTER_FOUND_S):
+    """Coarse map of loud Short snippets inside the audio file: [{'short_t', 'file_t', 'nc'}].
+    Searches [start, end) from its end backwards: clippers post within hours of the moment, so the stream right
+    before the Short comes first. Stops `after_found_s` past the chunk where the Short was found, and at `deadline`
+    (on `clock`) with what was searched so far. `.searched_s` on the result says how much that was."""
     idx = snippets(short_audio, sr)
     snips = [short_audio[i:i + int(SNIP_S * sr)] for i in idx]
     best = [(-1.0, 0.0)] * len(snips)
     end = audio_duration(path) if end is None else end
-    t = start
-    while t < end:
-        a = C.read_audio(path, sr, start=t, dur=chunk_s + SNIP_S, highpass=120)
-        for k, s in enumerate(snips):
-            i, sc = ncc_search(a, s)
+    t, stop_at, cache = end, None, {}
+
+    def hits():
+        return _Hits({"short_t": idx[k] / sr, "file_t": best[k][1], "nc": best[k][0]} for k in range(len(snips)))
+
+    while t > start:
+        t0 = max(start, t - chunk_s)
+        a = C.read_audio(path, sr, start=t0, dur=t - t0 + SNIP_S, highpass=120)
+        for k, (i, sc) in enumerate(ncc_many(a, snips, cache)):
             if sc > best[k][0]:
-                best[k] = (sc, t + i / sr)
-        t += chunk_s
-    return [{"short_t": idx[k] / sr, "file_t": best[k][1], "nc": best[k][0]} for k in range(len(snips))]
+                best[k] = (sc, t0 + i / sr)
+        t = t0
+        if stop_at is None and _found(hits()):
+            stop_at = t0 - after_found_s
+        if (stop_at is not None and t <= stop_at) or (deadline is not None and clock() > deadline):
+            break
+    out = hits()
+    out.searched_s = end - t
+    return out
+
+
+class _Hits(list):
+    searched_s = 0.0
 
 
 def sections_for(offsets, dur, pad=20.0):
@@ -338,43 +390,94 @@ def _found(hits, n_min=2):
     return good if len(good) >= max(n_min, (len(hits) + 2) // 3) else None
 
 
-def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams):
-    """VOD windows to search, best first: [(vod_id, login, start|None, end|None)]. Known before any download, so a
-    Short whose streamer has no stream VOD around it is skipped without fetching anything. Twitch archives first,
-    then YouTube live streams (IShowSpeed, Kai's YouTube channel)."""
+_VOD_OWNER = {}
+
+
+def partner_logins(con, tw, streamer, own=()):
+    """Twitch logins whose streams this streamer's Shorts were found in before, most finds first. A collab: the
+    Agent00 Shorts came from Kai Cenat's stream (#131), so his VODs are searched for Agent00's Shorts too."""
+    if con is None or tw is None or not streamer:
+        return []
+    try:
+        ids = [str(r[0]) for r in con.execute(
+            "SELECT vod_id FROM remakes WHERE streamer = ? AND status = 'done' AND vod_id IS NOT NULL"
+            " AND vod_id NOT LIKE 'yt:%'", (streamer,))]
+        need = [i for i in dict.fromkeys(ids) if i not in _VOD_OWNER]
+        for k in range(0, len(need), 100):
+            for v in tw._get("videos", {"id": need[k:k + 100]}).get("data", []):
+                _VOD_OWNER[str(v["id"])] = v["user_login"].lower()
+    except Exception as e:  # noqa: BLE001 - no partners is the old behaviour
+        C.log(f"partners of {streamer}: {e}")
+        return []
+    n = {}
+    for i in ids:
+        lg = _VOD_OWNER.get(i)
+        if lg and lg not in own:
+            n[lg] = n.get(lg, 0) + 1
+    return sorted(n, key=lambda lg: -n[lg])
+
+
+def before_publish(start, dur, published):
+    """(w0, w1): the part of a stream VOD that was live before the Short went up (seconds into the VOD).
+    The moment can't be later than that, and searching the rest cost up to 20 min on a 48 h stream."""
+    w1 = min(float(dur), (published - start).total_seconds())
+    return (0.0, w1) if w1 > 0 else None
+
+
+def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams, partners=()):
+    """VOD windows to search, best first: [(vod_id, login, start|None, end|None, search window|None)]. Known before
+    any download, so a Short whose streamer has no stream VOD around it is skipped without fetching anything.
+    The moment-match hint first, then the streamer's Twitch archives, YouTube live streams (IShowSpeed, Kai's
+    YouTube channel), then partners' archives (streams the streamer's Shorts were found in before, #131)."""
     plans = []
     hint = moment_hint(con, short["id"])
     if hint:
         vod_id, off, login = hint
         plans.append((vod_id, login, max(0, off - HINT_PAD_S), off + HINT_PAD_S))
     published = datetime.fromisoformat(short["published"].replace("Z", "+00:00")).astimezone(timezone.utc)
-    if tw is not None:
-        for login in logins:
+    def twitch(names):
+        for login in names:
             try:
-                for v in recent_vods(tw, login, published)[:3]:
-                    plans.append((v["id"], login, None, None))
+                for v in recent_vods(tw, login, published)[:MAX_VODS]:
+                    w = before_publish(v["start"], v["dur"], published)
+                    if w:
+                        plans.append((v["id"], login, None, None, w))
             except Exception as e:  # unknown login, API hiccup: try the next
                 C.log(f"vods for {login}: {e}")
+    if tw is not None:
+        twitch(logins)
     for handle in handles:
         try:
-            for v in yt_streams(handle, published)[:3]:
-                plans.append((v["id"], handle, None, None))
+            for v in yt_streams(handle, published)[:MAX_VODS]:
+                w = before_publish(v["start"], v["dur"], published)
+                if w:
+                    plans.append((v["id"], handle, None, None, w))
         except Exception as e:  # noqa: BLE001 - yt-dlp / API hiccup: try the next
             C.log(f"youtube streams for {handle}: {e}")
+    if tw is not None:
+        twitch([p for p in partners if p not in logins])
     return plans
 
 
-def find(short, work, con=None, tw=None, logins=(), plans=None, handles=()):
+def find(short, work, con=None, tw=None, logins=(), plans=None, handles=(), budget_s=None, clock=time.monotonic):
     """Locate the Short in a VOD and download the video sections. Returns
-    {'vod_id', 'login', 'sections': [{'file', 'vod_s', 'vod_e'}], 'hits': [...]}; raises NotFound."""
+    {'vod_id', 'login', 'sections': [{'file', 'vod_s', 'vod_e'}], 'hits': [...]}; raises NotFound, also when the
+    search has used `budget_s` (a Short that isn't in these streams cost up to an hour before #131)."""
     work = Path(work)
     short_audio = C.read_audio(work / "short.mp4", LOC_SR, highpass=120)
     dur = len(short_audio) / LOC_SR
-    tried = []
+    tried, searched = [], 0.0
+    budget_s = SEARCH_BUDGET_S if budget_s is None else budget_s
+    deadline = clock() + budget_s
     plans = plans if plans is not None else plans_for(short, con, tw, logins, handles)
-    for vod_id, login, s, e in plans:
+    for p in plans:
+        vod_id, login, s, e = p[:4]
+        win = p[4] if len(p) > 4 and s is None else None
         if (vod_id, s) in tried:
             continue
+        if clock() > deadline:
+            raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)}, gave up after "
+                           f"{budget_s / 60:.0f} min with {searched / 3600:.1f} h of stream searched)")
         tried.append((vod_id, s))
         audio = work / (f"vod_{vod_id}_{int(s)}.m4a" if s is not None else f"vod_{vod_id}.m4a")
         try:
@@ -382,7 +485,8 @@ def find(short, work, con=None, tw=None, logins=(), plans=None, handles=()):
         except subprocess.CalledProcessError as err:
             C.log(f"audio download failed for VOD {vod_id}: {err.stderr[-300:] if err.stderr else err}")
             continue
-        hits = locate(short_audio, audio)
+        hits = locate(short_audio, audio, *(win or (0.0, None)), deadline=deadline, clock=clock)
+        searched += hits.searched_s
         base = s or 0.0
         for h in hits:
             h["vod_t"] = base + h["file_t"]
@@ -411,4 +515,4 @@ def find(short, work, con=None, tw=None, logins=(), plans=None, handles=()):
         owner = name_for("youtube", login) if is_yt(vod_id) else login
         return {"vod_id": vod_id, "login": login, "owner": owner, "platform": "youtube" if is_yt(vod_id) else "twitch",
                 "sections": secs, "hits": hits}
-    raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)})")
+    raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)}, {searched / 3600:.1f} h of stream searched)")
