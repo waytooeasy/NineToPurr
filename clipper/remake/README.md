@@ -52,7 +52,10 @@ pytest -q remake/tests                         # offline
 ## Limits / next
 - Layouts: full and fit. A stacked layout (face cam on top of gameplay) is skipped (`layout not supported yet`).
 - Fonts: only the 39 free fonts in `style.FONTS`; a clipper's paid font (e.g. DIN, Gotham) gets the closest one by shape.
-- Picture mismatches (frames the map missed) are scored and shown, not rebuilt yet.
+- Frames SIFT misses are filled by correlation around the predicted section frame with a neighbour's crop (#121).
+- `frame_shift` moves whole output frames (cut, crop, section frame), never the section index: Twitch VODs are often
+  30 fps stored at 60 fps (every other frame a duplicate), where one section frame is 0 or 2 of their frames (#121).
+- Openings can still be mis-framed (AIJsi_csYws frames 0-14 map to a wrong crop): next for #121's follow-up.
 - 1080-wide output; the study clipper uploads 2160x2880 (YouTube encodes 4K uploads better).
 - A hook edit from Telegram (`needs_rerender`) does not apply to remakes yet.
 - Needs YouTube to let the VM download the Short; while the bot check (#64) blocks, the timer just retries.
