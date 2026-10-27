@@ -370,7 +370,7 @@ def measure_event(th, base, ev):
     lh0 = float(np.median([r1 - r0 for r0, r1 in lines]))
     hal = halo(th, base, fill, lh0, outline_px(fill, dark, lh0))
     if hal["glow"]:             # a glow lit up around the letters: those pixels are not letter (#125)
-        tight_fill = without_glow(th, fill)
+        tight_fill = without_glow(th, fill, base)
         tl = lines_of(tight_fill, near=ev.get("y", 0.5) * th.shape[0], k=len(shape))
         if len(tl) == len(lines):
             fill, lines = tight_fill, tl
@@ -473,6 +473,7 @@ def outline_px(fill, dark, line_h):
 GLOW_MIN = 18           # mean brightening (0-255 luma) just beyond the outline that makes a glow
 SHADOW_MIN = 14         # mean darkening (0-255 luma) under the letters' shifted shape that makes a drop shadow
 CORE_NEAR = 28          # a fill pixel this far (max channel) from its letter's core colour is glow, not letter
+LETTER_E = 0.9          # ... or below this share of the letter's own strength over the picture
 _LUMA = np.array([0.114, 0.587, 0.299], np.float32)
 
 
@@ -490,7 +491,7 @@ def halo(th, base, fill, line_h, outline=0.0):
     th, base, fill = th[y0:y1, x0:x1], base[y0:y1, x0:x1], fill[y0:y1, x0:x1]
     a, b = th.astype(np.float32), base.astype(np.float32)
     lt, lb = a @ _LUMA, b @ _LUMA
-    fill = without_glow(th, fill)               # a glow close to the letters looks like letter: measure from the core
+    fill = without_glow(th, fill, base)         # a glow close to the letters looks like letter: measure from the core
     dt = cv2.distanceTransform((~fill).astype(np.uint8), cv2.DIST_L2, 3)
     o = int(round(outline))
     R = int(max(o + 8, min(1.5 * line_h, 90)))
@@ -552,20 +553,36 @@ def halo(th, base, fill, line_h, outline=0.0):
     return out
 
 
-def without_glow(th, fill):
-    """The letters without the bright glow around them: fill pixels close to their letter's core colour."""
+def without_glow(th, fill, base=None):
+    """The letters without the glow lit around them: per letter blob, the pixels at (nearly) the full strength of
+    the letter's own colour. A glow is the same colour blended into the picture: it fades from the letter's edge,
+    so its pixels sit at a fraction of the letter's strength (`base` = our caption-free frame, when known)."""
     n, lab = cv2.connectedComponents(fill.astype(np.uint8), connectivity=8)
-    core = cv2.erode(fill.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
     keep = np.zeros_like(fill)
-    a = th.astype(np.int16)
+    a = th.astype(np.float32)
+    bg = base.astype(np.float32) if base is not None else None
     for i in range(1, n):
         comp = lab == i
-        c = comp & core
-        if c.sum() < 10:
+        if comp.sum() < 12:
             keep |= comp
             continue
-        ref = np.median(a[c], 0)
-        keep |= comp & (np.abs(a - ref).max(2) < CORE_NEAR)
+        px = a[comp]
+        if bg is None:                          # no picture to compare with: closeness to the core colour
+            core = comp & (cv2.erode(fill.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
+            ref = np.median(a[core], 0) if core.sum() >= 10 else np.median(px, 0)
+            keep |= comp & (np.abs(a - ref).max(2) < CORE_NEAR)
+            continue
+        bp = bg[comp]
+        d = px - bp
+        mag = np.abs(d).max(1)
+        top = mag >= np.percentile(mag, 75)
+        ref = np.median(px[top], 0)
+        v = ref - np.median(bp[top], 0)
+        e = (d @ v) / (float(v @ v) + 1e-6)     # 1 = the letter's full colour, a glow pixel its fraction
+        ok = (e >= LETTER_E) & (np.abs(px - ref).max(1) < 1.7 * CORE_NEAR)
+        sub = np.zeros_like(fill)
+        sub[comp] = ok
+        keep |= sub
     return keep
 
 

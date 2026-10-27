@@ -47,7 +47,7 @@ def test_plain_letters_have_no_glow_and_no_shadow():
 def test_glow_pixels_are_not_counted_as_letters():
     base, th, letters = glow_frame(shadow=None, colour=(255, 255, 255))
     _, fill, _ = style.caption_masks(th, base, 0.52)
-    tight = style.without_glow(th, fill)
+    tight = style.without_glow(th, fill, base)
     assert fill.sum() > 1.3 * letters.sum()                 # the glow made the letters look fat
     assert abs(int(tight.sum()) - int(letters.sum())) < 0.25 * letters.sum()
 
@@ -76,3 +76,19 @@ def test_tune_tries_glow_and_shadow_when_present():
         return abs(g["size"] - 0.42) + abs(s["llm"]["shadow"]["dy"] - 0.13)     # best: a bigger glow, lower shadow
     best, err = tune.tune(st, score)
     assert best["llm"]["glow"]["size"] > 0.3 and best["llm"]["shadow"]["dy"] > 0.1 and err < 0.15
+
+
+def test_a_strong_glow_in_the_letters_own_colour_is_still_not_letter():
+    rng = np.random.default_rng(4)
+    base = cv2.GaussianBlur(rng.integers(50, 140, (640, 360, 3), dtype=np.uint8), (0, 0), 8).astype(np.float32)
+    m = np.zeros((640, 360), np.uint8)
+    cv2.putText(m, "RON", (60, 340), cv2.FONT_HERSHEY_DUPLEX, 2.2, 255, 7, cv2.LINE_AA)
+    letters = m.astype(np.float32) / 255
+    g = np.clip(cv2.GaussianBlur(letters, (0, 0), 6) * 3.0, 0, 1)          # ~95 % at the letters' edge
+    out = base * (1 - 0.95 * g[..., None]) + np.array((40, 230, 255), np.float32) * 0.95 * g[..., None]
+    out = out * (1 - letters[..., None]) + np.array((40, 230, 255), np.float32) * letters[..., None]
+    th, base = np.clip(out, 0, 255).astype(np.uint8), base.astype(np.uint8)
+    _, fill, _ = style.caption_masks(th, base, 0.52)
+    tight = style.without_glow(th, fill, base)
+    assert fill.sum() > 1.5 * (m > 127).sum()
+    assert tight.sum() < 1.45 * (m > 127).sum() < 0.8 * fill.sum()
