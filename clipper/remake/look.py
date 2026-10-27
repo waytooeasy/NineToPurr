@@ -30,15 +30,22 @@ def _pairs(short_path, vm, ns, width):
         m = R.sec_frame_index(vm, shot, n)
         th = C.read_frames(short_path, n, 1, vm["fps"], (w, h))
         sf = C.read_frames(sec["file"], m, 1, sec["fps"], (sec["w"] // 2, sec["h"] // 2))
-        if len(th) and len(sf):
-            out.append((n, shot, th[0], R.compose(sf[0], vm, shot, n, (w, h))))
+        shifted = {i: C.read_frames(sec["file"], mp, 1, sec["fps"], (sec["w"] // 2, sec["h"] // 2))
+                   for i, mp in R.panel_frames(vm, shot, n).items()}
+        if len(th) and len(sf) and all(len(v) for v in shifted.values()):
+            out.append((n, shot, th[0], R.compose(sf[0], vm, shot, n, (w, h), {i: v[0] for i, v in shifted.items()})))
     return out
 
 
 def _valid(vm, shot, n, w, h):
     """Rows/cols of our frame that show the stream itself (the panel of a 'fit' shot)."""
     m = np.ones((h, w), bool)
-    if shot["layout"] == "fit":
+    if shot["layout"] == "stack":            # the panels themselves, not the fill or 3 px around their edges
+        m[:] = False
+        for p in shot["panels"]:
+            v0, v1, u0, u1 = R.panel_px(p["rect"], w, h)
+            m[v0 + 3:v1 - 3, u0 + 3:u1 - 3] = True
+    elif shot["layout"] == "fit":
         k, cx, cy = R.VM.params_at(shot, n)
         OW, OH = vm["out_w"], vm["out_h"]
         sec = vm["sections"][shot["sec"]]
@@ -114,11 +121,16 @@ def overlays(short_path, vm, W, width=270):
         m0 = R.sec_frame_index(vm, shot, n0)
         m1 = R.sec_frame_index(vm, shot, max(n0, n1 - 1))
         sf = C.read_frames(sec["file"], m0, m1 - m0 + 2, sec["fps"], (sec["w"] // 4, sec["h"] // 4))
+        pf0, pf1 = R.panel_frames(vm, shot, n0), R.panel_frames(vm, shot, max(n0, n1 - 1))
+        sh = {p: (a, C.read_frames(sec["file"], a, pf1[p] - a + 2, sec["fps"], (sec["w"] // 4, sec["h"] // 4)))
+              for p, a in pf0.items()}
         for i, n in enumerate(range(n0, n0 + len(th))):
             j = R.sec_frame_index(vm, shot, n) - m0
             if not (0 <= j < len(sf)):
                 continue
-            ours = R.apply_look(R.compose(sf[j], vm, shot, n, (w, h)), lut).astype(np.float32)
+            shifted = {p: f[min(len(f) - 1, max(0, mp - a))] for (p, (a, f)), mp in
+                       zip(sh.items(), R.panel_frames(vm, shot, n).values()) if len(f)}
+            ours = R.apply_look(R.compose(sf[j], vm, shot, n, (w, h), shifted), lut).astype(np.float32)
             a = cv2.GaussianBlur(th[i].astype(np.float32), (0, 0), 2)
             b = cv2.GaussianBlur(ours, (0, 0), 2)
             diff = np.abs(a - b).mean(axis=2)

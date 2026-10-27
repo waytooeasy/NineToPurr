@@ -34,6 +34,7 @@ RUN_BUDGET_S = int(os.environ.get("REMAKE_RUN_BUDGET_S", "2400"))   # start no n
 MEDIA = (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts", ".ytdl")
 STALE_S = 2 * 3600
 VOD_CACHE_MAX = 8e9
+MAX_OTHER = 0.03          # share of frames in no known layout (not in the stream: their own cam, another source...)
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
 CAPTIONS_GOOD = 92.0      # caption match (%) that ends the search for a better caption look
 MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
@@ -274,6 +275,11 @@ def save_channel_style(channel, st, captions_pct):
     C.save_json(f, {**{k: st.get(k) for k in STYLE_KEYS}, "captions_pct": captions_pct})
 
 
+def other_frames(vm):
+    """Frames in shots of no known layout (their surround is not the stream, a blur of it or one colour)."""
+    return sum(sh["n1"] - sh["n0"] for sh in vm["shots"] if sh["layout"] == "other")
+
+
 def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title.anthropic_ask, keep=False,
                vision_style=None):
     """Rebuild one clipper Short. Returns our clip id; raises Unsupported / other errors (status recorded)."""
@@ -297,8 +303,9 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         vm = _stage(work, "vmap", lambda: vmap.build(short_path, found["sections"], am))
         if vm["mapped"] < MIN_MAPPED * vm["nfr"]:
             raise Unsupported(f"only {vm['mapped']}/{vm['nfr']} frames found in the stream")
-        if any(sh["layout"] == "other" for sh in vm["shots"]):
-            raise Unsupported("layout not supported yet (stack / overlay)")
+        other = other_frames(vm)
+        if other > MAX_OTHER * vm["nfr"]:   # a few frames (a cut's tail) are drawn like 'fit'; the gate decides
+            raise Unsupported(f"layout not supported yet ({other}/{vm['nfr']} frames in no known layout)")
         vm = _stage(work, "vmap_aligned", lambda: align.refine(short_path, vm))   # their framing, frame by frame
         secs = found["sections"]
         a = min(secs[g["sec"]]["vod_s"] + g["t0"] + g["off"] for g in am["segments"])
