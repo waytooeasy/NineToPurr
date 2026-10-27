@@ -1,26 +1,41 @@
-# Format Library (updated 2026-10-26)
+# Format Library (updated 2026-10-27)
 
-**Rules:** Use only our own cuts of footage we have rights or permission to use. Use competitor data only as metadata, to learn title and format patterns. Never download or re-upload competitor videos.
+Copy the structure, not the content. Original cuts only.
 
-## Title/hook formats (ranked by recent vph)
-1. **Curiosity twist:** `What if {X} is actually {Y}? {emoji} #{streamer}`. Top performer, but the sample is a single video.
-2. **Versus/gauntlet:** `{Streamer} vs {challenger} GAUNTLET!`. Use for event-type moments.
-3. **Challenge:** `TEAM {STREAMER} {X} CHALLENGE!`. Strong in the first 24h.
-4. **Delayed payoff:** `Bro does it smoothly at the end {emoji}`. Keep the best moment for the last seconds.
-5. **Escalation:** `{Stunt}, but {constraint tightens}..`
-6. **Mock fail:** `Imagine {X} and still {failing} TWICE {emoji}{emoji}`
-7. **Reaction one-liner:** `{Streamer}'s {thing} is crazy {emoji}`, `Bro really {did X} {emoji}`, `No way {streamer} found him everywhere`. Reliable, mid-tier (10-40k vph).
+## Hook templates (title)
+1. `{S} vs {creator/brand} gauntlet!` - event or collab, top performer (about 240k vph, official-channel scale)
+2. `Bro does it smoothly at the end 🥶 #{S}` - payoff tease, about 92k vph
+3. `{Person} was the real one for {S} ❤️‍🩹 #{S}` - wholesome side character, about 33k vph
+4. `{S}'s {quirk} is crazy 💀💀` - signature move or sound, about 35k vph
+5. `Imagine {X} and still losing TWICE 😭` - fail or irony, about 31k vph
 
-## Format specs
-- **Length:** 30-55s default. 46-60s is the top bucket, but the sample is skewed. Avoid <=15s (weakest).
-- **Title:** short, 1-2 emojis (skull, cold face, crying), add `#{streamer}` for the biggest streamer. Use lowercase or ALL CAPS consistently.
-- **Open:** the hook moment or its setup lands in the first 2s. Hold the payoff for the end where possible, so viewers watch to the end.
-- **Post times:** 12:00-14:00 UTC (09:00-11:00 Asuncion) is the main slot. 16:00-18:00 UTC (13:00-15:00 Asuncion) is the second. Avoid 02:00-06:00 UTC.
+## Extra formats that work
+- Challenge: `Team {S} {thing} challenge!` (about 106k vph)
+- Time-box: `I spent {N} hours in {place}!` (about 50k vph)
+- Reaction or wholesome: `He couldn't stop smiling after watching this 😂` (about 18k vph)
+- Gag with a one-line caption, 16-30s (about 10-22k vph): `Bro was just making sure😂`, `Bro really caught a shark💀💀`
+
+## Length
+- Story, payoff and event clips: 40-58s (46-60s bucket averages about 71k vph).
+- Pure gags: 16-30s is fine, but expect lower vph (about 18k).
+- Hook within the first 2s. Put the payoff in the last 5-10s and tease it in the title.
+
+## Title style
+- Short, casual, 1-2 emoji (💀 😭 🥶 😳 ❤️‍🩹).
+- Add #{streamer} on recap-style uploads.
+- Name the person or moment, not the whole story.
+
+## Posting windows
+- Lead: 14:00 UTC (11:00 Asuncion).
+- Next: 16:00-18:00 UTC (13:00-15:00 Asuncion), then 12:00 UTC (09:00 Asuncion).
+- Test: 02:00 UTC (23:00 Asuncion).
 
 ## Streamer priority
-IShowSpeed first, then Kai Cenat (merge the "kaicenat" alias), then CaseOh as a test slot.
+1. IShowSpeed
+2. CaseOh
+3. Kai Cenat
+4. Watch: YourRAGE (#yourrage rising, one channel)
 
-## Watch list
-- Recap competitors for title patterns only: @NexxoRecaps, @GoofyRecaps, @deagzzzshorts.
-- Treat viral outliers (50M views) as one-offs, not benchmarks.
-- Re-check the length and time findings once there is more than 20 videos of data.
+## Rules
+- Metadata only for competitor research. Never download or re-upload competitor videos.
+- Re-check each window against fresh data before changing the schedule. The sample is small and Speed-heavy.

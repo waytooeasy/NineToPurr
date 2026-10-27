@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-26",
+  "updated": "2026-10-27",
   "sample": [
-    "bs0XsXVW7vs",
     "NDFE8W8wQ-Y",
     "EkYXY7UeqTI",
     "AmmDYr4HquA",
-    "iPjKK-KJ9iU",
-    "CRUtic_pytc",
+    "kNzT5aWaDgg",
+    "h602c51kG0s",
     "EGeUtjaRi-4",
+    "CRUtic_pytc",
     "PomI_EZhtPM"
   ],
   "seen": 4,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FF0000",
+    "highlight": "#00E5FF",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,11 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FF0000",
       "#00E5FF",
-      "#39FF14"
+      "#FF2A2A",
+      "#7CFC00"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Burned-in captions appear on images 1, 5, 6, 8; the remaining images lack captions."
+  "notes": "Captions appear on 4 of 10 thumbnails; styles vary, with colored emphasis words common."
 }
