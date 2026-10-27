@@ -36,6 +36,8 @@ SHIFT_STEP = 10       # ... every this many section frames, then frame by frame 
 SHIFT_RUN = 120       # runs of frames missing a panel are searched in pieces of at most this many frames
 WEAK_NCC = 0.85       # a panel matching below this is also searched at other seconds ...
 SHIFT_GAIN = 0.04     # ... and moved there only when it matches this much better
+PROP_GAIN = 0.01      # an offset the panel has right next to a run is taken for it when it matches this much better
+PROP_REACH = 60       # ... "next to": within this many frames
 DENSE_N = 8000        # keypoints kept per section frame (a facecam corner keeps enough of its own)
 
 _dense = _masked = None
@@ -468,13 +470,20 @@ def shift_job(args):
     facecam reaction...): the panel's own time offset dm, found on the run's middle frame within SHIFT_S, then
     the panel mapped at m + dm on every frame of the run where that beats its ncc at m (`old`) by SHIFT_GAIN.
     -> [(n, M, ncc, dm)]."""
-    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old = args
+    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, *rest = args
+    cands = rest[0] if rest else None
     nm = ns[len(ns) // 2]
     th = C.read_frames(short_path, nm, 1, fps, asz, gray=True)
     if not len(th):
         return []
     f = feats_in(th[0], mask)
     S, m0 = int(SHIFT_S * sfps), m_of[nm]
+    if cands:                       # offsets this panel has next to the run: tried before any scan
+        gain = PROP_GAIN
+        dm = _best_known(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, cands)
+        if dm is None:
+            return []
+        return _remap(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, dm, gain)
 
     def scan(a, b, step):
         best = (-1.0, None)
@@ -493,7 +502,33 @@ def shift_job(args):
     c, mb = scan(mb - SHIFT_STEP, mb + SHIFT_STEP, 1)
     if mb is None or c < max(VM.MIN_NCC, old.get(nm, -1.0) + SHIFT_GAIN) or abs(mb - m0) <= 2:
         return []
-    dm = mb - m0
+    return _remap(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, mb - m0, SHIFT_GAIN)
+
+
+def _best_known(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, cands):
+    """Of the known offsets `cands`, the one that beats the panel's ncc at m on 3 frames of the run (¼, ½, ¾) by
+    PROP_GAIN on average and on at least 2 of them, else None."""
+    picks = sorted({ns[len(ns) // 4], ns[len(ns) // 2], ns[3 * len(ns) // 4]})
+    best = (0.0, None)
+    for dm in cands:
+        gains = []
+        for n in picks:
+            th = C.read_frames(short_path, n, 1, fps, asz, gray=True)
+            lo = max(0, m_of[n] + dm - 1)
+            fr = C.read_frames(sec_path, lo, 3, sfps, vsz, gray=True)
+            if not len(th) or not len(fr):
+                continue
+            secs = {lo + j: (fr[j], dense_feats(fr[j])) for j in range(len(fr))}
+            _, Ms, cs = map_frame(th[0], secs.get, m_of[n] + dm, [mask])
+            if Ms[0] is not None:
+                gains.append(cs[0] - old.get(n, -1.0))
+        if len(gains) >= 2 and sum(g >= PROP_GAIN for g in gains) >= 2 and np.mean(gains) > best[0]:
+            best = (float(np.mean(gains)), dm)
+    return best[1]
+
+
+def _remap(short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask, old, dm, gain):
+    """The panel mapped at m + dm on every frame of the run where that beats its ncc at m by `gain`."""
     th = C.read_frames(short_path, ns[0], ns[-1] - ns[0] + 1, fps, asz, gray=True)
     lo = max(0, min(m_of[n] for n in ns) + dm - 2)
     sec = C.read_frames(sec_path, lo, max(m_of[n] for n in ns) + dm + 3 - lo, sfps, vsz, gray=True)
@@ -510,8 +545,33 @@ def shift_job(args):
         for m in [m for m in cache if m < m_of[n] + dm - 2]:
             del cache[m]
         m, Ms, cs = map_frame(th[i], sec_at, m_of[n] + dm, [mask])
-        if Ms[0] is not None and cs[0] >= max(VM.MIN_NCC, old.get(n, -1.0) + SHIFT_GAIN):
+        if Ms[0] is not None and cs[0] >= max(VM.MIN_NCC, old.get(n, -1.0) + gain):
             out.append((n, Ms[0].tolist(), float(cs[0]), int(m - m_of[n])))
+    return out
+
+
+def neighbour_runs(recs, tpls):
+    """Runs where a panel is mapped at the shot's time right next to frames where the same panel was found at
+    other seconds (a re-synced facecam whose background matched well enough at m): [(tpl, panel, seg, [n],
+    [offsets seen next to it])]."""
+    out = []
+    by_n = {r[0]: r for r in recs}
+    for t, tpl in enumerate(tpls):
+        for p in range(len(tpl["rects"])):
+            cur, seg = [], None
+            for r in recs + [None]:
+                plain = (r is not None and r[3] == t and r[4][p] is not None and abs(r[6][p]) <= 2)
+                if plain and cur and r[0] == cur[-1] + 1 and r[1] == seg and len(cur) < SHIFT_RUN:
+                    cur.append(r[0])
+                    continue
+                if len(cur) >= VM.MIN_SHOT_F:
+                    near = [by_n[n] for n in list(range(cur[0] - PROP_REACH, cur[0])) +
+                            list(range(cur[-1] + 1, cur[-1] + 1 + PROP_REACH)) if n in by_n]
+                    seen = sorted({q[6][p] for q in near if q[3] == t and q[1] == seg and q[4][p] is not None
+                                   and abs(q[6][p]) > 2})
+                    if seen:
+                        out.append((t, p, seg, cur, seen))
+                cur, seg = ([r[0]], r[1]) if plain else ([], None)
     return out
 
 

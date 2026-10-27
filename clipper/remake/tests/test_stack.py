@@ -288,3 +288,13 @@ def test_a_cut_tail_in_no_known_layout_goes_to_the_gate_a_whole_shot_does_not():
     assert run.other_frames(vm) == 10 <= run.MAX_OTHER * vm["nfr"]
     vm["shots"] = [{"n0": 0, "n1": 500, "layout": "other"}, {"n0": 500, "n1": 1000, "layout": "full"}]
     assert run.other_frames(vm) > run.MAX_OTHER * vm["nfr"]
+
+
+def test_runs_next_to_a_retimed_panel_are_offered_its_offset():
+    A, B = [[0.4, 0, 10], [0, 0.4, 330]], [[0.6, 0, 150], [0, 0.6, 0]]
+    tpls = [{"rects": [[0, 0.5, 0, 1], [0.5, 1, 0, 1]]}]
+    recs = [[n, 0, 100 + n, 0, [A, B], [0.9, 0.9], [140 if n < 10 else 0, 0]] for n in range(30)]
+    runs = panels.neighbour_runs(recs, tpls)
+    assert [(t, p, ns[0], ns[-1], seen) for t, p, _, ns, seen in runs] == [(0, 0, 10, 29, [140])]
+    recs[25][3] = 1                                    # another layout breaks the run: still offered up to it
+    assert panels.neighbour_runs(recs, tpls)[0][3][-1] == 24

@@ -564,6 +564,23 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
                 r[4][p], r[5][p], r[6][p] = M, c, dm
         C.log(f"stack: {sum(len(r) for r in found)} frames of {sum(len(j[6]) for j in shift)} found at their "
               f"panel's own time ({sorted({x[3] for r in found for x in r})[:6]} section frames off)")
+        prop, which = [], []    # runs next to those, where the same offset matches better than the shot's time
+        for t, p, seg_i, ns, seen in PN.neighbour_runs(recs, tpls):
+            which.append(p)
+            g = amap["segments"][seg_i]
+            sp = secp[g["sec"]]
+            vsz = (VA, int(round(VA * sp["h"] / sp["w"] / 2) * 2))
+            prop.append((str(short_path), fps, asz, sections[g["sec"]]["file"], sp["fps"], vsz, ns,
+                         {n: by_n[n][2] for n in ns}, tmasks[t][p], {n: by_n[n][5][p] for n in ns}, seen))
+        if prop:
+            with Pool(max(1, min(workers, len(prop)))) as pool:
+                found = pool.map(PN.shift_job, prop)
+            for p, res in zip(which, found):
+                for n, M, c, dm in res:
+                    r = by_n[n]
+                    r[4][p], r[5][p], r[6][p] = M, c, dm
+            C.log(f"stack: {sum(len(r) for r in found)} more frames of {sum(len(j[6]) for j in prop)} take the "
+                  f"offset their neighbours have")
     single = {n for n in best}
     return PN.classify(nfr, recs, single, asz), recs
 
