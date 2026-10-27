@@ -30,6 +30,9 @@ SAME_PX = 3.0         # two crops are the same when they place the frame within 
 HARD_JUMP = 4         # a secondary panel cuts a shot only on a jump this many times vmap.JUMP
 ERR_CAP = 60.0        # per-pixel error cap for the edge search (0-255)
 MERGE_TOL = 0.015     # two templates whose refined edges agree this closely are one layout
+SHIFT_S = 5.0         # a panel missing at the main panel's time is looked for this far (s) in the stream ...
+SHIFT_STEP = 10       # ... every this many section frames, then frame by frame around the best
+SHIFT_RUN = 120       # runs of frames missing a panel are searched in pieces of at most this many frames
 DENSE_N = 8000        # keypoints kept per section frame (a facecam corner keeps enough of its own)
 
 _dense = _masked = None
@@ -399,7 +402,8 @@ def map_frame(th, sec_at, m0, masks, sync=(0, -1, 1)):
 
 
 def map_job(args):
-    """Frames n0..n1-1 of the Short against the templates: [(n, seg_i, m, tpl, [M | None], [ncc])]."""
+    """Frames n0..n1-1 of the Short against the templates: [[n, seg_i, m, tpl, [M | None], [ncc], [dm]]] (dm: a
+    panel's own time offset in section frames, 0 here; see shift_job)."""
     seg_i, short_path, fps, asz, sec_path, sfps, vsz, off, n0, n1, tmasks, hints = args
     th = C.read_frames(short_path, n0, n1 - n0, fps, asz, gray=True)
     m_of = {n: int(hints.get(n, round((n / fps + off) * sfps))) for n in range(n0, n0 + len(th))}
@@ -427,10 +431,78 @@ def map_job(args):
             area = [float(mk.sum()) for mk in masks]
             score = sum(a * max(c, 0) for a, c in zip(area, cs) if c >= VM.MIN_NCC) / max(1.0, sum(area))
             if best is None or score > best[0]:
-                best = (score, (n, seg_i, m, t, [M.tolist() if M is not None and c >= VM.MIN_NCC else None
-                                                 for M, c in zip(Ms, cs)], [float(c) for c in cs]))
+                best = (score, [n, seg_i, m, t, [M.tolist() if M is not None and c >= VM.MIN_NCC else None
+                                                 for M, c in zip(Ms, cs)], [float(c) for c in cs], [0] * len(Ms)])
         if best is not None and best[0] > 0:
             out.append(best[1])
+    return out
+
+
+def missing_runs(recs, tpls):
+    """Runs of consecutive frames where one panel is missing while another one maps (same template, same
+    footage): [(tpl, panel, seg, [n, ...])], each at most SHIFT_RUN frames."""
+    out = []
+    for t, tpl in enumerate(tpls):
+        for p in range(len(tpl["rects"])):
+            cur, seg = [], None
+            for r in recs + [None]:
+                miss = (r is not None and r[3] == t and r[4][p] is None
+                        and any(M is not None for i, M in enumerate(r[4]) if i != p))
+                if miss and cur and r[0] == cur[-1] + 1 and r[1] == seg and len(cur) < SHIFT_RUN:
+                    cur.append(r[0])
+                    continue
+                if len(cur) >= VM.MIN_SHOT_F:
+                    out.append((t, p, seg, cur))
+                cur, seg = ([r[0]], r[1]) if miss else ([], None)
+    return out
+
+
+def shift_job(args):
+    """A run of frames missing one panel at the main panel's time (the clipper re-synced a facecam reaction...):
+    the panel's own time offset dm, found on the run's middle frame within SHIFT_S, then the panel mapped at
+    m + dm on every frame of the run. -> [(n, M, ncc, dm)]."""
+    short_path, fps, asz, sec_path, sfps, vsz, ns, m_of, mask = args
+    nm = ns[len(ns) // 2]
+    th = C.read_frames(short_path, nm, 1, fps, asz, gray=True)
+    if not len(th):
+        return []
+    f = feats_in(th[0], mask)
+    S, m0 = int(SHIFT_S * sfps), m_of[nm]
+
+    def scan(a, b, step):
+        best = (-1.0, None)
+        for c0 in range(max(0, a), b + 1, 120):
+            fr = C.read_frames(sec_path, c0, min(120, b + 1 - c0), sfps, vsz, gray=True)
+            for j in range(0, len(fr), step):
+                M = similarity(f, dense_feats(fr[j]))
+                if M is not None:
+                    c = masked_ncc(th[0], fr[j], M, mask)
+                    if c > best[0]:
+                        best = (c, c0 + j)
+        return best
+    c, mb = scan(m0 - S, m0 + S, SHIFT_STEP)
+    if mb is None or c < VM.MIN_NCC:
+        return []
+    c, mb = scan(mb - SHIFT_STEP, mb + SHIFT_STEP, 1)
+    if mb is None or c < VM.MIN_NCC:
+        return []
+    dm = mb - m0
+    th = C.read_frames(short_path, ns[0], ns[-1] - ns[0] + 1, fps, asz, gray=True)
+    lo = max(0, min(m_of[n] for n in ns) + dm - 2)
+    sec = C.read_frames(sec_path, lo, max(m_of[n] for n in ns) + dm + 3 - lo, sfps, vsz, gray=True)
+    cache = {}
+
+    def sec_at(m):
+        if not (lo <= m < lo + len(sec)):
+            return None
+        if m not in cache:
+            cache[m] = (sec[m - lo], dense_feats(sec[m - lo]))
+        return cache[m]
+    out = []
+    for i, n in enumerate(ns[:len(th)]):
+        m, Ms, cs = map_frame(th[i], sec_at, m_of[n] + dm, [mask])
+        if Ms[0] is not None and cs[0] >= VM.MIN_NCC:
+            out.append((n, Ms[0].tolist(), float(cs[0]), int(m - m_of[n])))
     return out
 
 
@@ -478,38 +550,54 @@ def _jump(a, b, sec_wh, f):
             or abs(a[2] - b[2]) / SH > f * VM.JUMP)
 
 
+def _dt_moved(a, b):
+    """A panel's own time offset changed (None = the shot's time)."""
+    return (a is None) != (b is None) or (a is not None and abs(a - b) > 2)
+
+
 def split_stack(frames, sec_wh):
-    """frames: sorted [{'n', 'seg', 'tpl', 'p': [(k, cx, cy) | None per panel]}] -> runs split at cuts: another
-    template or footage, every panel jumping at once, or one panel jumping hard. Runs < MIN_SHOT_F dropped."""
-    shots = []
+    """frames: sorted [{'n', 'seg', 'tpl', 'p': [(k, cx, cy) | None per panel], 'dt': [per panel]}] -> runs split
+    at cuts: another template or footage, a panel's time offset changing, every panel jumping at once, or one
+    panel jumping hard. Runs < MIN_SHOT_F dropped."""
+    shots, last_dt = [], {}
     for f in frames:
         if shots:
             q = shots[-1][-1]
             cut = f["seg"] != q["seg"] or f["tpl"] != q["tpl"] or f["n"] - q["n"] > 6
+            # a panel showing other seconds of the stream than before (its time offset changed) is a cut too
+            cut = cut or any(a is not None and i in last_dt and _dt_moved(f["dt"][i], last_dt[i])
+                             for i, a in enumerate(f["p"]))
             if not cut:   # a cut moves every panel; one panel alone moving that much is a punch-in on it
                 both = [(a, b) for a, b in zip(f["p"], q["p"]) if a is not None and b is not None]
                 cut = bool(both) and (all(_jump(a, b, sec_wh, 1) for a, b in both)
                                       or any(_jump(a, b, sec_wh, HARD_JUMP) for a, b in both))
             if not cut:
                 shots[-1].append(f)
+                last_dt.update({i: f["dt"][i] for i, a in enumerate(f["p"]) if a is not None})
                 continue
         shots.append([f])
+        last_dt = {i: f["dt"][i] for i, a in enumerate(f["p"]) if a is not None}
     return [s for s in shots if len(s) >= VM.MIN_SHOT_F]
 
 
-def stack_shots(kind, tpls, amap, secp, short_wh, out_w):
-    """Shots of the stacked frames: {'layout': 'stack', 'panels': [{'rect', 'path'}], 'fill', 'path' (main
-    panel's), ...} plus {n: [seg, m]} for the frames they show."""
+def stack_shots(kind, tpls, amap, secp, short_wh, out_w, fps):
+    """Shots of the stacked frames: {'layout': 'stack', 'panels': [{'rect', 'path', 'dt'}], 'fill', 'path' (main
+    panel's), ...} plus {n: [seg, m]} for the frames they show. A panel shows the shot's section frame, or with
+    'dt' its own: round((n / fps + off) * section fps) + dt (render.panel_frames)."""
     frames = []
     for n, kd in enumerate(kind):
         if kd is None or kd[0] != "stack":
             continue
-        _, seg_i, m, t, Ms, cs = kd[1]
+        _, seg_i, m, t, Ms, cs, dms = kd[1]
         sec_i = amap["segments"][seg_i]["sec"]
         sec_wh = (secp[sec_i]["w"], secp[sec_i]["h"])
+        expected = int(round((n / fps + amap["segments"][seg_i]["off"]) * secp[sec_i]["fps"]))
         frames.append({"n": n, "seg": seg_i, "sec": sec_i, "m": m, "tpl": t,
                        "ncc": float(np.mean([c for c, M in zip(cs, Ms) if M is not None])),
-                       "p": [None if M is None else _params(M, short_wh, sec_wh, out_w) for M in Ms]})
+                       "p": [None if M is None else _params(M, short_wh, sec_wh, out_w) for M in Ms],
+                       "dm": [int(d) for d in dms],
+                       # a panel on other seconds: its frame against the audio timeline (the main m jitters by 1)
+                       "dt": [m + int(d) - expected if abs(int(d)) > 2 else None for d in dms]})
     shots, fmap = [], {}
     if not frames:
         return shots, fmap
@@ -519,11 +607,13 @@ def stack_shots(kind, tpls, amap, secp, short_wh, out_w):
         for i, rect in enumerate(tpl["rects"]):
             have = [f for f in run if f["p"][i] is not None]
             if not have:
-                panels.append({"rect": rect, "path": None})
+                panels.append({"rect": rect, "path": None, "dt": None})
                 continue
             sm = VM.smooth([[np.log(f["p"][i][0]), f["p"][i][1], f["p"][i][2]] for f in have])
-            panels.append({"rect": rect, "path": {str(f["n"]): [float(np.exp(a)), float(b), float(c)]
-                                                  for f, (a, b, c) in zip(have, sm)}})
+            dts = [f["dt"][i] for f in have]
+            panels.append({"rect": rect, "dt": max(set(dts), key=lambda d: (dts.count(d), d is None)),
+                           "path": {str(f["n"]): [float(np.exp(a)), float(b), float(c)]
+                                    for f, (a, b, c) in zip(have, sm)}})
         seg_i = run[0]["seg"]
         shots.append({"n0": run[0]["n"], "n1": run[-1]["n"] + 1, "seg": seg_i, "sec": run[0]["sec"],
                       "off": amap["segments"][seg_i]["off"], "layout": "stack", "band": [0.0, 1.0, 0.0, 1.0],
@@ -547,6 +637,7 @@ def _borrow_paths(shots):
             near = [o for k, o in enumerate(shots)
                     if k != i and o["tpl"] == s["tpl"] and o["panels"][j]["path"]]
             if near:
-                src = min(near, key=lambda o: abs(o["n0"] - s["n0"]))["panels"][j]["path"]
+                o = min(near, key=lambda o: abs(o["n0"] - s["n0"]))
+                src = o["panels"][j]["path"]
                 key = min(src, key=lambda x: abs(int(x) - s["n0"]))
-                p["path"] = {str(s["n0"]): src[key]}
+                p["path"], p["dt"] = {str(s["n0"]): src[key]}, o["panels"][j].get("dt")

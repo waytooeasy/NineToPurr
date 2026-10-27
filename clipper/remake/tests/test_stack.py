@@ -241,3 +241,43 @@ def test_fit_band_over_a_solid_colour_is_drawn_with_that_colour():
     out = render.compose(sec, vm, shot, 0)
     top = int(720 - 540 / 1.458)
     assert out[top + 10, 540, 1] > 190 and out[top - 40, 540].max() == 0
+
+
+def test_facecam_shown_seconds_later_than_the_gameplay_gets_its_own_time_offset(tmp_path, monkeypatch):
+    """The clipper re-syncs the facecam reaction: from frame 6 on, the top band shows the stream 6 frames later than
+    the bottom band (Jynxzi / iboclips, 2026-10-24: 2.25 s)."""
+    monkeypatch.setattr(panels, "SHIFT_STEP", 2)      # 30 fps test stream: a fine coarse step
+    n_sec, dm = 22, 6
+    base = stream_frames()
+    rng = np.random.default_rng(3)
+    pos, vel = rng.uniform(0, [300, 260], (40, 2)), rng.normal(0, 9, (40, 2))
+    col = rng.integers(0, 255, (40, 3))
+    room = canvas(seed=21, w=300, h=260)
+    sec = []
+    for i in range(n_sec):
+        f = base[i % NF].copy()
+        cam = room.copy()                                 # the facecam corner: a person moving in a room
+        for p, v, c in zip(pos, vel, col):
+            x, y = (p + v * i).astype(int)
+            cv2.circle(cam, (int(x) % 300, int(y) % 260), 18, tuple(int(a) for a in c), -1)
+        f[10:270, 590:890] = cam
+        sec.append(f)
+    their = []
+    for n in range(14):
+        out = np.empty((OH, OW, 3), np.uint8)
+        out[:SEAM] = crop(sec[n + (dm if n >= 6 else 0)], *FACE, (OW, SEAM))
+        x, y, k = GAME
+        out[SEAM:] = crop(sec[n], x, y, k, (OW, OH - SEAM))
+        their.append(out)
+    sp, tp = video(tmp_path / "sec.mp4", sec), video(tmp_path / "short.mp4", their)
+    am = {"segments": [{"sec": 0, "t0": 0.0, "t1": 14 / FPS, "off": 0.0, "gain": 1.0}]}
+    vm = vmap.build(tp, [{"file": sp}], am, out_w=OW, workers=2)
+    assert [s["layout"] for s in vm["shots"]] == ["stack", "stack"]
+    a, b = vm["shots"]
+    assert abs(b["n0"] - 6) <= 1 and a["panels"][0]["dt"] is None and b["panels"][0]["dt"] == dm
+    assert b["panels"][1]["dt"] is None
+    assert render.panel_frames(vm, b, 10) == {0: 10 + dm}
+    ours = render.compose(sec[render.sec_frame_index(vm, b, 10)], vm, b, 10, shifted={0: sec[10 + dm]})
+    d = np.abs(cv2.GaussianBlur(their[10].astype(np.float32), (0, 0), 1.5)
+               - cv2.GaussianBlur(ours.astype(np.float32), (0, 0), 1.5)).max(2)
+    assert np.mean(d < 18) > 0.97

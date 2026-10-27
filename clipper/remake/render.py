@@ -39,9 +39,10 @@ def sec_frame_index(vm, shot, n):
     return int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
 
 
-def compose(sec_img, vm, shot, n, size=None):
+def compose(sec_img, vm, shot, n, size=None, shifted=None):
     """Our frame n (ungraded): the section frame framed like theirs. `size` (w, h) renders smaller; `sec_img` may
-    be a downscaled section frame (its width says by how much)."""
+    be a downscaled section frame (its width says by how much). shifted: {panel index: its own section frame}
+    for stack panels on other seconds (panel_frames, same scale as sec_img)."""
     OW, OH = vm["out_w"], vm["out_h"]
     w, h = size or (OW, OH)
     r = w / OW
@@ -49,7 +50,7 @@ def compose(sec_img, vm, shot, n, size=None):
     q = sec_img.shape[1] / sec["w"]
     flags = cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP
     if shot["layout"] == "stack":
-        return compose_stack(sec_img, vm, shot, n, (w, h), q, r, flags)
+        return compose_stack(sec_img, vm, shot, n, (w, h), q, r, flags, shifted or {})
     k, cx, cy = VM.params_at(shot, n)
     M = np.array([[q * k / r, 0, q * (cx - k * OW / 2)], [0, q * k / r, q * (cy - k * OH / 2)]])
     if shot["layout"] == "full":
@@ -86,21 +87,32 @@ def panel_px(rect, w, h):
     return int(round(t * h)), int(round(b * h)), int(round(lft * w)), int(round(rgt * w))
 
 
-def compose_stack(sec_img, vm, shot, n, size, q, r, flags):
-    """Stacked / overlay layout (#130): each panel's own crop of the same section frame inside its rectangle, in
-    draw order; the rest of the frame in the measured fill colour."""
+def panel_frames(vm, shot, n):
+    """{panel index: section frame} for the stack panels on their own seconds ('dt', #130): the clipper showed
+    that crop at another moment than the shot (a re-synced facecam reaction)."""
+    if shot["layout"] != "stack":
+        return {}
+    sec = vm["sections"][shot["sec"]]
+    base = int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
+    return {i: max(0, base + int(p["dt"])) for i, p in enumerate(shot["panels"]) if p.get("dt") is not None}
+
+
+def compose_stack(sec_img, vm, shot, n, size, q, r, flags, shifted):
+    """Stacked / overlay layout (#130): each panel's own crop of the section frame (or of its own frame, panel
+    'dt') inside its rectangle, in draw order; the rest of the frame in the measured fill colour."""
     OW, OH = vm["out_w"], vm["out_h"]
     w, h = size
     out = np.empty((h, w, 3), np.uint8)
     out[:] = np.clip(np.round(shot.get("fill") or (0, 0, 0)), 0, 255).astype(np.uint8)
-    for p in shot["panels"]:
+    for i, p in enumerate(shot["panels"]):
         v0, v1, u0, u1 = panel_px(p["rect"], w, h)
         if v1 <= v0 or u1 <= u0:
             continue
         k, cx, cy = VM.params_at(p, n)
+        img = shifted.get(i, sec_img)
         a = q * k / r
         M = np.array([[a, 0, q * (cx - k * OW / 2) + a * u0], [0, a, q * (cy - k * OH / 2) + a * v0]])
-        out[v0:v1, u0:u1] = cv2.warpAffine(sec_img, M, (u1 - u0, v1 - v0), flags=flags,
+        out[v0:v1, u0:u1] = cv2.warpAffine(img, M, (u1 - u0, v1 - v0), flags=flags,
                                            borderMode=cv2.BORDER_REPLICATE)
     return out
 
@@ -249,7 +261,14 @@ def render(spec, out_path, work, crf=17):
             rd = readers.get(shot["sec"])
             if rd is None:
                 rd = readers[shot["sec"]] = C.FrameReader(sec["file"], sec["fps"], (sec["w"], sec["h"]))
-            img = compose(rd.get(sec_frame_index(vm, shot, ns)), vm, shot, ns)
+            m = sec_frame_index(vm, shot, ns)
+            shifted = {}
+            for i, mp in panel_frames(vm, shot, ns).items():   # a panel on other seconds: its own reader
+                key = (shot["sec"], i, shot["n0"])
+                if key not in readers:
+                    readers[key] = C.FrameReader(sec["file"], sec["fps"], (sec["w"], sec["h"]))
+                shifted[i] = readers[key].get(mp).copy()
+            img = compose(rd.get(m), vm, shot, ns, shifted=shifted)
             img = apply_look(img, lut, look.get("sharpen"))
             if n in mats:      # their exact colour effect on this frame (replaces the single-colour wash)
                 img = apply_mat(img, mats[n])

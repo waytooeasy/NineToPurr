@@ -379,7 +379,7 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
     if tpls:      # stacked / overlay layout (#130): every frame mapped per panel, stacked frames become 'stack' shots
         from . import panels as PN
         kind, recs = map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, workers)
-        st_shots, st_frames = PN.stack_shots(kind, tpls, amap, secp, (W, H), out_w)
+        st_shots, st_frames = PN.stack_shots(kind, tpls, amap, secp, (W, H), out_w, fps)
         if st_shots:
             singles = [f for f in frames if kind[f["n"]] is not None and kind[f["n"]][0] == "single"]
             frames = singles + [{"n": n, "seg": v[0], "m": v[1]} for n, v in st_frames.items()]
@@ -541,10 +541,29 @@ def map_panels(short_path, fps, asz, nfr, best, amap, sections, secp, tpls, work
         res = [r for part in pool.map(PN.map_job, jobs) for r in part]
     recs = {}
     for r in res:              # a frame near a segment switch is tried in both: keep the better one
-        sc = sum(max(c, 0) for c, M in zip(r[5], r[4]) if M is not None)
+        sc = sum(max(c, 0) for c, M in zip(r[5], r[4]) if M is not None)   # r: panels.map_job record
         if r[0] not in recs or sc > recs[r[0]][0]:
             recs[r[0]] = (sc, r)
     recs = [v[1] for _, v in sorted(recs.items())]
+    shift, which = [], []       # panels missing at the main panel's time: their own time offset (shift_job)
+    for t, p, seg_i, ns in PN.missing_runs(recs, tpls):
+        which.append(p)
+        g = amap["segments"][seg_i]
+        sp = secp[g["sec"]]
+        vsz = (VA, int(round(VA * sp["h"] / sp["w"] / 2) * 2))
+        by_n = {r[0]: r for r in recs}
+        shift.append((str(short_path), fps, asz, sections[g["sec"]]["file"], sp["fps"], vsz, ns,
+                      {n: by_n[n][2] for n in ns}, tmasks[t][p]))
+    if shift:
+        by_n = {r[0]: r for r in recs}
+        with Pool(max(1, min(workers, len(shift)))) as pool:
+            found = pool.map(PN.shift_job, shift)
+        for p, res in zip(which, found):
+            for n, M, c, dm in res:
+                r = by_n[n]
+                r[4][p], r[5][p], r[6][p] = M, c, dm
+        C.log(f"stack: {sum(len(r) for r in found)} frames of {sum(len(j[6]) for j in shift)} found at their "
+              f"panel's own time ({sorted({x[3] for r in found for x in r})[:6]} section frames off)")
     single = {n for n in best}
     return PN.classify(nfr, recs, single, asz), recs
 
