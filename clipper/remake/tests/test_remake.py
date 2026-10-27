@@ -173,12 +173,14 @@ def test_gap_fill_finds_the_right_section_frame_under_motion_blur():
 
 def test_frame_shift_moves_whole_short_frames_even_on_a_30_in_60_section():
     # their 60 fps frames n map to a 30 fps stream stored at 60 fps: section frames 0,0,2,2,4,4... (duplicates)
-    vm = {"fps": 60.0, "frame_shift": 1, "frames": {str(n): [0, 2 * (n // 2)] for n in range(10)},
+    vm = {"fps": 60.0, "nfr": 10, "frame_shift": 1, "frames": {str(n): [0, 2 * (n // 2)] for n in range(10)},
           "sections": [{"fps": 60.0}]}
     shot = {"seg": 0, "sec": 0, "off": 0.0}
-    # shift 1 = show what their next frame maps to (never m + 1, which would be the same frame or two frames on)
-    assert [render.sec_frame_index(vm, shot, n) for n in range(5)] == [0, 2, 2, 4, 4]
-    assert render.sec_frame_index({**vm, "frame_shift": 0}, shot, 3) == 2
+    # shift 1 = render frame n as map frame n + 1 (shot, crop, section frame), never section index m + 1, which
+    # would be the same frame or two of theirs further on
+    assert [render.sec_frame_index(vm, shot, render.src_frame(vm, n)) for n in range(5)] == [0, 2, 2, 4, 4]
+    assert render.src_frame(vm, 9) == 9 and render.src_frame({**vm, "frame_shift": -2}, 1) == 0
+    assert render.sec_frame_index(vm, shot, 3) == 2      # the index itself is never shifted
 
 
 def test_to_out_converts_analysis_map_to_output_frame():
