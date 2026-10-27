@@ -368,7 +368,7 @@ def measure_event(th, base, ev):
     rows[max(0, lines[0][0] - 4):lines[-1][1] + 4] = True
     fill, dark = fill & rows[:, None], dark & rows[:, None]
     words = ev["words"]
-    out = {"lines": [], "colours": [None] * len(words)}
+    out = {"lines": [], "colours": [None] * len(words), "heights": [None] * len(words)}
     if len(lines) == 1 and len(shape) > 1:      # their caption sits on one line where the OCR saw a break
         shape = [len(words)]
     if len(lines) == len(shape):
@@ -379,8 +379,12 @@ def measure_event(th, base, ev):
             text = " ".join(w["w"] for w in words[i:i + n])
             xs = np.where(lm.any(0))[0]
             out["lines"].append({"r0": int(r0), "r1": int(r1), "x0": int(xs.min()), "x1": int(xs.max() + 1),
-                                 "text": text, "mask": tight(lm)})
+                                 "text": text, "mask": tight(lm), "w0": i, "w1": i + n})
             if len(cols) == n:
+                for k, (c0, c1) in enumerate(cols):      # each word's letter height (#124: sizes per word)
+                    ys = np.where(lm[:, c0:c1].any(1))[0]
+                    if len(ys) >= 3:
+                        out["heights"][i + k] = int(ys.max() - ys.min() + 1)
                 hug = _hugging(lm, dark[r0:r1], th[r0:r1])
                 for k, (c0, c1) in enumerate(cols):
                     sel = lm[:, c0:c1] & hug[:, c0:c1]
@@ -458,43 +462,64 @@ def outline_px(fill, dark, line_h):
 
 
 # ---------------- animation ----------------
+def event_heights(short_path, base_path, ev, fps, size, look_frames=14):
+    """Their caption's letter height and brightness over the first frames of one event: ([h], [v])."""
+    n0 = int(ev["start"] * fps) - 1
+    th = C.read_frames(short_path, max(0, n0), look_frames, fps, size)
+    ba = C.read_frames(base_path, max(0, n0), look_frames, fps, size)
+    hs, vs = [], []
+    for a, b in zip(th, ba):
+        _, fill, _ = caption_masks(a, b, ev.get("y", 0.5))
+        ys = np.where(fill.any(1))[0]
+        if fill.sum() < 30 or not len(ys):
+            hs.append(0.0)
+            vs.append(0.0)
+            continue
+        ls = lines_of(fill, near=ev.get("y", 0.5) * a.shape[0])
+        hs.append(float(max((r1 - r0) for r0, r1 in ls)) if ls else float(ys.max() - ys.min()))
+        vs.append(float(a.max(2)[fill].mean()))
+    return hs, vs
+
+
+def reveal_of(hs, vs, fps):
+    """How one caption came in, from its letter height / brightness per frame: {'kind': 'pop', 'from', 'peak',
+    't_peak_ms', 'ms'} | {'kind': 'fade', 'ms'} | {'kind': 'none', 'ms': 0}; None if it can't be read."""
+    if len(hs) < 4 or max(hs) == 0:
+        return None
+    hf, vf = np.median(hs[-4:]), np.median(vs[-4:])
+    if hf <= 0:
+        return None
+    k0 = next((i for i, h in enumerate(hs) if h > 0.3 * hf), None)
+    if k0 is None:
+        return None
+    rel = np.array(hs[k0:]) / hf
+    settle = next((i for i in range(len(rel)) if all(abs(r - 1) < 0.05 for r in rel[i:])), len(rel))
+    if rel[0] < 0.88 or rel.max() > 1.08:
+        ip = int(np.argmax(rel))
+        return {"kind": "pop", "from": float(rel[0]), "peak": float(max(1.0, rel.max())),
+                "t_peak_ms": int(ip * 1000 / fps), "ms": int(max(1, settle) * 1000 / fps)}
+    if vs[k0] < 0.8 * vf:
+        up = next((i for i in range(k0, len(vs)) if vs[i] >= 0.95 * vf), len(vs))
+        return {"kind": "fade", "ms": int(max(1, up - k0 + 1) * 1000 / fps)}
+    return {"kind": "none", "ms": 0}
+
+
+def same_reveal(a, b, tol=0.08):
+    """Two reveals look alike (kind, and for pops their start / peak scale within tol)."""
+    if a is None or b is None or a["kind"] != b["kind"]:
+        return a is b
+    if a["kind"] != "pop":
+        return True
+    return abs(a["from"] - b["from"]) <= tol and abs(a["peak"] - b["peak"]) <= tol
+
+
 def animation(short_path, base_path, evs, fps, size, n_events=6, look_frames=14):
     """How a caption appears: {'kind': 'pop'|'fade'|'none', 'from': scale, 'peak': scale, 't_peak_ms', 'ms'}."""
     votes = []
     for ev in evs[:n_events]:
-        n0 = int(ev["start"] * fps) - 1
-        th = C.read_frames(short_path, max(0, n0), look_frames, fps, size)
-        ba = C.read_frames(base_path, max(0, n0), look_frames, fps, size)
-        hs, vs = [], []
-        for a, b in zip(th, ba):
-            _, fill, _ = caption_masks(a, b, ev.get("y", 0.5))
-            ys = np.where(fill.any(1))[0]
-            if fill.sum() < 30 or not len(ys):
-                hs.append(0.0)
-                vs.append(0.0)
-                continue
-            ls = lines_of(fill, near=ev.get("y", 0.5) * a.shape[0])
-            hs.append(float(max((r1 - r0) for r0, r1 in ls)) if ls else float(ys.max() - ys.min()))
-            vs.append(float(a.max(2)[fill].mean()))
-        if len(hs) < 4 or max(hs) == 0:
-            continue
-        hf, vf = np.median(hs[-4:]), np.median(vs[-4:])
-        if hf <= 0:
-            continue
-        k0 = next((i for i, h in enumerate(hs) if h > 0.3 * hf), None)
-        if k0 is None:
-            continue
-        rel = np.array(hs[k0:]) / hf
-        settle = next((i for i in range(len(rel)) if all(abs(r - 1) < 0.05 for r in rel[i:])), len(rel))
-        if rel[0] < 0.88 or rel.max() > 1.08:
-            ip = int(np.argmax(rel))
-            votes.append({"kind": "pop", "from": float(rel[0]), "peak": float(max(1.0, rel.max())),
-                          "t_peak_ms": int(ip * 1000 / fps), "ms": int(max(1, settle) * 1000 / fps)})
-        elif vs[k0] < 0.8 * vf:
-            up = next((i for i in range(k0, len(vs)) if vs[i] >= 0.95 * vf), len(vs))
-            votes.append({"kind": "fade", "ms": int(max(1, up - k0 + 1) * 1000 / fps)})
-        else:
-            votes.append({"kind": "none", "ms": 0})
+        v = reveal_of(*event_heights(short_path, base_path, ev, fps, size, look_frames), fps)
+        if v is not None:
+            votes.append(v)
     if not votes:
         return {"kind": "none", "ms": 0}
     kinds = [v["kind"] for v in votes]
@@ -676,6 +701,19 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
                 fss.append(100 * (ln["x1"] - ln["x0"]) / w100)
     fs = float(np.median(fss)) if fss else None
     good = [m for m in ms if m]
+    sizes = word_sizes(evs, ms)
+    if sizes and any(sizes):        # #124: the font size is the one of their normal words, not of a big one
+        fss2 = []
+        for i in sample_idx:
+            m = ms[i]
+            for ln in (m["lines"] if m else []):
+                sc = (sizes[i] or [1.0] * len(evs[i]["words"]))[ln["w0"]:ln["w1"]]
+                if len(ln["text"]) >= 3 and all(abs(x - 1) <= SIZE_TOL for x in sc):
+                    w100 = libass_width(entry, ln["text"], 100, track * 100, fonts_dir)
+                    if w100 > 0:
+                        fss2.append(100 * (ln["x1"] - ln["x0"]) / w100)
+        if fss2:
+            fs = float(np.median(fss2))
     lh0 = float(np.median([m["line_h"] for m in good]))
     pads = [m["box_pad"] for m in good if m.get("box_pad")
             and m["box_pad"][0] <= 1.2 * lh0 and m["box_pad"][1] <= 0.8 * lh0]
@@ -686,6 +724,7 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
     cy = float(np.median([m["cy"] for m in good]))
     cx = float(np.median([m["cx"] for m in good]))
     anim = animation(short_path, base_path, [evs[i] for i in sample_idx], fps, size)
+    anims = event_reveals(short_path, base_path, evs, fps, size, anim)
     crops = []
     for i in sample_idx[:4]:
         m = ms[i]
@@ -718,11 +757,45 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
           "box_pad": box, "dy": dy, "pos": pos,
           "font_score": round(score, 3), "track": track, "fs": fs, "spacing": None if fs is None else track * fs,
           "outline": outline, "line_h": line_h, "x": cx, "y": cy, "anim": anim, "colours": colours,
+          "sizes": sizes, "anims": anims,
           "llm": looks, "alternatives": [(round(s, 3), e[0], e[2], t) for s, e, t in ranked[1:4]]}
     C.log(f"style: {entry[0]}{' italic' if entry[2] else ''} (shape {score:.2f}, next "
           f"{', '.join(f'{e[0]} {s:.2f}' for s, e, _ in ranked[1:3])}), size {fs and round(fs)}, track {track}, "
-          f"outline {outline:.1f}px, anim {anim['kind']}")
+          f"outline {outline:.1f}px, anim {anim['kind']}, {sum(1 for x in sizes if x)} events with word sizes, "
+          f"{sum(1 for a in anims if a)} with their own reveal")
     return st
+
+
+SIZE_TOL = 0.12          # a word this much bigger / smaller than their normal words is sized on its own (#124)
+SIZE_RANGE = (0.4, 2.5)
+
+
+def word_sizes(evs, ms):
+    """Per event: each word's size relative to their normal words (letter height), or None when all are normal.
+    Only words in capitals count (lower-case letters have their own heights)."""
+    hs = [h for m in ms if m for h in m.get("heights") or [] if h]
+    if len(hs) < 3:
+        return [None] * len(evs)
+    ref = float(np.median(hs))
+    out = []
+    for ev, m in zip(evs, ms):
+        sc = []
+        for w, h in zip(ev["words"], (m or {}).get("heights") or [None] * len(ev["words"])):
+            caps = re.search(r"[A-Z0-9]", w["w"]) and not re.search(r"[a-z]", w["w"])
+            sc.append(round(float(np.clip(h / ref, *SIZE_RANGE)), 3) if (h and caps) else 1.0)
+        out.append(sc if any(abs(x - 1) > SIZE_TOL for x in sc) else None)
+    return out
+
+
+def event_reveals(short_path, base_path, evs, fps, size, anim, look_frames=14):
+    """Per event: how that caption came in when it differs from the Short's usual reveal (#124), else None.
+    Read at half size (heights are relative)."""
+    half = (size[0] // 2, int(round(size[1] / 2 / 2) * 2))
+    out = []
+    for ev in evs:
+        v = reveal_of(*event_heights(short_path, base_path, ev, fps, half, look_frames), fps)
+        out.append(None if v is None or same_reveal(v, anim) else v)
+    return out
 
 
 def with_font(st, alt_index, fonts_dir=None):

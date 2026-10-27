@@ -400,8 +400,8 @@ def _reveal(t1, anim, target_alpha="&H00&"):
     return tag
 
 
-def _styled_text(ev, colours, anim, layer, st):
-    """One caption line set: per word colour + reveal; layer = 'main' | 'shadow' | 'glow'."""
+def _styled_text(ev, colours, anim, layer, st, sizes=None):
+    """One caption line set: per word colour + size (#124) + reveal; layer = 'main' | 'shadow' | 'glow'."""
     llm = st.get("llm") or {}
     parts, i = [], 0
     for li, n in enumerate(ev.get("lines") or [len(ev["words"])]):
@@ -410,8 +410,10 @@ def _styled_text(ev, colours, anim, layer, st):
                 break
             w = ev["words"][i]
             c = _rgb_hex(colours[i] if i < len(colours) else w["c"])
+            k = sizes[i] if sizes and i < len(sizes) else 1.0
             i += 1
             t1 = max(0, int(round((w["t"] - ev["start"]) * 1000)))
+            fs = f"\\fs{float(st['fs']) * k:.1f}" if (abs(k - 1) > 1e-6 and st.get("fs")) else ""
             if layer == "main":
                 tag = f"\\c{ass_colour(c)}" + _reveal(t1, anim)
             elif layer == "glow":
@@ -424,7 +426,7 @@ def _styled_text(ev, colours, anim, layer, st):
                 tag = f"\\c{ass_colour(sc)}\\3c{ass_colour(sc)}" + _reveal(t1, anim, _ass_alpha(s.get("opacity", 0.8)))
             sep = "\\N" if (j == 0 and li > 0) else ("" if not parts else " ")
             text = w["w"].upper() if llm.get("case") == "upper" else w["w"]
-            parts.append(sep + "{" + tag + "}" + text.replace("{", "(").replace("}", ")"))
+            parts.append(sep + "{" + fs + tag + "}" + text.replace("{", "(").replace("}", ")"))
     return "".join(parts)
 
 
@@ -512,8 +514,11 @@ def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None, width=None
     outline = float(st.get("outline") or 0)
     pos = st.get("pos") or []
     moves = any(pos)          # style.build keeps per-caption places only when their captions follow the speaker
+    anims, sizes_all = st.get("anims") or [], st.get("sizes") or []
     for k, ev in enumerate(evs):
         cols = (st.get("colours") or [])[k] if k < len(st.get("colours") or []) else [w["c"] for w in ev["words"]]
+        an = (anims[k] if k < len(anims) else None) or anim          # this caption's own reveal (#124)
+        sz = None if pad else (sizes_all[k] if k < len(sizes_all) else None)   # word sizes; boxes keep one size
         cy = (st.get("y") or ev.get("y", 0.5)) * out_h
         x = (st.get("x") or 0.5) * out_w
         if moves:
@@ -527,13 +532,13 @@ def write_ass_style(evs, path, out_w, out_h, st, mark=None, dur=None, width=None
         if gl.get("present"):
             gb = max(1.0, float(gl.get("size", 0.25)) * lh)
             lines.append(f"Dialogue: 0,{s0},{s1},C,,0,0,0,,{{\\an5\\pos({x:.0f},{y:.0f})\\bord{outline + gb:.1f}"
-                         f"\\blur{gb * 0.7:.1f}\\shad0}}" + _styled_text(ev, cols, anim, "glow", st))
+                         f"\\blur{gb * 0.7:.1f}\\shad0}}" + _styled_text(ev, cols, an, "glow", st, sz))
         if sh.get("present"):
             dx, dy = float(sh.get("dx", 0.06)) * lh, float(sh.get("dy", 0.08)) * lh
             bl = float(sh.get("blur", 0.3)) * 0.25 * lh
             lines.append(f"Dialogue: 1,{s0},{s1},C,,0,0,0,,{{\\an5\\pos({x + dx:.0f},{y + dy:.0f})\\bord{outline:.1f}"
-                         f"\\blur{bl:.1f}\\shad0}}" + _styled_text(ev, cols, anim, "shadow", st))
+                         f"\\blur{bl:.1f}\\shad0}}" + _styled_text(ev, cols, an, "shadow", st, sz))
         lines.append(f"Dialogue: 2,{s0},{s1},C,,0,0,0,,{{\\an5\\pos({x:.0f},{y:.0f})\\shad0}}"
-                     + _styled_text(ev, cols, anim, "main", st))
+                     + _styled_text(ev, cols, an, "main", st, sz))
     Path(path).write_text(style_header(out_w, out_h, st) + "\n".join(lines) + "\n")
     return path
