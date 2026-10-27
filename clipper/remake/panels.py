@@ -26,7 +26,8 @@ PROBES = 16           # sample frames probed for a stack
 TOL = 0.05            # rectangles of two samples agree within this (share of width / height) per edge
 SNAP = 0.025          # an edge this close to the frame border is the border
 EDGE_S = 0.05         # inner edges are searched this far (share of the frame) around the coarse one
-SAME_PX = 3.0         # two crops are the same when they place the frame within this (section analysis px)
+SAME_PX = 12.0        # two crops are the same within this (section analysis px): one full frame mapped half by half
+                      # differs by a few px at the corners (lens, rolling shutter); a real second crop by far more
 HARD_JUMP = 4         # a secondary panel cuts a shot only on a jump this many times vmap.JUMP
 ERR_CAP = 60.0        # per-pixel error cap for the edge search (0-255)
 MERGE_TOL = 0.015     # two templates whose refined edges agree this closely are one layout
