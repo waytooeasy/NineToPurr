@@ -171,6 +171,16 @@ def test_gap_fill_finds_the_right_section_frame_under_motion_blur():
     assert c2 < c                                         # a wrong crop scores lower
 
 
+def test_frame_shift_moves_whole_short_frames_even_on_a_30_in_60_section():
+    # their 60 fps frames n map to a 30 fps stream stored at 60 fps: section frames 0,0,2,2,4,4... (duplicates)
+    vm = {"fps": 60.0, "frame_shift": 1, "frames": {str(n): [0, 2 * (n // 2)] for n in range(10)},
+          "sections": [{"fps": 60.0}]}
+    shot = {"seg": 0, "sec": 0, "off": 0.0}
+    # shift 1 = show what their next frame maps to (never m + 1, which would be the same frame or two frames on)
+    assert [render.sec_frame_index(vm, shot, n) for n in range(5)] == [0, 2, 2, 4, 4]
+    assert render.sec_frame_index({**vm, "frame_shift": 0}, shot, 3) == 2
+
+
 def test_to_out_converts_analysis_map_to_output_frame():
     # their 2160x2880, section 1920x1080; analysis map: their(540 wide) -> section(960 wide)
     M = [[0.75, 0, 200], [0, 0.75, 10]]

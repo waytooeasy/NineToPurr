@@ -24,12 +24,15 @@ def shot_at(vm, n):
 
 def sec_frame_index(vm, shot, n):
     """Section frame shown at output frame n (the map's own choice when it has one)."""
-    shift = int(vm.get("frame_shift", 0))        # measured on the rendered result (match.frame_shift)
+    # frame_shift (match.frame_shift on the rendered result) is in THEIR frames: our n + s showed their n, so frame n
+    # shows what n + s would. Adding it to the section index instead breaks on 30 fps streams stored at 60 fps
+    # (every other section frame a duplicate): one section frame is then 0 or 2 of their frames, never 1 (#121).
+    n = n + int(vm.get("frame_shift", 0))
     f = vm.get("frames", {}).get(str(n))
     if f is not None and f[0] == shot["seg"]:
-        return int(f[1]) + shift
+        return int(f[1])
     sec = vm["sections"][shot["sec"]]
-    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"])) + shift
+    return int(round((n / vm["fps"] + shot["off"]) * sec["fps"]))
 
 
 def compose(sec_img, vm, shot, n, size=None):
