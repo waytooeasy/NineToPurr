@@ -3,7 +3,7 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-27 13:30 UTC_
+_Last updated: 2026-10-27 13:00 UTC_
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
@@ -41,6 +41,15 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - **Edit the description of [GSiO8GujwEs](https://youtube.com/shorts/GSiO8GujwEs) in YouTube Studio:** delete the first line (`Remake of : "Jason And Ron…"`). The upload token only has the `youtube.upload` scope, so Claude can't edit it.
 - AdSense signup + W-8BEN.
 - Decision on YouTube footage (#64). Legit routes: Whop official clipping campaigns (send campaign links) or YouTube heat via the official API (#70).
+
+## HQ session playbook (Lucas 2026-10-27: precision/quality first, fewer and shorter sessions)
+- **One session = one issue** (`remake-precision` label: #121 lost frames, #122 shake/zoom+effects, #123 freeze/ramps,
+  #124 caption size/pop per word, #125 glow captions; #126 match % vs views). Medium thinking.
+- **Measure, don't guess:** sandbox on the VM, never the live engine: `/opt/clipper/work/idtest` (`repo2` = branch
+  checkout, `clip.db` copy, `recap.sh <short_id> <streamer> <published> pix "<channel>"` re-runs one Short;
+  `ab.sh <short_id>` makes the original|remake video). Example Shorts per issue are in each issue body.
+- **Keep output small:** grep the `[remake]` lines, look at one frame grid, not whole logs. Report before/after %.
+- Ship as a PR; Lucas merges; deploy = `git pull` on the VM (+ bot restart if `publisher/` changed).
 
 ## Next for Claude
 - **Ops (2026-10-27):** quality gate (picture ≥ 80 %, captions ≥ 70 %, env `REMAKE_MIN_*`) and Telegram health alerts (disk, cookies, failing/idle remakes) run every pipeline pass. Precision work is queued as GitHub issues (label `remake-precision`); add `agent` to one to start it.

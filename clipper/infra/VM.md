@@ -9,7 +9,7 @@ Source of truth for the box. Update this file when anything here changes. No sec
 | Size | — | 6 vCPU, 8 GB RAM, 80 GB disk (root LV only 38.5 GB, see "Open items") |
 | Created by | — | `New-PRMVM.ps1` on moon (`C:\Users\apollo11\Downloads`), auto-starts with Windows |
 | User | `apollo11` | `prm` (sudo needs a password) |
-| LAN IP | — | `192.168.100.123` (DHCP, can change) |
+| LAN IP | — | `192.168.100.125` since ~2026-10-25 (was .123; DHCP, changes) |
 | Tailscale IP | `100.75.233.34` | `100.73.94.67` (`tailscale up --ssh`) |
 | Remote in | RDP, SSH, WinRM (Tailscale + LAN only) | SSH |
 
@@ -71,9 +71,18 @@ The chat must be linked to moon in the Claude desktop app, with the `project` fo
   cp ~/mnt/project/.prm-ssh/id_ed25519 ~/k && chmod 600 ~/k
   ssh -i ~/k -o UserKnownHostsFile=$HOME/mnt/project/.prm-ssh/known_hosts prm@192.168.100.123 'cmd'
   ```
-  If the LAN IP changed, use `100.73.94.67` (Tailscale).
-
+  **Use the Tailscale IP `100.73.94.67` first** (the LAN IP changes; 2026-10-27 it moved to .125 and the old one
+  timed out, which looked like "VM down"). The stored known_hosts has no entry for the Tailscale IP: copy it and
+  accept the key once (same ED25519 key, `SHA256:RIr4jHn+cZMM/j6OdChT+fGr1EHjoJSYOKQrHblaf2w`):
+  ```bash
+  cp ~/mnt/project/.prm-ssh/known_hosts ~/kh
+  ssh -i ~/k -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/kh prm@100.73.94.67 'cmd'
+  ```
+- Heredocs (`ssh ... bash -s <<'EOF'`) for multi-line commands; ffmpeg inside them needs `-nostdin`.
+- Data inside `/opt/clipper/remake/<id>/` is written by root (the timer service): `prm` can't delete it, `sudo` needs
+  Lucas's password. Remake runs sweep their own media now.
 ### 2. `vm-shell` runner (any cloud session, no link to moon needed)
+- **2026-10-27: the runner was offline** (jobs stay `queued`). Check `actions.runner.waytooeasy-PRM.prm-vm.service` on the VM before relying on it.
 - Comment on issue **#58** (label `vm-shell`) as `waytooeasy`:
   ````
   /vm
