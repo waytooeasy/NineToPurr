@@ -30,10 +30,14 @@ SYNC_D = 3            # frames the video may sit off the audio map
 _sift = None
 
 
+def _one_thread():
+    cv2.setNumThreads(1)        # the pool is the parallelism: OpenCV's own threads per worker overload the VM
+
+
 def spawn_pool(n):
     """A worker pool started fresh, not forked: by the stack passes the parent has used OpenCV, and a fork of a
     process with OpenCV's threads running can hang its children forever (2026-10-27, Ludwig remake)."""
-    return mp.get_context("spawn").Pool(max(1, n))
+    return mp.get_context("spawn").Pool(max(1, n), initializer=_one_thread)
 
 
 def _feats(img):
