@@ -29,6 +29,7 @@ EDGE_S = 0.05         # inner edges are searched this far (share of the frame) a
 SAME_PX = 3.0         # two crops are the same when they place the frame within this (section analysis px)
 HARD_JUMP = 4         # a secondary panel cuts a shot only on a jump this many times vmap.JUMP
 ERR_CAP = 60.0        # per-pixel error cap for the edge search (0-255)
+MERGE_TOL = 0.015     # two templates whose refined edges agree this closely are one layout
 DENSE_N = 8000        # keypoints kept per section frame (a facecam corner keeps enough of its own)
 
 _dense = _masked = None
@@ -347,7 +348,9 @@ def templates(probes, asz):
             fill = None
         elif fill is None:                       # refined edges opened a gap: measure its colour
             fill = np.median(np.concatenate([p["col"][~cover] for p, _ in grp["members"]]), 0).tolist()
-        out.append({"rects": [_frac(r, AH, AW) for r in R], "fill": fill, "members": len(grp["members"])})
+        t = {"rects": [_frac(r, AH, AW) for r in R], "fill": fill, "members": len(grp["members"])}
+        if not any(_agree(t["rects"], o["rects"], MERGE_TOL) for o in out):   # refined to the same layout: one
+            out.append(t)
     return out
 
 
@@ -477,17 +480,16 @@ def _jump(a, b, sec_wh, f):
 
 def split_stack(frames, sec_wh):
     """frames: sorted [{'n', 'seg', 'tpl', 'p': [(k, cx, cy) | None per panel]}] -> runs split at cuts: another
-    template or footage, a jump of the main panel or a hard jump of another panel. Runs < MIN_SHOT_F dropped."""
+    template or footage, every panel jumping at once, or one panel jumping hard. Runs < MIN_SHOT_F dropped."""
     shots = []
     for f in frames:
         if shots:
             q = shots[-1][-1]
             cut = f["seg"] != q["seg"] or f["tpl"] != q["tpl"] or f["n"] - q["n"] > 6
-            if not cut:
-                for i, (a, b) in enumerate(zip(f["p"], q["p"])):
-                    if a is not None and b is not None and _jump(a, b, sec_wh, 1 if i == 0 else HARD_JUMP):
-                        cut = True
-                        break
+            if not cut:   # a cut moves every panel; one panel alone moving that much is a punch-in on it
+                both = [(a, b) for a, b in zip(f["p"], q["p"]) if a is not None and b is not None]
+                cut = bool(both) and (all(_jump(a, b, sec_wh, 1) for a, b in both)
+                                      or any(_jump(a, b, sec_wh, HARD_JUMP) for a, b in both))
             if not cut:
                 shots[-1].append(f)
                 continue

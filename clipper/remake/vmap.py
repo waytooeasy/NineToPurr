@@ -388,6 +388,8 @@ def build(short_path, sections, amap, out_w=1080, workers=WORKERS):
             for run in _single_runs(singles, set(st_frames)):
                 shots += single_shots(run, short_path, fps, sections, secp, amap, out_wh)
             stacked = len(st_frames)
+            hits = [sum(1 for r in recs if len(r[4]) > i and r[4][i] is not None) for i in range(3)]
+            C.log(f"stack: panels mapped on {hits[:max(len(t['rects']) for t in tpls)]} of {len(recs)} frames tried")
             C.log(f"stack: {len(tpls)} layout(s) " + "; ".join(
                 " | ".join("[" + ", ".join(f"{v:.3f}" for v in r) + "]" for r in t["rects"]) for t in tpls)
                 + f", {stacked} frames stacked")
