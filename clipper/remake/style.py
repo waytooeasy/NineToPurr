@@ -785,6 +785,7 @@ def measure_all(short_path, base_path, evs, fps, size, at=(0.4, 0.6, 0.85)):
             continue
         m = found[-1]
         m["colours"] = [vote_colour([x["colours"][i] for x in found]) for i in range(len(ev["words"]))]
+        m["heights"] = [steady([x["heights"][i] for x in found if x.get("heights")]) for i in range(len(ev["words"]))]
         out.append(m)
     return out
 
@@ -918,8 +919,19 @@ def build(short_path, base_path, evs, fps, out_w, out_h, vision=None, fonts_dir=
     return st
 
 
-SIZE_TOL = 0.12          # a word this much bigger / smaller than their normal words is sized on its own (#124)
-SIZE_RANGE = (0.4, 2.5)
+SIZE_TOL = 0.25          # a word this much bigger / smaller than their normal words is sized on its own (#124)
+SIZE_RANGE = (0.55, 2.2)  # outside this a "word height" is a mis-split line, not a size
+STEADY = 0.12            # a word's height must agree this closely on the frames it was measured on
+
+
+def steady(hs):
+    """A word's letter height when the frames agree on it (a pop still settling or a mis-split word don't)."""
+    hs = [h for h in hs if h]
+    if not hs:
+        return None
+    if len(hs) > 1 and max(hs) > (1 + STEADY) * min(hs):
+        return None
+    return int(np.median(hs))
 
 
 def word_sizes(evs, ms):
@@ -934,8 +946,9 @@ def word_sizes(evs, ms):
         sc = []
         for w, h in zip(ev["words"], (m or {}).get("heights") or [None] * len(ev["words"])):
             caps = re.search(r"[A-Z0-9]", w["w"]) and not re.search(r"[a-z]", w["w"])
-            sc.append(round(float(np.clip(h / ref, *SIZE_RANGE)), 3) if (h and caps) else 1.0)
-        out.append(sc if any(abs(x - 1) > SIZE_TOL for x in sc) else None)
+            r = h / ref if (h and caps) else 1.0
+            sc.append(round(float(r), 3) if (SIZE_RANGE[0] <= r <= SIZE_RANGE[1] and abs(r - 1) > SIZE_TOL) else 1.0)
+        out.append(sc if any(x != 1.0 for x in sc) else None)
     return out
 
 
