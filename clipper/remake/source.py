@@ -168,19 +168,28 @@ def recent_vods(tw, login, published, days=4):
     return sorted(out, key=lambda x: x["start"], reverse=True)
 
 
-def youtube_streams(handle, published, days=4, key=None, runner=subprocess.run, session=None):
+def youtube_streams(handle, published, days=4, key=None, session=None, uploads=30):
     """Past live streams of a YouTube channel that were live within `days` before `published` (newest first).
-    The channel's /streams tab via yt-dlp (one request), start/end times via the Data API (1 unit)."""
-    r = runner([C.ytdlp(), *yt_flags(), "--flat-playlist", "--playlist-end", "8", "--print", "%(id)s",
-                f"https://www.youtube.com/{handle}/streams"], capture_output=True, text=True, timeout=120)
-    ids = [x.strip() for x in (r.stdout or "").split() if re.fullmatch(r"[A-Za-z0-9_-]{11}", x.strip())]
+    Data API only (3 units: channel -> uploads playlist -> videos). The channel's /streams tab via yt-dlp came back
+    empty or hung from the VM (YouTube throttles the home IP, #64), so every IShowSpeed Short was skipped."""
     key = key or os.environ.get("YOUTUBE_API_KEY")
-    if not ids or not key:
+    if not key:
         return []
     import requests
     sess = session or requests
-    data = sess.get("https://www.googleapis.com/youtube/v3/videos", params={
-        "part": "liveStreamingDetails,contentDetails", "id": ",".join(ids), "key": key}, timeout=30).json()
+    api = "https://www.googleapis.com/youtube/v3/"
+    ch = sess.get(api + "channels", params={"part": "contentDetails", "forHandle": handle, "key": key},
+                  timeout=30).json().get("items") or []
+    if not ch:
+        return []
+    up = ch[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+    items = sess.get(api + "playlistItems", params={"part": "contentDetails", "playlistId": up,
+                                                    "maxResults": uploads, "key": key}, timeout=30).json().get("items") or []
+    ids = [i["contentDetails"]["videoId"] for i in items]
+    if not ids:
+        return []
+    data = sess.get(api + "videos", params={"part": "liveStreamingDetails", "id": ",".join(ids), "key": key},
+                    timeout=30).json()
     out = []
     for it in data.get("items", []):
         ls = it.get("liveStreamingDetails") or {}
