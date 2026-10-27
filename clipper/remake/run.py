@@ -34,7 +34,6 @@ RUN_BUDGET_S = int(os.environ.get("REMAKE_RUN_BUDGET_S", "2400"))   # start no n
 MEDIA = (".mp4", ".m4a", ".wav", ".webm", ".part", ".ts", ".ytdl")
 STALE_S = 2 * 3600
 VOD_CACHE_MAX = 8e9
-OUR_COLOURS = os.environ.get("REMAKE_OUR_COLOURS", "1") != "0"   # D62: caption word colours are ours (0 = theirs)
 MIN_MAPPED = 0.8          # share of the Short's frames found in the stream, else it is not a stream remake
 CAPTIONS_GOOD = 92.0      # caption match (%) that ends the search for a better caption look
 MIN_AUDIO = 0.4           # share of 0.8 s audio windows heard in the stream (their music bed hides the rest)
@@ -156,6 +155,9 @@ def _stage(work, name, fn):
     out = fn()
     C.save_json(f, out)
     return out
+
+
+OUR_COLOURS = os.environ.get("REMAKE_OUR_COLOURS", "1") != "0"   # D62: caption word colours are ours (0 = theirs)
 
 
 def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
