@@ -603,12 +603,13 @@ def _kick_client():
 
 
 def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams, partners=(), kicks=(),
-              kc=None):
+              kc=None, own=None):
     """VOD windows to search, best first: [(vod_id, login, start|None, end|None, search window|None)]. Known before
     any download, so a Short whose streamer has no stream VOD around it is skipped without fetching anything.
     The moment-match hint first, then the streamer's Twitch archives, YouTube live streams (IShowSpeed, Kai's
     YouTube channel), Kick streams (Adin Ross, N3on, ...), then partners' archives (streams the streamer's Shorts were
-    found in before, #131)."""
+    found in before, #131). With `own` (the ids of the streamer the Short is filed under), their streams go first
+    after the hint: an Adin Ross Short naming IShowSpeed spent its whole search budget on Speed's streams."""
     plans = []
     hint = moment_hint(con, short["id"])
     if hint:
@@ -645,6 +646,10 @@ def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtub
             C.log(f"kick streams for {slug}: {e}")
     if tw is not None:
         twitch([p for p in partners if p not in logins])
+    if own:
+        mine = {str(o).lower() for o in own}
+        k = 1 if hint else 0
+        plans[k:] = sorted(plans[k:], key=lambda p: str(p[1]).lower() not in mine)
     return plans
 
 
