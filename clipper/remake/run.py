@@ -113,11 +113,11 @@ def candidates(market_data, con, now=None, twitch_names=None):
 
 
 def twitch_watchlist_names(wl_path=None):
-    """Watchlist streamers whose streams we can rebuild from: Twitch archives or YouTube live streams."""
+    """Watchlist streamers whose streams we can rebuild from: Twitch archives, YouTube live streams, Kick streams."""
     import yaml
     cfg = yaml.safe_load(Path(wl_path or source.WATCHLIST).read_text()) or {}
     return {str(e["name"]) for e in cfg.get("streamers", [])
-            if e.get("platform") in ("twitch", "youtube") and not e.get("disabled")}
+            if e.get("platform") in ("twitch", "youtube", "kick") and not e.get("disabled")}
 
 
 def done_today(con, now=None):
@@ -151,13 +151,14 @@ def register(con, s, found, am, vm, cp, mp4, our_title):
     """Our remake becomes an edited clip (QC, visual check and Telegram take it from there)."""
     login = found["login"]
     yt = source.is_yt(found["vod_id"])
+    platform = source.platform_of(found["vod_id"])
     dur = vm["nfr"] / vm["fps"]
     secs = found["sections"]
     seg0 = am["segments"][0]
     vod_s = secs[seg0["sec"]]["vod_s"] + seg0["off"]
     con.execute("INSERT OR IGNORE INTO creators (name, main_platform, channel_url) VALUES (?, ?, ?)",
-                (login, "youtube" if yt else "twitch",
-                 f"https://www.youtube.com/{login}" if yt else f"https://twitch.tv/{login}"))
+                (login, platform, {"youtube": f"https://www.youtube.com/{login}", "kick": f"https://kick.com/{login}"}
+                 .get(platform, f"https://twitch.tv/{login}")))
     creator_id = con.execute("SELECT id FROM creators WHERE name=?", (login,)).fetchone()[0]
     url = source.vod_url(found["vod_id"]) + (f"&t={int(vod_s)}s" if yt else f"?t={int(vod_s)}s")
     con.execute("INSERT OR IGNORE INTO sources (creator_id, url, title, source_views) VALUES (?,?,?,?)",
@@ -325,11 +326,13 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         text = f"{s.get('title', '')} {s.get('desc', '')}"
         logins = source.twitch_logins([s.get("streamer", "")], text)
         handles = source.youtube_handles([s.get("streamer", "")], text)
+        kicks = source.kick_slugs([s.get("streamer", "")], text)
         partners = [] if (work / "found.json").exists() else source.partner_logins(con, tw, s.get("streamer", ""), logins)
         plans = [] if (work / "found.json").exists() else \
-            source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles, partners=partners)
+            source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles, partners=partners,
+                             kicks=kicks)
         if not plans and not (work / "found.json").exists():
-            who = ", ".join(logins + handles + partners) or s.get("streamer")
+            who = ", ".join(logins + handles + kicks + partners) or s.get("streamer")
             raise source.NotFound(f"no stream VOD of {who} around it")
         short_path = source.download_short(sid, work)
         found = _stage(work, "found", lambda: source.find({"id": sid, "published": s["published"]}, work, con=con,

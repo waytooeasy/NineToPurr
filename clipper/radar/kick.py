@@ -58,6 +58,12 @@ class Kick:
                 time.sleep(self.pause_s)
         return out
 
+    def get_videos(self, slug):
+        """The channel's past streams (and the live one), newest first: start_time (UTC), duration (ms), the HLS
+        master playlist in `source`, video.uuid. The remake engine searches them for a Short's moment."""
+        d = self._get(f"{slug}/videos")
+        return d if isinstance(d, list) else (d or {}).get("data") or []
+
     def is_live(self, slug):
         return bool((self._get(slug).get("livestream") or {}).get("is_live"))
 
