@@ -80,32 +80,40 @@ def p_found(s, rates):
     return pc.get((s.get("streamer"), s.get("channel")), ps.get(s.get("streamer"), base))
 
 
-def candidates(market_data, con, now=None, twitch_names=None):
+def candidates(market_data, con, now=None, twitch_names=None, trending=None):
     """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer,
-    p_found}]. Best = most views/hour times the chance its stream footage is found (found_rates)."""
+    p_found}]. Best = most views/hour times the chance its stream footage is found (found_rates). From the market scan
+    (watchlist streamers) and the trend scan (D65: whoever is trending, with their Twitch logins / Kick slugs)."""
     now = now or datetime.now(timezone.utc)
     # a 'working' row older than 2 h is a run that was killed (stop/timeout): it may be tried again
     tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped')"
                                        " OR (status='working' AND updated_at >= datetime('now','-2 hours'))"
                                        " OR attempts >= ?", (MAX_ATTEMPTS,))}
     out, seen = [], set()
+
+    def take(s, name):
+        sid = s.get("id")
+        if not sid or sid in seen or sid in tried or s.get("channel") == OUR_CHANNEL:
+            return
+        if not (MIN_DUR_S <= (s.get("dur") or 0) <= MAX_DUR_S) or s.get("en") is False:
+            return
+        try:
+            age_h = (now - _ts(s["published"])).total_seconds() / 3600
+        except (KeyError, ValueError):
+            return
+        if age_h > MAX_AGE_H or (s.get("vph") or 0) < MIN_VPH:
+            return
+        seen.add(sid)
+        out.append({**s, "streamer": name})
+
     for name, d in (market_data or {}).get("streamers", {}).items():
-        if twitch_names is not None and name not in twitch_names:
-            continue
-        for s in d.get("shorts", []):
-            sid = s.get("id")
-            if not sid or sid in seen or sid in tried or s.get("channel") == OUR_CHANNEL:
-                continue
-            if not (MIN_DUR_S <= (s.get("dur") or 0) <= MAX_DUR_S) or s.get("en") is False:
-                continue
-            try:
-                age_h = (now - _ts(s["published"])).total_seconds() / 3600
-            except (KeyError, ValueError):
-                continue
-            if age_h > MAX_AGE_H or (s.get("vph") or 0) < MIN_VPH:
-                continue
-            seen.add(sid)
-            out.append({**s, "streamer": name})
+        if twitch_names is None or name in twitch_names:
+            for s in d.get("shorts", []):
+                take(s, name)
+    for s in (trending or {}).get("shorts", []):
+        name = s.get("streamer")
+        if name and (s.get("logins") or s.get("kicks") or twitch_names is None or name in twitch_names):
+            take(s, name)
     rates = found_rates(con)
     for s in out:
         s["p_found"] = round(p_found(s, rates), 3)
@@ -120,9 +128,12 @@ def twitch_watchlist_names(wl_path=None):
             if e.get("platform") in ("twitch", "youtube", "kick") and not e.get("disabled")}
 
 
-def own_ids(streamer):
-    """The streamer's own Twitch logins, YouTube handles and Kick slugs (not the names in the title)."""
-    return source.twitch_logins([streamer]) + source.youtube_handles([streamer]) + source.kick_slugs([streamer])
+def own_ids(streamer, s=None):
+    """The streamer's own Twitch logins, YouTube handles and Kick slugs (not the names in the title); a trending
+    Short (D65) brings its own."""
+    s = s or {}
+    return list(dict.fromkeys(list(s.get("logins") or []) + source.twitch_logins([streamer]) + source.youtube_handles(
+        [streamer]) + list(s.get("kicks") or []) + source.kick_slugs([streamer])))
 
 
 def done_today(con, now=None):
@@ -329,13 +340,13 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
     _status(con, s, "working", last_error=None)
     try:
         text = f"{s.get('title', '')} {s.get('desc', '')}"
-        logins = source.twitch_logins([s.get("streamer", "")], text)
+        logins = list(dict.fromkeys(list(s.get("logins") or []) + source.twitch_logins([s.get("streamer", "")], text)))
         handles = source.youtube_handles([s.get("streamer", "")], text)
-        kicks = source.kick_slugs([s.get("streamer", "")], text)
+        kicks = list(dict.fromkeys(list(s.get("kicks") or []) + source.kick_slugs([s.get("streamer", "")], text)))
         partners = [] if (work / "found.json").exists() else source.partner_logins(con, tw, s.get("streamer", ""), logins)
         plans = [] if (work / "found.json").exists() else \
             source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles, partners=partners,
-                             kicks=kicks, own=own_ids(s.get("streamer", "")))
+                             kicks=kicks, own=own_ids(s.get("streamer", ""), s))
         if not plans and not (work / "found.json").exists():
             who = ", ".join(logins + handles + kicks + partners) or s.get("streamer")
             raise source.NotFound(f"no stream VOD of {who} around it")
@@ -453,7 +464,7 @@ def sweep(root=None, stale_s=STALE_S, now=None):
     return freed
 
 
-def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False):
+def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False, trending=None):
     """Remake up to `max_n` popping Shorts (or the one named). Returns {'done': [...], 'skipped': {...}, 'failed': {...}}."""
     res = {"done": [], "skipped": {}, "failed": {}}
     if short:
@@ -464,7 +475,10 @@ def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, 
         if market_data is None:
             from radar import market
             market_data = market.load()
-        picks = candidates(market_data, con, now, twitch_watchlist_names())
+        if trending is None:
+            from radar import trend
+            trending = trend.load()
+        picks = candidates(market_data, con, now, twitch_watchlist_names(), trending)
     if dry:
         for p in picks[:10]:
             print(f"{p['vph']:>8}/h {p.get('p_found', 0):>5.0%} {p['dur']:>3}s {p['streamer']:<14} {p['channel'][:22]:<22} "
@@ -515,6 +529,10 @@ def main(argv=None):
     if a.short:
         short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": a.channel,
                  "published": a.published or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        from radar import trend   # a trending Short (D65) brings who is in it: its logins / Kick slugs
+        t = next((x for x in (trend.load() or {}).get("shorts", []) if x.get("id") == a.short), None)
+        if t:
+            short = {**t, **{k: v for k, v in short.items() if v}}
     import fcntl
     with open(os.environ.get("CLIPPER_REMAKE_LOCK", LOCK), "w") as fh:
         try:
