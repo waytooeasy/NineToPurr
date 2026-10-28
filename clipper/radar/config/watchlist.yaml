@@ -28,7 +28,7 @@ streamers:
   - {name: Tminnzy, platform: twitch, id: tminnzy}
   - {name: ExtraEmily, platform: twitch, id: extraemily}
   - {name: Emiru, platform: twitch, id: emiru}
-  - {name: Esfand, platform: twitch, id: esfand}
+  - {name: Esfand, platform: twitch, id: esfandtv}   # his Twitch is esfandtv ('esfand' found no VODs)
   - {name: Erobb, platform: twitch, id: erobb221}
   - {name: Shroud, platform: twitch, id: shroud}
   - {name: Tarik, platform: twitch, id: tarik}

@@ -49,8 +49,40 @@ def _ts(s):
     return datetime.fromisoformat(str(s).replace("Z", "+00:00")).astimezone(timezone.utc)
 
 
+FOUND_PRIOR = 3.0         # tries' weight of the prior in the chance a Short's stream footage is found
+
+
+def found_rates(con):
+    """Chance that a Short's stream footage is found, from past tries: (by streamer, by (streamer, clipper channel),
+    overall). Found = done, or failed/skipped after the source was found. 2026-10-28: IShowSpeed 1 of 47, CaseOh 0 of
+    12, Kai Cenat 12 of 33, iboclips 6 of 6: most tries went to Shorts whose footage is in no stream we search."""
+    # a broken download (cookies, YouTube, timeouts) says nothing about the source: not a try
+    rows = con.execute(
+        "SELECT streamer, channel, CASE WHEN status = 'done' OR vod_id IS NOT NULL OR last_error NOT LIKE 'source:%'"
+        " THEN 1 ELSE 0 END FROM remakes WHERE (status = 'done' OR (status IN ('skipped', 'failed')"
+        " AND last_error IS NOT NULL AND last_error NOT LIKE '%cookie%' AND last_error NOT LIKE '%yt-dlp%'"
+        " AND last_error NOT LIKE '%bot check%' AND last_error NOT LIKE '%timed out%'))").fetchall()
+    n = len(rows)
+    base = (sum(r[2] for r in rows) + 1.0) / (n + 3.0)
+    tally = lambda key: {k: [0, 0] for k in {key(r) for r in rows}}   # noqa: E731
+    by_s, by_c = tally(lambda r: r[0]), tally(lambda r: (r[0], r[1]))
+    for r in rows:
+        for d, k in ((by_s, r[0]), (by_c, (r[0], r[1]))):
+            d[k][0] += r[2]
+            d[k][1] += 1
+    ps = {k: (f + FOUND_PRIOR * base) / (t + FOUND_PRIOR) for k, (f, t) in by_s.items()}
+    pc = {k: (f + FOUND_PRIOR * ps[k[0]]) / (t + FOUND_PRIOR) for k, (f, t) in by_c.items()}
+    return ps, pc, base
+
+
+def p_found(s, rates):
+    ps, pc, base = rates
+    return pc.get((s.get("streamer"), s.get("channel")), ps.get(s.get("streamer"), base))
+
+
 def candidates(market_data, con, now=None, twitch_names=None):
-    """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer}]."""
+    """Popping clipper Shorts not tried yet, best first: [{id, title, channel, views, vph, dur, published, streamer,
+    p_found}]. Best = most views/hour times the chance its stream footage is found (found_rates)."""
     now = now or datetime.now(timezone.utc)
     # a 'working' row older than 2 h is a run that was killed (stop/timeout): it may be tried again
     tried = {r[0] for r in con.execute("SELECT short_id FROM remakes WHERE status IN ('done','skipped')"
@@ -74,7 +106,10 @@ def candidates(market_data, con, now=None, twitch_names=None):
                 continue
             seen.add(sid)
             out.append({**s, "streamer": name})
-    return sorted(out, key=lambda s: -(s.get("vph") or 0))
+    rates = found_rates(con)
+    for s in out:
+        s["p_found"] = round(p_found(s, rates), 3)
+    return sorted(out, key=lambda s: -(s.get("vph") or 0) * s["p_found"])
 
 
 def twitch_watchlist_names(wl_path=None):
@@ -424,7 +459,8 @@ def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, 
         picks = candidates(market_data, con, now, twitch_watchlist_names())
     if dry:
         for p in picks[:10]:
-            print(f"{p['vph']:>8}/h {p['dur']:>3}s {p['streamer']:<14} {p['channel'][:22]:<22} {p['title'][:60]}")
+            print(f"{p['vph']:>8}/h {p.get('p_found', 0):>5.0%} {p['dur']:>3}s {p['streamer']:<14} {p['channel'][:22]:<22} "
+                  f"{p['title'][:60]}")
         return res
     if tw is None:
         try:
