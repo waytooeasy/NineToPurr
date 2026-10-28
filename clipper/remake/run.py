@@ -214,6 +214,7 @@ OUR_COLOURS = os.environ.get("REMAKE_OUR_COLOURS", "1") != "0"   # D62: caption 
 
 
 NO_CAPTIONS = "no captions: their text is in the stream"
+NO_CAPS_COVER = 0.08   # their own caption pixels on less of the Short than this: they added no captions
 
 
 def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
@@ -240,6 +241,20 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     pe = _stage(work, "pixcaps", lambda: {"events": style.pixel_events(short_path, base, fps, nfr, (OW, OH), y0,
                                                                          vision)})
     evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
+    dur = float(sp.get("dur") or nfr / fps)
+    cover = sum(max(0.0, e["end"] - e["start"]) for e in pe["events"]) / max(dur, 1e-6)
+    if evs is pe["events"] and cover < NO_CAPS_COVER:
+        # text their Short shows and our caption-free render doesn't: only flickers at cuts (Asmongold SoEIW3zI338,
+        # 70 of 2827 frames). The words OCR read are the stream's own (subtitles of the video he reacts to), and
+        # they're in our picture already: no captions of ours, judged on the picture (no caption rows to score)
+        C.log(f"captions: their own text covers {cover:.0%} of the Short: they added none, neither do we")
+        cand = work / "cand_0.mp4"
+        shutil.copyfile(base, cand)
+        m = match.score(short_path, cand, [], fps, nfr, OW, OH, base=base, colour_blind=OUR_COLOURS)
+        m.pop("per_frame", None)
+        C.log(f"captions '{NO_CAPTIONS}': {match.summary(m)}")
+        return {"path": cand, "match": m, "name": NO_CAPTIONS, "colours": "none",
+                "tried": [{"name": NO_CAPTIONS, **{x: m[x] for x in ("picture", "captions", "overall")}}]}
     st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
     known = load_channel_style(channel)
     if known and (not st.get("ok") or st.get("font_score", 0) < known.get("font_score", 0) - 0.1):
