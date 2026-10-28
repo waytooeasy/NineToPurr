@@ -529,6 +529,10 @@ def main(argv=None):
     if a.short:
         short = {"id": a.short, "streamer": a.streamer, "title": a.title, "channel": a.channel,
                  "published": a.published or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+        from radar import trend   # a trending Short (D65) brings who is in it: its logins / Kick slugs
+        t = next((x for x in (trend.load() or {}).get("shorts", []) if x.get("id") == a.short), None)
+        if t:
+            short = {**t, **{k: v for k, v in short.items() if v}}
     import fcntl
     with open(os.environ.get("CLIPPER_REMAKE_LOCK", LOCK), "w") as fh:
         try:
