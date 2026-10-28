@@ -678,7 +678,8 @@ def stack_shots(kind, tpls, amap, secp, short_wh, out_w, fps):
             if not have:
                 panels.append({"rect": rect, "path": None, "dt": None})
                 continue
-            sm = VM.smooth([[np.log(f["p"][i][0]), f["p"][i][1], f["p"][i][2]] for f in have])
+            sm = hold_if_still(VM.smooth([[np.log(f["p"][i][0]), f["p"][i][1], f["p"][i][2]] for f in have]),
+                               secp[run[0]["sec"]]["w"])
             dts = [f["dt"][i] for f in have]
             panels.append({"rect": rect, "dt": max(set(dts), key=lambda d: (dts.count(d), d is None)),
                            "path": {str(f["n"]): [float(np.exp(a)), float(b), float(c)]
@@ -695,6 +696,21 @@ def stack_shots(kind, tpls, amap, secp, short_wh, out_w, fps):
         s["panels"] = [p for p in s["panels"] if p["path"]]
         s["path"] = s["panels"][0]["path"]
     return shots, fmap
+
+
+HOLD_LOGK = 0.012   # a panel's zoom varying less than this (std of log scale) over a shot is noise
+HOLD_POS = 0.006    # ... and its centre less than this share of the stream's width
+
+
+def hold_if_still(path, sec_w):
+    """A panel whose crop only moves within estimation noise over the shot holds one crop (the median): clippers set
+    a stack panel's crop once. Short smoothing left it wobbling on a dark, low-texture video (clip 33, 2026-10-28)."""
+    p = np.asarray(path, np.float64)
+    if len(p) < 5:
+        return p
+    if p[:, 0].std() < HOLD_LOGK and p[:, 1].std() < HOLD_POS * sec_w and p[:, 2].std() < HOLD_POS * sec_w:
+        return np.repeat(np.median(p, 0)[None, :], len(p), 0)
+    return p
 
 
 def _borrow_paths(shots):

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import align, amap, caps, look, match, render, source, style, title, tune, vmap
+from . import align, amap, caps, clean, look, match, render, source, style, title, tune, vmap
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
@@ -414,6 +414,12 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         if m["picture"] < MIN_PICTURE or m["captions"] < MIN_CAPTIONS:   # only remakes close to theirs reach Lucas
             raise Unsupported(f"below the quality gate: picture {m['picture']:.0f}% (min {MIN_PICTURE:.0f}), "
                               f"captions {m['captions']:.0f}% (min {MIN_CAPTIONS:.0f})")
+        # what the match score can't see: a video played inside the stream (clip 33, 2026-10-28)
+        size = (270, int(round(270 * vm["out_h"] / vm["out_w"] / 2) * 2))
+        why = clean.judder(short_path, best["path"], vm["fps"], vm["nfr"], size) or \
+            clean.foreign_ui(short_path, best["path"], vm["nfr"] / vm["fps"], vision)
+        if why:
+            raise Unsupported(why)
         shutil.move(str(best["path"]), out)
         try:   # Lucas reviews every remake next to the original (2026-10-21)
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
