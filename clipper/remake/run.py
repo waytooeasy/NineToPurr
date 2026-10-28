@@ -491,7 +491,23 @@ def sweep(root=None, stale_s=STALE_S, now=None):
     return freed
 
 
-def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False, trending=None):
+def kick_pipeline(runner=None):
+    """Start the pipeline pass now (QC, visual check, Telegram), not at its next 20-min tick: a finished remake waited
+    up to 20 min for Lucas to see it (2026-10-28). No-op while a pass runs; outside systemd it just logs."""
+    if os.environ.get("REMAKE_KICK_PIPELINE", "1") == "0":
+        return
+    import subprocess
+    try:
+        r = (runner or subprocess.run)(["systemctl", "start", "--no-block", "clipper-pipeline.service"],
+                                       capture_output=True, text=True, timeout=20)
+        if getattr(r, "returncode", 0):
+            C.log(f"pipeline not started now: {(r.stderr or '').strip()[:120]}")
+    except Exception as e:  # noqa: BLE001 - the 20-min timer still picks it up
+        C.log(f"pipeline not started now: {e}")
+
+
+def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, dry=False, trending=None,
+        kick=kick_pipeline):
     """Remake up to `max_n` popping Shorts (or the one named). Returns {'done': [...], 'skipped': {...}, 'failed': {...}}."""
     res = {"done": [], "skipped": {}, "failed": {}}
     if short:
@@ -526,6 +542,7 @@ def run(con, out_dir, max_n=1, short=None, tw=None, market_data=None, now=None, 
             break
         try:
             res["done"].append(remake_one(con, s, out_dir, tw=tw))
+            kick()
         except source.BotCheck as e:   # every download would hit it now: stop, the timer tries again later
             res["failed"][s["id"]] = str(e)
             break
