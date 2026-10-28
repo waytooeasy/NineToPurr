@@ -88,9 +88,19 @@ def is_yt(vod_id):
     return str(vod_id).startswith("yt:")
 
 
+def is_kick(vod_id):
+    return str(vod_id).startswith("kick:")
+
+
 def vod_url(vod_id):
     v = str(vod_id)
+    if is_kick(v):
+        return f"https://kick.com/video/{v[5:]}"
     return f"https://www.youtube.com/watch?v={v[3:]}" if is_yt(v) else f"https://www.twitch.tv/videos/{v}"
+
+
+def platform_of(vod_id):
+    return "kick" if is_kick(vod_id) else "youtube" if is_yt(vod_id) else "twitch"
 
 
 def yt_flags():
@@ -116,6 +126,10 @@ def watchlist_ids(platform, names, text="", wl_path=None):
 
 def youtube_handles(names, text="", wl_path=None):
     return watchlist_ids("youtube", names, text, wl_path)
+
+
+def kick_slugs(names, text="", wl_path=None):
+    return watchlist_ids("kick", names, text, wl_path)
 
 
 def name_for(platform, ident, wl_path=None):
@@ -209,6 +223,73 @@ def youtube_streams(handle, published, days=4, key=None, session=None, uploads=3
     return sorted(out, key=lambda x: x["start"], reverse=True)
 
 
+_KICK_SRC = {}   # 'kick:<uuid>' -> the stream's master playlist, from Kick's video list (kick_vods)
+
+
+def kick_vods(kc, slug, published, days=4, now=None):
+    """Past streams of a Kick channel (and the one live now) that were live within `days` before `published`, newest
+    first. Kick's own channel JSON (radar.kick): its streams are AWS IVS HLS like Twitch's, and yt-dlp's Kick
+    extractor answers NOT_FOUND from the VM, so the playlists are read directly. Adin Ross, N3on, Clavicular, Ice
+    Poseidon and xQc's popping Shorts were never tried before (36 in one day's market file, 2026-10-28)."""
+    now = now or datetime.now(timezone.utc)
+    out = []
+    for v in kc.get_videos(slug) or []:
+        src, uuid = v.get("source"), (v.get("video") or {}).get("uuid")
+        if not src or not uuid or not v.get("start_time"):
+            continue
+        start = datetime.fromisoformat(str(v["start_time"]).replace(" ", "T")[:19]).replace(tzinfo=timezone.utc)
+        dur = (v.get("duration") or 0) / 1000.0
+        if v.get("is_live") or dur <= 0:      # live now: its playlist grows as it goes
+            dur = max(0.0, (now - start).total_seconds())
+        if start <= published and start + timedelta(seconds=dur) >= published - timedelta(days=days):
+            _KICK_SRC[f"kick:{uuid}"] = src
+            out.append({"id": f"kick:{uuid}", "login": slug, "start": start, "dur": dur})
+    return sorted(out, key=lambda x: x["start"], reverse=True)
+
+
+def kick_variant(vod_id, video=True, fetch=None):
+    """The media playlist of a Kick stream: the best ≤1080p one for video, the smallest for the audio search."""
+    from urllib.parse import urljoin
+    master = _KICK_SRC.get(str(vod_id))
+    if not master:
+        raise RuntimeError(f"{vod_id}: no playlist known (list the channel's videos first)")
+    text = (fetch or _http_text)(master)
+    lines = [ln.strip() for ln in text.splitlines()]
+    vs = []
+    for i, ln in enumerate(lines):
+        if ln.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines) and lines[i + 1] and not lines[i + 1].startswith("#"):
+            h = re.search(r"RESOLUTION=\d+x(\d+)", ln)
+            bw = re.search(r"BANDWIDTH=(\d+)", ln)
+            vs.append((int(h.group(1)) if h else 0, int(bw.group(1)) if bw else 0, urljoin(master, lines[i + 1])))
+    if not vs:
+        return master if "#EXTINF" in text else None
+    if video:
+        ok = [v for v in vs if v[0] <= 1080] or vs
+        return max(ok, key=lambda v: (v[0], v[1]))[2]
+    return min(vs, key=lambda v: v[1])[2]
+
+
+def _http_text(url):
+    import requests
+    from radar.kick import UA
+    r = requests.get(url, timeout=30, headers={"User-Agent": UA})
+    r.raise_for_status()
+    return r.text
+
+
+def _kick_audio(vod_id, out, start=None, end=None, runner=subprocess.run, fetch=None):
+    """A Kick stream's audio (all of it, or [start, end]) from its smallest rendition: Kick has no audio-only one."""
+    url = kick_variant(vod_id, video=False, fetch=fetch)
+    tmp = Path(out).with_name(Path(out).stem + ".part.mp4")
+    if start is None:   # yt-dlp's HLS downloader fetches fragments in parallel
+        runner([C.ytdlp(), "-N", str(FRAGMENTS), "-o", str(tmp), url], check=True, capture_output=True)
+    else:
+        _hls_section(url, start, end, tmp, runner, fetch)
+    runner(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", str(tmp), "-vn", "-c:a", "copy", str(out)],
+           check=True, capture_output=True)
+    tmp.unlink(missing_ok=True)
+
+
 def download_short(short_id, out_dir, runner=subprocess.run):
     out = Path(out_dir) / "short.mp4"
     if not out.exists():
@@ -245,6 +326,8 @@ def download_audio(vod_id, out, start=None, end=None):
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.unlink(missing_ok=True)
         out = cache
+    if not out.exists() and is_kick(vod_id):
+        _kick_audio(vod_id, out, start, end)
     if not out.exists():
         if is_yt(vod_id):
             cmd = [C.ytdlp(), *yt_flags(), "-N", str(FRAGMENTS), "-f", "ba[ext=m4a]/ba", "-o", str(out)]
@@ -305,15 +388,21 @@ def _twitch_section(vod_id, start, end, out, runner=subprocess.run, fetch=None):
     url = (r.stdout or "").strip().splitlines()[0] if r.returncode == 0 and (r.stdout or "").strip() else ""
     if not url.split("?")[0].endswith(".m3u8"):
         raise RuntimeError(f"no HLS playlist for VOD {vod_id}")
+    _hls_section(url, start, end, out, runner, fetch, label=f"VOD {vod_id}")
+
+
+def _hls_section(url, start, end, out, runner=subprocess.run, fetch=None, label=""):
+    """[start, end] of an HLS media playlist (Twitch or Kick, both AWS IVS) cut from only its own segments."""
+    out = Path(out)
     if fetch is None:
         import requests
         fetch = lambda u: requests.get(u, timeout=30).text   # noqa: E731
     win = hls_window(fetch(url), url, start, end)
     if win is None:
-        raise RuntimeError(f"VOD {vod_id} has no segments at {start:.0f}-{end:.0f} s")
+        raise RuntimeError(f"{label or url} has no segments at {start:.0f}-{end:.0f} s")
     text, off, muted = win
     if muted > MUTED_MAX:
-        raise Muted(f"stream muted there: Twitch removed the sound of VOD {vod_id} at {start:.0f}-{end:.0f} s")
+        raise Muted(f"stream muted there: Twitch removed the sound of {label} at {start:.0f}-{end:.0f} s")
     pl, tmp = out.with_suffix(".m3u8"), out.with_name(out.stem + ".part.mp4")
     pl.write_text(text)
     runner(["ffmpeg", "-nostdin", "-v", "error", "-y", "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
@@ -325,6 +414,8 @@ def _twitch_section(vod_id, start, end, out, runner=subprocess.run, fetch=None):
 
 def download_video(vod_id, start, end, out, runner=subprocess.run, fetch=None, audio_check=has_audio):
     out = Path(out)
+    if not out.exists() and is_kick(vod_id):   # no yt-dlp fallback: its Kick extractor fails from here
+        _hls_section(kick_variant(vod_id, video=True, fetch=fetch), start, end, out, runner, fetch, label=vod_id)
     if not out.exists():
         if not is_yt(vod_id):
             try:
@@ -506,11 +597,18 @@ def before_publish(start, dur, published):
     return (0.0, w1) if w1 > 0 else None
 
 
-def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams, partners=()):
+def _kick_client():
+    from radar.kick import Kick
+    return Kick()
+
+
+def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtube_streams, partners=(), kicks=(),
+              kc=None):
     """VOD windows to search, best first: [(vod_id, login, start|None, end|None, search window|None)]. Known before
     any download, so a Short whose streamer has no stream VOD around it is skipped without fetching anything.
     The moment-match hint first, then the streamer's Twitch archives, YouTube live streams (IShowSpeed, Kai's
-    YouTube channel), then partners' archives (streams the streamer's Shorts were found in before, #131)."""
+    YouTube channel), Kick streams (Adin Ross, N3on, ...), then partners' archives (streams the streamer's Shorts were
+    found in before, #131)."""
     plans = []
     hint = moment_hint(con, short["id"])
     if hint:
@@ -536,6 +634,15 @@ def plans_for(short, con=None, tw=None, logins=(), handles=(), yt_streams=youtub
                     plans.append((v["id"], handle, None, None, w))
         except Exception as e:  # noqa: BLE001 - yt-dlp / API hiccup: try the next
             C.log(f"youtube streams for {handle}: {e}")
+    for slug in kicks:
+        try:
+            kc = kc or _kick_client()
+            for v in kick_vods(kc, slug, published)[:MAX_VODS]:
+                w = before_publish(v["start"], v["dur"], published)
+                if w:
+                    plans.append((v["id"], slug, None, None, w))
+        except Exception as e:  # noqa: BLE001 - Kick blocked / hiccup: try the next
+            C.log(f"kick streams for {slug}: {e}")
     if tw is not None:
         twitch([p for p in partners if p not in logins])
     return plans
@@ -594,7 +701,7 @@ def find(short, work, con=None, tw=None, logins=(), plans=None, handles=(), budg
         for k, (a, b) in enumerate(sections_for(offs, dur)):
             f = download_video(vod_id, a, b, work / f"sec{k}_{vod_id}_{int(a)}_{int(b)}.mp4")
             secs.append({"file": str(f), "vod_s": a, "vod_e": b})
-        owner = name_for("youtube", login) if is_yt(vod_id) else login
-        return {"vod_id": vod_id, "login": login, "owner": owner, "platform": "youtube" if is_yt(vod_id) else "twitch",
+        owner = name_for(platform_of(vod_id), login) if not str(vod_id).isdigit() else login
+        return {"vod_id": vod_id, "login": login, "owner": owner, "platform": platform_of(vod_id),
                 "sections": secs, "hits": hits}
     raise NotFound(f"no VOD audio matches {short['id']} (tried {len(tried)}, {searched / 3600:.1f} h of stream searched)")
