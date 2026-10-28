@@ -35,6 +35,10 @@ class NotFound(RuntimeError):
     pass
 
 
+class Muted(NotFound):
+    """Twitch removed the stream's sound where the Short is (music): a remake needs the streamer's audio."""
+
+
 class BotCheck(RuntimeError):
     """YouTube asks the VM to sign in ('confirm you're not a bot'): try again later (or refresh the cookie file)."""
 
@@ -252,14 +256,92 @@ def download_audio(vod_id, out, start=None, end=None):
     return out
 
 
-def download_video(vod_id, start, end, out):
+MUTED_MAX = 0.5   # share of a section Twitch may have muted before the Short is skipped
+TWITCH_FMT = "b[height<=1080]/b"
+
+
+def hls_window(text, url, a, b, pad=1.0):
+    """The part of a Twitch VOD's HLS playlist that covers [a, b]: (playlist text with absolute URLs, where `a` is in
+    it, muted share). Twitch names the segments it muted '<n>-muted.ts|mp4'. None when nothing covers the window."""
+    from urllib.parse import urljoin
+    t, dur, init, written, first = 0.0, None, None, None, None
+    out, total, muted = ["#EXTM3U", "#EXT-X-VERSION:6", "#EXT-X-MEDIA-SEQUENCE:0"], 0.0, 0.0
+    target = 1
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("#EXT-X-MAP:"):
+            m = re.search(r'URI="([^"]+)"', line)
+            init = urljoin(url, m.group(1)) if m else None
+        elif line.startswith("#EXTINF:"):
+            dur = float(line[8:].split(",")[0])
+        elif line and not line.startswith("#") and dur is not None:
+            if t + dur > a - pad and t < b + pad:
+                first = t if first is None else first
+                if init and init != written:
+                    out.append(f'#EXT-X-MAP:URI="{init}"')
+                    written = init
+                out += [f"#EXTINF:{dur:.3f},", urljoin(url, line)]
+                total += dur
+                muted += dur if "-muted" in line.rsplit("/", 1)[-1] else 0.0
+                target = max(target, int(np.ceil(dur)))
+            t, dur = t + dur, None
+    if first is None:
+        return None
+    out.insert(2, f"#EXT-X-TARGETDURATION:{target}")
+    return "\n".join(out + ["#EXT-X-ENDLIST", ""]), a - first, muted / max(total, 1e-9)
+
+
+def has_audio(path):
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=index",
+                        "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+    return bool(r.stdout.strip())
+
+
+def _twitch_section(vod_id, start, end, out, runner=subprocess.run, fetch=None):
+    """Download [start, end] of a Twitch VOD from only the segments that cover it. yt-dlp's sections let ffmpeg read
+    the playlist from its first segment: minutes to reach an hour in, and on a stream whose start Twitch muted
+    (Plaqueboymax, 2026-10-28) the section came out with no sound track, so every remake of it crashed."""
+    r = runner([C.ytdlp(), "-g", "-f", TWITCH_FMT, vod_url(vod_id)], capture_output=True, text=True, timeout=120)
+    url = (r.stdout or "").strip().splitlines()[0] if r.returncode == 0 and (r.stdout or "").strip() else ""
+    if not url.split("?")[0].endswith(".m3u8"):
+        raise RuntimeError(f"no HLS playlist for VOD {vod_id}")
+    if fetch is None:
+        import requests
+        fetch = lambda u: requests.get(u, timeout=30).text   # noqa: E731
+    win = hls_window(fetch(url), url, start, end)
+    if win is None:
+        raise RuntimeError(f"VOD {vod_id} has no segments at {start:.0f}-{end:.0f} s")
+    text, off, muted = win
+    if muted > MUTED_MAX:
+        raise Muted(f"stream muted there: Twitch removed the sound of VOD {vod_id} at {start:.0f}-{end:.0f} s")
+    pl, tmp = out.with_suffix(".m3u8"), out.with_name(out.stem + ".part.mp4")
+    pl.write_text(text)
+    runner(["ffmpeg", "-nostdin", "-v", "error", "-y", "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
+            "-ss", f"{off:.3f}", "-i", str(pl), "-t", f"{end - start:.3f}", "-c", "copy", str(tmp)],
+           check=True, capture_output=True, timeout=900)
+    tmp.replace(out)
+    pl.unlink(missing_ok=True)
+
+
+def download_video(vod_id, start, end, out, runner=subprocess.run, fetch=None, audio_check=has_audio):
     out = Path(out)
     if not out.exists():
-        fmt = ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b"] if is_yt(vod_id) else ["-f", "b[height<=1080]/b"]
-        subprocess.run([C.ytdlp(), *(yt_flags() if is_yt(vod_id) else []), "-N", str(FRAGMENTS), *fmt,
-                        "--download-sections", f"*{int(start)}-{int(end + 0.999)}",
-                        "--merge-output-format", "mp4", "-o", str(out), vod_url(vod_id)],
-                       check=True, capture_output=True)
+        if not is_yt(vod_id):
+            try:
+                _twitch_section(vod_id, start, end, out, runner, fetch)
+            except Muted:
+                raise
+            except Exception as e:  # noqa: BLE001 - yt-dlp's own sections still work on most VODs
+                C.log(f"VOD {vod_id}: section from its segments failed ({str(e)[:160]}), yt-dlp sections instead")
+        if not out.exists():
+            fmt = ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b"] if is_yt(vod_id) else ["-f", TWITCH_FMT]
+            runner([C.ytdlp(), *(yt_flags() if is_yt(vod_id) else []), "-N", str(FRAGMENTS), *fmt,
+                    "--download-sections", f"*{int(start)}-{int(end + 0.999)}",
+                    "--merge-output-format", "mp4", "-o", str(out), vod_url(vod_id)],
+                   check=True, capture_output=True)
+    if not audio_check(out):
+        out.unlink(missing_ok=True)
+        raise Muted(f"VOD {vod_id} section {start:.0f}-{end:.0f} s came without its sound track")
     return out
 
 
