@@ -213,10 +213,17 @@ def _stage(work, name, fn):
 OUR_COLOURS = os.environ.get("REMAKE_OUR_COLOURS", "1") != "0"   # D62: caption word colours are ours (0 = theirs)
 
 
+NO_CAPTIONS = "no captions: their text is in the stream"
+NO_CAPS_COVER = 0.08   # their own caption pixels on less of the Short than this: they added no captions
+
+
 def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
                channel=""):
     """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
-    study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}."""
+    study look) and keep the one that matches their Short best (match.py). {'path', 'match', 'name', 'tried'}.
+    Last candidate: none at all. Some clippers add no captions and the text on screen is the stream's own (subtitles
+    of the video a streamer reacts to): it's already in our picture, and burning ours on top failed the gate
+    (Asmongold SoEIW3zI338, picture 96 %, captions 24 %, 2026-10-28)."""
     OW, OH, fps, nfr = vm["out_w"], vm["out_h"], vm["fps"], vm["nfr"]
     base = work / "base.mp4"
     if not base.exists():
@@ -234,6 +241,20 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     pe = _stage(work, "pixcaps", lambda: {"events": style.pixel_events(short_path, base, fps, nfr, (OW, OH), y0,
                                                                          vision)})
     evs = pe["events"] if len(pe["events"]) >= 0.5 * len(cp["events"]) else cp["events"]
+    dur = float(sp.get("dur") or nfr / fps)
+    cover = sum(max(0.0, e["end"] - e["start"]) for e in pe["events"]) / max(dur, 1e-6)
+    if evs is pe["events"] and cover < NO_CAPS_COVER:
+        # text their Short shows and our caption-free render doesn't: only flickers at cuts (Asmongold SoEIW3zI338,
+        # 70 of 2827 frames). The words OCR read are the stream's own (subtitles of the video he reacts to), and
+        # they're in our picture already: no captions of ours, judged on the picture (no caption rows to score)
+        C.log(f"captions: their own text covers {cover:.0%} of the Short: they added none, neither do we")
+        cand = work / "cand_0.mp4"
+        shutil.copyfile(base, cand)
+        m = match.score(short_path, cand, [], fps, nfr, OW, OH, base=base, colour_blind=OUR_COLOURS)
+        m.pop("per_frame", None)
+        C.log(f"captions '{NO_CAPTIONS}': {match.summary(m)}")
+        return {"path": cand, "match": m, "name": NO_CAPTIONS, "colours": "none",
+                "tried": [{"name": NO_CAPTIONS, **{x: m[x] for x in ("picture", "captions", "overall")}}]}
     st = _stage(work, "style", lambda: style.build(short_path, base, evs, fps, OW, OH, vision_style))
     known = load_channel_style(channel)
     if known and (not st.get("ok") or st.get("font_score", 0) < known.get("font_score", 0) - 0.1):
@@ -264,13 +285,17 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
 
     def score(k, name, s_, events=None):
         ass = work / f"cap_{k}.ass"
-        if s_ is not None:
+        if name == NO_CAPTIONS:
+            cand = work / f"cand_{k}.mp4"
+            shutil.copyfile(base, cand)
+        elif s_ is not None:
             caps.write_ass_style(evs_c, ass, OW, OH, {**s_, "colours": cols} if ours else s_, mark=mark,
                                  dur=sp["dur"])
+            cand = match.burn(base, ass, work / f"cand_{k}.mp4")
         else:
             caps.write_ass((ocr_c if events is not None and ours else events) or evs_c, ass, OW, OH, mark=mark,
                            dur=sp["dur"])
-        cand = match.burn(base, ass, work / f"cand_{k}.mp4")
+            cand = match.burn(base, ass, work / f"cand_{k}.mp4")
         m = match.score(short_path, cand, sevs, fps, nfr, OW, OH, line_h=st.get("line_h"), base=base,
                         colour_blind=ours)
         m.pop("per_frame", None)
@@ -285,6 +310,7 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     cands.append(("study look", None, None))
     if evs is not cp["events"]:      # the study look as first built: OCR words and timing (glow captions read best so)
         cands.append(("study look, OCR captions", None, cp["events"]))
+    cands.append((NO_CAPTIONS, None, None))
     tried, best = [], None
     for k, (name, s_, events) in enumerate(cands):
         if best and best["match"]["captions"] >= CAPTIONS_GOOD:
@@ -387,7 +413,8 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
             render.side_by_side(short_path, out, out.with_suffix(".sbs.mp4"))
         except Exception as e:  # noqa: BLE001 - the remake itself is fine without it
             C.log(f"side by side failed: {e}")
-        out.with_suffix(".json").write_text(json.dumps({"our_captions": True, "mode": "remake", "cut": 0.0,
+        out.with_suffix(".json").write_text(json.dumps({"our_captions": best["name"] != NO_CAPTIONS,
+                                                        "mode": "remake", "cut": 0.0,
                                                         "moving": False, "match": best["match"],
                                                         "caption_look": best["name"],
                                                         "caption_colours": best.get("colours", "theirs")}))
