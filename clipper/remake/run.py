@@ -217,6 +217,14 @@ NO_CAPTIONS = "no captions: their text is in the stream"
 NO_CAPS_COVER = 0.08   # their own caption pixels on less of the Short than this: they added no captions
 
 
+def mark_only(base, work, k, out_w, out_h, mark, dur):
+    """The caption-free remake with only our channel handle burnt in: it rides on the caption track, so a Short with
+    no captions came out without it and failed the visual check (clip 32, 2026-10-28)."""
+    ass = work / f"cap_{k}.ass"
+    caps.write_ass([], ass, out_w, out_h, mark=mark, dur=dur)
+    return match.burn(base, ass, work / f"cand_{k}.mp4")
+
+
 def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vision=caps.anthropic_vision,
                channel=""):
     """Render once without captions, then burn caption candidates (their measured look, the next-best fonts, the
@@ -248,8 +256,7 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
         # 70 of 2827 frames). The words OCR read are the stream's own (subtitles of the video he reacts to), and
         # they're in our picture already: no captions of ours, judged on the picture (no caption rows to score)
         C.log(f"captions: their own text covers {cover:.0%} of the Short: they added none, neither do we")
-        cand = work / "cand_0.mp4"
-        shutil.copyfile(base, cand)
+        cand = mark_only(base, work, 0, OW, OH, mark, dur)
         m = match.score(short_path, cand, [], fps, nfr, OW, OH, base=base, colour_blind=OUR_COLOURS)
         m.pop("per_frame", None)
         C.log(f"captions '{NO_CAPTIONS}': {match.summary(m)}")
@@ -286,8 +293,7 @@ def build_best(short_path, work, vm, am, lk, cp, sp, mark, vision_style=None, vi
     def score(k, name, s_, events=None):
         ass = work / f"cap_{k}.ass"
         if name == NO_CAPTIONS:
-            cand = work / f"cand_{k}.mp4"
-            shutil.copyfile(base, cand)
+            cand = mark_only(base, work, k, OW, OH, mark, sp["dur"])
         elif s_ is not None:
             caps.write_ass_style(evs_c, ass, OW, OH, {**s_, "colours": cols} if ours else s_, mark=mark,
                                  dur=sp["dur"])
