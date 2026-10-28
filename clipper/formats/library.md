@@ -1,41 +1,40 @@
-# Format Library (updated 2026-10-27)
+# Format Library (updated 2026-10-28)
+Use patterns only. Write original titles. Never copy or re-upload competitor videos.
 
-Copy the structure, not the content. Original cuts only.
+## Title formats (ranked by vph)
+1. {S} vs {guest/brand} GAUNTLET! (214k vph, event/crossover)
+2. {Game} {object} CHALLENGE! (179k vph, 29s, one mechanic)
+3. TEAM {S} {object} CHALLENGE! (88k vph)
+4. I spent {N} hours in {location}! (35k vph, 59s)
+5. {S}'s {thing} is crazy 💀💀 (33k vph, 23s)
+6. Imagine {doing X} and still losing TWICE 😭😭 (32k vph)
+7. {Person} is also a huge {S} fan ❤️‍🩹 #{S} (32k vph)
+8. No way {person} found him everywhere 😳 #{S} (27k vph)
+9. That {X} was NOT having it 💀💀 (23k vph)
+10. {S} was about to learn the real lesson 😳 #{S} (19k vph)
 
-## Hook templates (title)
-1. `{S} vs {creator/brand} gauntlet!` - event or collab, top performer (about 240k vph, official-channel scale)
-2. `Bro does it smoothly at the end 🥶 #{S}` - payoff tease, about 92k vph
-3. `{Person} was the real one for {S} ❤️‍🩹 #{S}` - wholesome side character, about 33k vph
-4. `{S}'s {quirk} is crazy 💀💀` - signature move or sound, about 35k vph
-5. `Imagine {X} and still losing TWICE 😭` - fail or irony, about 31k vph
-
-## Extra formats that work
-- Challenge: `Team {S} {thing} challenge!` (about 106k vph)
-- Time-box: `I spent {N} hours in {place}!` (about 50k vph)
-- Reaction or wholesome: `He couldn't stop smiling after watching this 😂` (about 18k vph)
-- Gag with a one-line caption, 16-30s (about 10-22k vph): `Bro was just making sure😂`, `Bro really caught a shark💀💀`
+## Style rules
+- Titles are short, lowercase-friendly, and end with 1-2 emoji (💀 😭 😳 😂 ❤️‍🩹).
+- Add #{streamer} on reaction/recap-style titles.
+- Open on the payoff or the twist within the first 2s.
+- Reaction titles with no streamer name also work ("bro was just making sure😂", ~11k vph). Use them as filler.
 
 ## Length
-- Story, payoff and event clips: 40-58s (46-60s bucket averages about 71k vph).
-- Pure gags: 16-30s is fine, but expect lower vph (about 18k).
-- Hook within the first 2s. Put the payoff in the last 5-10s and tease it in the title.
+- 16-30s for single-beat gags/challenges (best for a quick loop).
+- 46-60s for story or event clips.
+- 31-45s is weakest so far, so avoid the dead middle unless the clip needs it.
+- Evidence is thin (20 videos, outlier-driven).
 
-## Title style
-- Short, casual, 1-2 emoji (💀 😭 🥶 😳 ❤️‍🩹).
-- Add #{streamer} on recap-style uploads.
-- Name the person or moment, not the whole story.
-
-## Posting windows
-- Lead: 14:00 UTC (11:00 Asuncion).
-- Next: 16:00-18:00 UTC (13:00-15:00 Asuncion), then 12:00 UTC (09:00 Asuncion).
-- Test: 02:00 UTC (23:00 Asuncion).
+## Timing
+- 14:00 UTC (11:00 Asuncion) is the peak, but it reflects Speed's official release schedule.
+- Test 16:00-17:00 UTC (13:00-14:00 Asuncion) for our uploads.
 
 ## Streamer priority
-1. IShowSpeed
-2. CaseOh
-3. Kai Cenat
-4. Watch: YourRAGE (#yourrage rising, one channel)
+- IShowSpeed first, then CaseOh and Kai Cenat (merge the "Kai Cenat"/"kaicenat" duplicate).
 
-## Rules
-- Metadata only for competitor research. Never download or re-upload competitor videos.
-- Re-check each window against fresh data before changing the schedule. The sample is small and Speed-heavy.
+## Watchlist
+- #yourrage tag (1 channel, unproven).
+- Twitch ranking is all new, with no history yet.
+
+## Retired
+- None yet (library was empty).

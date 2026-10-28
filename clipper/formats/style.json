@@ -1,32 +1,32 @@
 {
-  "updated": "2026-10-27",
+  "updated": "2026-10-28",
   "sample": [
     "NDFE8W8wQ-Y",
+    "WJhWVD5zPQ8",
     "EkYXY7UeqTI",
-    "AmmDYr4HquA",
     "kNzT5aWaDgg",
-    "h602c51kG0s",
     "EGeUtjaRi-4",
-    "CRUtic_pytc",
-    "PomI_EZhtPM"
+    "qGQDl_3q2AE",
+    "PomI_EZhtPM",
+    "CRUtic_pytc"
   ],
   "seen": 4,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#00E5FF",
+    "highlight": "#FFD21F",
     "outline": "#000000",
-    "words": 2,
+    "words": 1,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#00E5FF",
+      "#FFD21F",
       "#FF2A2A",
-      "#7CFC00"
+      "#7CFF3A"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear on 4 of 10 thumbnails; styles vary, with colored emphasis words common."
+  "notes": "Captions appear in a few thumbnails; the Hour Six and Home Depot clips show none."
 }
