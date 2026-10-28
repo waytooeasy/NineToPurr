@@ -1,7 +1,7 @@
 """Checks a finished remake must pass that the match score can't see (2026-10-28, clip 33, Asmongold reacting to a
 TikTok): the clipper used the clean original video, we rebuilt from his stream, where it played in a browser.
-1. judder: a video played inside a stream comes out with uneven frames (34 % of ours repeated the previous one,
-   17 % of theirs) and the picture jumps; a remake much less smooth than theirs is skipped.
+1. judder: our crop of each stacked panel wobbled (noisy per-frame estimates on a dark, low-texture video) where
+   theirs held still; a remake that shakes much more than theirs is skipped.
 2. foreign_ui: the stream also showed the player's progress bar and TikTok's watermark, which theirs didn't have;
    a vision check on theirs | ours frames skips a remake that shows another app's logo or a video player's UI."""
 import json
@@ -13,43 +13,52 @@ import numpy as np
 
 from . import common as C
 
-REPEAT_MARGIN = 0.12   # our share of repeated frames may exceed theirs by this much
-JUMP_FACTOR = 2.0      # our picture jumps per second may be this many times theirs (+ JUMP_SLACK)
-JUMP_SLACK = 1.0
-JUMP_PX = 2.0          # a change of frame-to-frame motion above this (at 270 px wide) is a jump
-STILL = 0.3            # mean abs difference below this: the frame repeats the previous one
-CHUNK = 120
+FLIP_MARGIN = 8        # back-and-forth jitters ours may have more than theirs, per half of the frame
+ACCEL_FACTOR = 3.0     # our frame-to-frame motion change (p90) may be this many times theirs (+ ACCEL_SLACK)
+ACCEL_SLACK = 0.25
+FLIP_PX = 0.4          # a frame-to-frame shift this big (at 270 px wide) that reverses the last one: a jitter
+HALVES = ((0.05, 0.5), (0.55, 0.95))   # top and bottom: a stack's panels move on their own
+CHUNK = 150
 
 
-def smoothness(path, fps, nfr, size, reader=None):
-    """(share of frames that repeat the previous one, picture jumps per second)."""
+def shake(path, fps, nfr, size, reader=None):
+    """Per half of the frame: (back-and-forth jitters, p90 of frame-to-frame motion change in px)."""
     read = reader or C.read_frames
-    prev, prev_shift, n, rep, jumps = None, None, 0, 0, 0
+    prev, shifts = [None] * len(HALVES), [[] for _ in HALVES]
     for k in range(0, nfr, CHUNK):
         frames = read(path, k, min(CHUNK, nfr - k), fps, size)
         if len(frames) == 0:
             break
         for f in frames:
             g = (cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) if f.ndim == 3 else f).astype(np.float32)
-            if prev is not None:
-                n += 1
-                if float(np.abs(g - prev).mean()) < STILL:
-                    rep += 1
-                (dx, dy), _ = cv2.phaseCorrelate(prev, g)
-                if prev_shift is not None and abs(dx - prev_shift[0]) + abs(dy - prev_shift[1]) > JUMP_PX:
-                    jumps += 1
-                prev_shift = (dx, dy)
-            prev = g
-    return rep / max(n, 1), jumps / max(n / fps, 1e-6)
+            for j, (a, b) in enumerate(HALVES):
+                part = g[int(a * g.shape[0]):int(b * g.shape[0])]
+                if prev[j] is not None:
+                    (dx, dy), _ = cv2.phaseCorrelate(prev[j], part)
+                    shifts[j].append((dx, dy))
+                prev[j] = part
+    out = []
+    for sh in shifts:
+        s = np.array(sh) if sh else np.zeros((2, 2))
+        flips = int(((np.sign(s[1:, 0]) * np.sign(s[:-1, 0]) < 0) & (np.abs(s[1:, 0]) > FLIP_PX)
+                     & (np.abs(s[:-1, 0]) > FLIP_PX)).sum()
+                    + ((np.sign(s[1:, 1]) * np.sign(s[:-1, 1]) < 0) & (np.abs(s[1:, 1]) > FLIP_PX)
+                       & (np.abs(s[:-1, 1]) > FLIP_PX)).sum())
+        acc = np.hypot(*np.diff(s, axis=0).T) if len(s) > 2 else np.zeros(1)
+        out.append((flips, float(np.percentile(acc, 90))))
+    return out
 
 
 def judder(theirs, ours, fps, nfr, size, reader=None):
-    """Why ours is much less smooth than theirs, or None."""
-    t, o = smoothness(theirs, fps, nfr, size, reader), smoothness(ours, fps, nfr, size, reader)
-    C.log(f"smoothness: repeated frames {o[0]:.0%} (theirs {t[0]:.0%}), jumps {o[1]:.1f}/s (theirs {t[1]:.1f}/s)")
-    if o[0] > t[0] + REPEAT_MARGIN or o[1] > JUMP_FACTOR * t[1] + JUMP_SLACK:
-        return (f"judder: {o[0]:.0%} of our frames repeat (theirs {t[0]:.0%}), {o[1]:.1f} jumps/s (theirs "
-                f"{t[1]:.1f}/s): the stream showed a video in a player, they used the clean original")
+    """Why our picture wobbles where theirs holds still, or None. Clip 33: our crop of each stack panel jittered
+    (top: 20 back-and-forth shakes in 25 s, theirs 0; bottom: 10x their motion changes); clip 32 matched theirs."""
+    t, o = shake(theirs, fps, nfr, size, reader), shake(ours, fps, nfr, size, reader)
+    C.log("shake (ours vs theirs): " + ", ".join(f"{n} {oo[0]} vs {tt[0]} jitters, {oo[1]:.2f} vs {tt[1]:.2f} px"
+                                                  for n, oo, tt in zip(("top", "bottom"), o, t)))
+    for name, (of, oa), (tf, ta) in zip(("top", "bottom"), o, t):
+        if of >= tf + FLIP_MARGIN or oa > ACCEL_FACTOR * ta + ACCEL_SLACK:
+            return (f"judder: the {name} of ours shakes ({of} jitters, motion change {oa:.2f} px) where theirs holds "
+                    f"({tf}, {ta:.2f} px)")
     return None
 
 
