@@ -89,3 +89,17 @@ def test_kick_slugs_come_from_the_watchlist(tmp_path):
                   "  - {name: Jynxzi, platform: twitch, id: jynxzi}\n")
     assert source.kick_slugs(["Adin Ross"], "", wl) == ["adinross"]
     assert source.kick_slugs(["Jynxzi"], "adin ross and jynxzi", wl) == ["adinross"]
+
+
+def test_the_filed_streamers_own_streams_come_before_the_names_in_the_title():
+    class Tw:
+        def broadcaster_id(self, login):
+            return login
+
+        def _get(self, path, params):
+            return {"data": [{"id": "111", "created_at": "2026-10-27T00:00:00Z", "duration": "3h0m0s"}]}
+
+    plans = source.plans_for({"id": "s", "published": "2026-10-27T12:00:00Z"}, None, Tw(), ["ishowspeed"],
+                             ["@IShowSpeed"], yt_streams=lambda h, p: [], kicks=["adinross"], kc=Kc(),
+                             own=["adinross"])
+    assert [p[1] for p in plans] == ["adinross", "ishowspeed"]

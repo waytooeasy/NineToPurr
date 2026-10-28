@@ -120,6 +120,11 @@ def twitch_watchlist_names(wl_path=None):
             if e.get("platform") in ("twitch", "youtube", "kick") and not e.get("disabled")}
 
 
+def own_ids(streamer):
+    """The streamer's own Twitch logins, YouTube handles and Kick slugs (not the names in the title)."""
+    return source.twitch_logins([streamer]) + source.youtube_handles([streamer]) + source.kick_slugs([streamer])
+
+
 def done_today(con, now=None):
     now = now or datetime.now(timezone.utc)
     return con.execute("SELECT COUNT(*) FROM remakes WHERE status='done' AND date(updated_at)=?",
@@ -330,7 +335,7 @@ def remake_one(con, s, out_dir, tw=None, vision=caps.anthropic_vision, ask=title
         partners = [] if (work / "found.json").exists() else source.partner_logins(con, tw, s.get("streamer", ""), logins)
         plans = [] if (work / "found.json").exists() else \
             source.plans_for({"id": sid, "published": s["published"]}, con, tw, logins, handles, partners=partners,
-                             kicks=kicks)
+                             kicks=kicks, own=own_ids(s.get("streamer", "")))
         if not plans and not (work / "found.json").exists():
             who = ", ".join(logins + handles + kicks + partners) or s.get("streamer")
             raise source.NotFound(f"no stream VOD of {who} around it")
