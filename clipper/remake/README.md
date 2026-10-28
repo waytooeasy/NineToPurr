@@ -28,6 +28,7 @@ the normal flow as an `edited` clip: QC → visual check → Telegram ✅ Post.
 | render | `render.render` | frames composed at their aspect (1080 wide) and fps, look + per-frame effects applied, stream audio crossfaded at their switch points, our own boom only on isolated bass hits (never a music bed) |
 | match | `match.score` | per frame vs their Short: picture (outside the caption rows) and captions (our caption error vs their caption's own pixels); % of matching frames + the worst stretches. In the render sidecar json and in Telegram ("📐 match vs original") |
 | title | `title.make` | Haiku: same hook, their names, never their wording |
+| hand-off | `run.kick_pipeline` | right after a Short is made, `systemctl start --no-block clipper-pipeline.service`: QC, the visual check and Telegram run now instead of at the next 20-min pass (`REMAKE_KICK_PIPELINE=0` turns it off) |
 | register | `run.register` | creators/sources/clips (`edited`, `caption_style='remake'`, `music_risk=0`, no `context_line`: it is the public description, so the clipper is never named there) + radar_candidates (`source='remake'`). Telegram shows the source Short from `remakes` |
 
 Stages are cached as JSON in the work dir (`$CLIPPER_REMAKE/<short id>/`): a re-run after a fix redoes only what
