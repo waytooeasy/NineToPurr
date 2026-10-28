@@ -64,8 +64,11 @@ def score(theirs, ours, evs, fps, nfr, out_w, out_h, y=None, line_h=None, base=N
             pic = float(d[~rows].mean()) if (~rows).any() else 0.0
             if colour_blind and z is not None and i < len(z):
                 Z = blur(z[i])
-                ta = np.abs(A - Z).max(2)[rows] > STRONG          # their caption's pixels (fill + outline)
-                tb = np.abs(B - Z).max(2)[rows] > STRONG          # ours
+                # their caption's pixels (fill + outline) and ours: what the caption-free base doesn't show within
+                # 1 px. Text that is in the stream itself (subtitles of a video the streamer reacts to) is in the base
+                # too; compared pixel for pixel its edges counted as their captions (Asmongold, 2026-10-28)
+                ta = shifted_min(A, Z, rows) > STRONG
+                tb = shifted_min(B, Z, rows) > STRONG
                 err, theirs_px = text_xor(ta, tb, int(rows.sum())), int(ta.sum())
                 pf.append((pic, float(err / max(theirs_px, 0.02 * rows.sum() * W))))
                 continue
