@@ -22,7 +22,7 @@ from . import align, amap, caps, look, match, render, source, style, title, tune
 from . import common as C
 
 OUR_CHANNEL = "Peakz Recaps"
-MAX_AGE_H = 36            # popping now: published in the last 36 h
+MAX_AGE_H = int(os.environ.get("REMAKE_MAX_AGE_H", "48"))   # popping now: published in the last 48 h (D64; was 36), all the market scan keeps
 MAX_DUR_S = 60            # market length (D36)
 MIN_DUR_S = 8
 MIN_VPH = 1500            # views/hour to count as popping
