@@ -15,6 +15,15 @@ names them (nicknames included; never add a name their title does not use), at m
 wording: reorder, swap words, say it your own way. No hashtags, no quotes, nothing the clip does not show.
 {extra}Reply with the title only."""
 
+FRESH = """You write YouTube Shorts titles for a streamer-clips channel.
+Whose stream the footage is from: {streamer}. What happens in the clip (captions): {captions}
+Write a punchy title for this clip, at most {max_len} characters, English, at most one emoji. Name only {streamer} if you
+name anyone. No hashtags, no quotes, nothing the clip does not show. Reply with the title only."""
+
+# last resort when the model keeps echoing theirs: ours, never theirs (2026-10-28, clip 33 went out as "What A Surprise 😭")
+FALLBACKS = ("{s} Was Not Ready For This 😭", "{s} Can't Believe What Just Happened", "This Caught {s} Off Guard 😭",
+             "{s}'s Reaction Says It All", "Nobody Expected This From {s} 😭")
+
 
 def anthropic_ask(prompt):
     import anthropic  # lazy
@@ -75,4 +84,15 @@ def make(theirs, streamer, captions="", ask=anthropic_ask, names=()):
             best = best or t
         extra = (f'Your last try "{t}" named {", ".join(bad)}, who is not in this clip. ' if bad else
                  f'Your last try "{t}" was too close to theirs: change the wording more. ')
-    return best if best and not too_close(best, theirs) else theirs[:MAX_LEN]
+    if best and not too_close(best, theirs):
+        return best
+    # A short title ("What A Surprise 😭") has few words to reword: every try stayed too close. Write one from the
+    # clip itself without showing theirs, then a fixed one with the streamer's name. Never their title.
+    t = clean(ask(FRESH.format(streamer=streamer, captions=captions or "-", max_len=MAX_LEN)))
+    if t and not refused(t) and not too_close(t, theirs) and not wrong_names(t, theirs, streamer, names):
+        return t
+    for f in FALLBACKS[sum(map(ord, theirs)) % len(FALLBACKS):] + FALLBACKS:
+        t = f.format(s=streamer or "Streamer")[:MAX_LEN]
+        if not too_close(t, theirs):
+            return t
+    return f"{streamer or 'Streamer'} Clip"[:MAX_LEN]

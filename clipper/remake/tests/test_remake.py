@@ -341,6 +341,16 @@ def test_title_is_ours_never_theirs():
     assert title.clean('"Hello #fyp"\nmore') == "Hello"
 
 
+def test_a_short_title_the_model_keeps_echoing_is_never_used_as_ours():
+    theirs = "What A Surprise 😭"
+    echo = lambda p: "What a Surprise! 😭"                           # noqa: E731 - every try too close
+    t = title.make(theirs, "Asmongold", "you make an appointment", ask=echo)
+    assert t and not title.too_close(t, theirs) and "Asmongold" in t   # clip 33, 2026-10-28
+    fresh = iter(["What a Surprise 😭"] * 3 + ["Asmongold Reacts To A Jail Without Trials"])
+    t = title.make(theirs, "Asmongold", "jail", ask=lambda p: next(fresh))
+    assert t == "Asmongold Reacts To A Jail Without Trials"
+
+
 # ---------------- picking + registering ----------------
 MARKET = {"streamers": {
     "Stable Ronaldo": {"shorts": [
