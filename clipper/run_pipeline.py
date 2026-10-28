@@ -159,6 +159,26 @@ def market_step(now=None, key=None, con=None):
     return f"scanned {len(data['streamers'])} streamers"
 
 
+def trend_step(now=None, key=None, tw=None):
+    """Trend scan (radar/trend.py, D65) every EVERY_H hours: popping stream Shorts found without a streamer list,
+    with who is in them; the remake engine tries them like the market's (Lucas: "we follow what's trending")."""
+    from radar import trend
+    now = now or datetime.now(timezone.utc)
+    key = key or os.environ.get("YOUTUBE_API_KEY")
+    if not trend.due(now=now):
+        return "fresh"
+    if not key:
+        return "skipped: no YOUTUBE_API_KEY"
+    if tw is None:
+        try:
+            from radar.twitch import Twitch
+            tw = Twitch()
+        except Exception as e:  # noqa: BLE001 - without Twitch only watchlist names and kick links identify
+            print(f"[trend] no Twitch client: {e}", file=sys.stderr)
+    data = trend.write(trend.scan(key, tw=tw, now=now))
+    return f"{len(data['shorts'])} popping with a streamer of {data['found']} found"
+
+
 def styles_step(now=None, vision=None, grab=None, con=None):
     """Per-streamer market look and layout (editor/streamer_style.py, D49, D56): after a new market scan, at most
     daily; the streamers with the most demand plus every streamer Radar posts (`match_streamers`, needs `con`)."""
@@ -537,6 +557,7 @@ def run_pass(con, steps=None):
         "formats": refresh_formats,
         "metrics": lambda: metrics_step(con),
         "market": lambda: market_step(con=con),   # daily + 6-h refresh: what's popping on Shorts (D48, D54)
+        "trend": lambda: trend_step(),   # every 6 h: what's trending beyond the watchlist (D65)
         "styles": lambda: styles_step(con=con),   # daily: each streamer's popping look and layout (D49, D56)
         "match": lambda: match_step(con),      # per market scan: the clippers' popping moments (D54)
         "radar": lambda: radar_step(con, pace=True) if own_cuts() else "off: remakes only (D60)",
