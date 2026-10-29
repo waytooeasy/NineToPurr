@@ -9,7 +9,8 @@ We reuse what exists (S8): same Google Cloud project, YouTube API key, upload to
 | 3 | **Rename the channel** | YouTube Studio → Customization: name **Nine to Purr**, handle **@NineToPurr**, description below. Picture and banner come after the character picks | 3 min |
 | 4 | **Gemini key** | aistudio.google.com → Get API key → Create API key → pick the **existing** Google Cloud project (the one with the YouTube API). On the VM paste:<br>`read -rs -p "Gemini key: " K && echo "GEMINI_API_KEY=$K" >> /opt/clipper/.env && unset K && echo saved`<br>(input stays hidden and out of shell history) | 5 min |
 | 5 | **$30 credit** | aistudio.google.com → Billing → set up billing on that project → buy **$30** prepaid credit (min $5; lasts 12 months; non-refundable). The $300 Google Cloud trial doesn't cover the Gemini API | 5 min |
-| 6 | **Merge** | The plan PR on GitHub (and close #152, it's included) | 1 min |
+| 6 | **Merge** | The plan PR #153 on GitHub (and close #152, it's included) | 1 min |
+| 6b | **Rename the repo** | GitHub → waytooeasy/PRM → Settings → General → Repository name: **ninetopurr** → Rename. (Claude can't: the proxy blocks settings changes.) Old links, `git pull` on the VM and the VM shell keep working through GitHub's redirect; HQ checks the runner after | 1 min |
 | 7 | Optional | BotFather → `/setname` → "Nine to Purr" (the bot keeps its username) · GitHub repo → Settings → Variables → `AGENTS_PAUSED=true` (stops the clipper's daily Trend Scout until Studio build issues start) | 3 min |
 | 8 | Still open | AdSense + W-8BEN (needed before any payout) · Anthropic Console spend limit on | 10 min |
 
