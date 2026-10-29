@@ -4,7 +4,7 @@
 
 _Last updated: 2026-10-29 (go for Nine to Purr)_
 
-> **2026-10-29 19:35 UTC: clipper paused (D67).** HQ set `REMAKES_PER_DAY=0` in `/opt/clipper/.env`: remake runs exit at once (no downloads, no API spend). Lucas disables `clipper-remake.timer`, `clipper-pipeline.timer`, `clipper-upload.timer` and `clipper-approve-bot.service` (Studio setup step 1, needs sudo). The channel is renamed **Nine to Purr** (@NineToPurr) after its Shorts are deleted (Studio S8). One clip sat in `qc_passed`; it never uploads with the upload timer off. Everything below is the state before the pause. Restart only on an HQ decision with new data.
+> **2026-10-29 19:35 UTC: clipper paused (D67).** HQ set `REMAKES_PER_DAY=0` in `/opt/clipper/.env`: remake runs exit at once (no downloads, no API spend). Lucas disabled `clipper-remake.timer`, `clipper-pipeline.timer`, `clipper-upload.timer` and `clipper-approve-bot.service` the same day (checked 20:20 UTC: all disabled, inactive). The channel's Shorts were deleted and it is now **Nine to Purr** (@ninetopurr) (Studio S8). One clip sat in `qc_passed`; it never uploads with the upload timer off. Everything below is the state before the pause. Restart only on an HQ decision with new data.
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
