@@ -32,7 +32,7 @@ Side states: `needs_retake` (a shot failed QC; retakes left), `needs_human` (ret
 | [`room/`](../room/) | Premises, then script + storyboard + title for the picked one | Claude Sonnet 5.5, bible prompt-cached | 08:00 + on pick | cents/day |
 | [`generator/`](../generator/) | Character refs; shots via Omni; spend ledger and budget guard | Gemini API (Nano Banana, Omni) | on pick | ~$2.40–3/episode |
 | [`assembler/`](../assembler/) | Concat, on-screen text, sound mix, upscale | ffmpeg + the clipper's caption renderer | per episode | $0 |
-| [`qc/`](../qc/) | Shot checks and final checks ([`QC.md`](QC.md)) | rules + Claude Haiku 5.5 on frames + Gemini 3.8 Flash watching the file | per shot / episode | ~$0.02 |
+| [`qc/`](../qc/) | Shot checks and final checks ([`QC.md`](QC.md)) | rules + Gemini 3.8 Flash watching the file | per shot / episode | ~$0.01–0.02 |
 | [`publisher/`](../publisher/) | Telegram bot (pick, approve, retake, stop) + YouTube upload | the clipper's uploader and bot pattern, new token and bot | always on / every 15 min | $0 |
 | [`analyst/`](../analyst/) | Stats, analytics, made-for-kids watch, recap, weekly learn | the clipper's metrics puller + Sonnet weekly | hourly / 6 h / weekly | cents |
 | [`db/`](../db/) | Schema and migrations ([`DATA.md`](DATA.md)) | SQLite | — | — |

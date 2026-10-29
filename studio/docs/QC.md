@@ -2,10 +2,8 @@
 
 Lucas's bar (Oct 28–29): no stuttery edits, no bad frames, colours right, nothing cheap-looking. QC runs before he ever sees a Short. Every glitch he catches becomes a new automatic check (regression list at the bottom), same rule as the clipper's D47.
 
-**Two independent checkers (S7):** Claude Haiku 5.5 reads dense still frames (2 per second) for picture problems, reusing the clipper's D47 visual check; Gemini 3.8 Flash watches the moving video with sound for what stills can't show (stutter, morphs, flicker, audio, timing). A Short passes only when both pass. About a cent per Short each.
-
 ## 1. Shot checks (after each Omni shot)
-Claude Haiku gets the shot's frames with the character refs and the prompt (picture checks); Gemini watches the shot itself (motion checks). Both answer in JSON.
+Gemini 3.8 Flash watches the shot with the character refs and the shot's prompt, and answers in JSON.
 
 | Check | Pass |
 |---|---|

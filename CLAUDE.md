@@ -7,7 +7,7 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 ## Studio (design only, 2026-10-29)
 - Original AI character Shorts on a new channel: a recurring animal cast living adult human life, playing whatever format is popping in AI Shorts today. **Copy formats, never content (S2).**
 - **No Studio code and no spend until Lucas says go (S1).** Until then only HQ edits `studio/`.
-- Separate stack on the same VM: `/opt/studio`, own Google Cloud project, channel, Telegram bot, budget cap (S3). Tools: **Claude first** for all writing and thinking (Sonnet 5.5) and picture QC on frames (Haiku 5.5); Gemini only where Claude can't: Omni 1.1 Flash (video), Nano Banana 2 Lite (refs), TTS (voice), 3.8 Flash (watching Shorts, motion/sound QC) (S4, S7). Format rules: `.claude/skills/studio-format`.
+- Separate stack on the same VM: `/opt/studio`, own Google Cloud project, channel, Telegram bot, budget cap (S3). Tools: Gemini Omni 1.1 Flash (video), Nano Banana 2 Lite (refs), Gemini 3.8 Flash (watching Shorts, QC), Claude Sonnet 5.5 (writing) (S4). Format rules: `.claude/skills/studio-format`.
 
 ## Clipper (active)
 - One YouTube Shorts channel, multi-streamer brand; the Heat Index picks streamers daily. No ties to streamers. Paid by YouTube Shorts ads.
