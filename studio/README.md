@@ -1,8 +1,8 @@
-# PRM Studio
+# PRM Studio: Nine to Purr
 
-Original AI character Shorts: a recurring cast of animals living adult human life, playing whatever format is popping in AI Shorts today. Paid by YouTube ads (Shorts for reach, long-form compilations for watch hours).
+AI cat office comedy Shorts on YouTube (@NineToPurr): Mochi, Pearl and Gus at Clawporate Inc., playing whatever format is popping in AI Shorts today. Goal: YouTube Partner Program before Feb 1, 2027.
 
-**Status: design only (2026-10-29).** Nothing is built, bought or posted until Lucas says go ([`docs/STATUS.md`](docs/STATUS.md)).
+**Status: go given 2026-10-29.** Setup and pilot next; modules are designed, not built yet ([`docs/STATUS.md`](docs/STATUS.md)).
 
 ## Read in this order
 1. [`docs/STATUS.md`](docs/STATUS.md): what runs, what waits

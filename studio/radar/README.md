@@ -6,7 +6,7 @@
 
 | | |
 |---|---|
-| **In** | YouTube Data API in the `prm-studio` project (`search.list` ≤ 80 of its 100 calls/day, `videos.list`, `channels.list`); RSS feeds of watched channels (free); Gemini 3.8 Flash watching public URLs (low media resolution, no downloads) |
+| **In** | YouTube Data API in the existing project (S8; the clipper's scans are off) (`search.list` ≤ 80 of its 100 calls/day, `videos.list`, `channels.list`); RSS feeds of watched channels (free); Gemini 3.8 Flash watching public URLs (low media resolution, no downloads) |
 | **Out** | `breakouts`, `waves`, `watch_channels` rows ([`../docs/DATA.md`](../docs/DATA.md)); `/opt/studio/formats/waves.json`, `library.md`, `style.json`; Telegram `/waves` |
 | **Runs** | every 6 h (00/06/12/18 Asunción) |
 | **Cost** | ~$0.25/day (≈40 Shorts watched) |

@@ -37,14 +37,13 @@ SQLite at `/opt/studio/studio.db`. Times in UTC ISO-8601. Migrations will live i
 | `why_it_works` | one line |
 
 ## Files on the VM
+Keys and tokens are shared with the clipper (S8): `/opt/clipper/.env`, `/opt/clipper/youtube_token.json`, `/opt/clipper/client_secret.json` (chmod 600, never in git). Studio's own data:
 ```
 /opt/studio/
-├── .env                      keys (chmod 600, never in git)
 ├── studio.db
-├── youtube_token.json        upload token for the Studio channel (chmod 600)
-├── analytics_token.json      read-only analytics token (chmod 600)
 ├── formats/                  waves.json, library.md, style.json (radar)
 ├── series/<slug>/refs/       character refs (PNG), Lucas keeps a copy
-├── work/<episode_id>/        shots/, narrator.wav, captions.ass, sidecar.json (cleared 3 days after upload)
+├── work/<episode_id>/        shots/, narrator.wav, captions.ass, sidecar.json; media cleared 3 days after upload,
+│                             sidecar (script, prompts, refs used, takes kept/rejected + thumbnails, QC, cost) kept: the YPP appeal pack
 └── out/<episode_id>.mp4      final Short, kept: weekly long-form compilations reuse them (~20 MB each)
 ```

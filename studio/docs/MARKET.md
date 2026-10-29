@@ -61,6 +61,39 @@ HQ research for the Studio test. The radar refreshes this daily once built (see 
 - Gemini API serves Paraguay. Omni: English is the tested language; images of recognizable people are not supported; audio references and voice editing are not supported (so character voices can't be kept consistent → wordless cast by default).
 - YouTube Data API: `search.list` and `videos.insert` have their own buckets of 100 calls/day **per Google Cloud project** (other calls share 10k units). The clipper's scans use its project's search bucket, so Studio gets its own project.
 
+## Second pass: YouTube, TikTok, Instagram, Reddit (2026-10-29 afternoon)
+**YouTube: our exact lane**
+| Channel | Numbers | Note |
+|---|---|---|
+| Cat Ai Network (Pakistan, since 2024) | 2.07M subs, 404M views, 166 videos; last 30 days ~73M views, ~203k subs (youtubers.me tracker) | AI cat Shorts, 1.3M–11M views each |
+| Batysyr | 770k subs; 100M views in one month from 20 AI cat videos (TopKlout, Sept 2026) | — |
+| Cat channel 91 | grew to 2M subs after switching from real to AI cats (TopKlout) | — |
+| CatVerse Studio (US, since Sept 2025) | 94 Shorts → **26 subs** (vling) | Generic "funny AI cat Shorts" |
+| **Meowffice** (@Meowffice) | 399 videos, 8.5k subs, 460k views; last uploads (Mar 2026) **5–24 views**, one 1.8k; stopped in March (YouTube API) | **Our concept** ("surreal AI office universe" with named cats): 6–11 s vibe clips, no joke, no payoff |
+
+- What winners do (TopKlout): story first, a fixed cast with personalities (e.g. a hardworking white cat and a mischievous orange cat), brand deals as the core money (KFC/FamilyMart-type deals in China). Scripting is the bottleneck; generation is cheap.
+- YouTube 2026: viewer survey "does this feel like AI slop?" (testing since March); enforcement is channel-level (pattern across recent uploads); AI-labeled videos aren't penalized in recommendations; Oct 1: Shorts feed favors original content.
+- **YPP from Feb 1, 2027 (announced Aug 10):** entry 1k subs + 8,000 watch hours/365 d or 20M Shorts views/90 d (double today's); partners already in stay in ("If you are in YPP today, you stay in YPP"); Shorts pool revenue needs ≥10M views per rolling 90 d for everyone; expanded tier (fan funding, brand deals, Shopping) stays at 500 subs + 3,000 h or 3M Shorts views.
+
+**TikTok**
+- 59% of what a new account sees is AI slop (Kapwing, May 2026 data), 3× YouTube; #cartoonkids ~97% AI. Users can turn AI content down (slider since Nov 2025).
+- 2026 algorithm (creator-community estimates): retention overhaul in January favors longer videos (under 15 s −22% reach, 1–3 min +18%); search-first indexing (keyword descriptions +25% impressions); small accounts get more reach (+25% under 10k followers); original audio ~+10%; saves weighted.
+- Stylized or cartoon AI needs no AI label; realistic AI does.
+- No Creator Rewards in Latin America.
+
+**Instagram**
+- Rewards original video and original audio; holds back templated AI, avatar videos and reused audio; DM shares weigh most (creator-observed, Q1 2026).
+- AI-generated profile label (Aug 31, 2026) is for AI-made *people*; unlabeled ones lose recommendations.
+- No ad revenue share; AI accounts earn from brand deals, products and tool affiliates (estimates).
+
+**Reddit (read through sites quoting it; Reddit blocks our reader)**
+- "The people actually doing well with AI channels are selling something" (AI tool builder, 2026).
+- Original AI thriller films channel (222k views, 36k watch hours in 28 days) rejected from YPP after 70 days for "unsatisfying or off-putting content" (Oct 8, 2026).
+- Original AI series with recurring characters: approved, then demonetized after one political-parody episode ("for shock value"), ~$20 that week (Sept 24, 2026).
+- AI filmmaker (Seedance originals) rejected repeatedly for "reused content" (Oct 2, 2026). Appeals want scripts, prompts, references, raw generations, rejected takes and the edit timeline.
+
+**Conclusion (S7–S10):** AI cats on YouTube are the money lane, generic ones die, and the concept alone (Meowffice) fails. We win on jokes with payoffs, a fixed cast, a policy-safe show and an appeal-ready paper trail, and we race the Feb 1, 2027 YPP change.
+
 ## What we copy, what we avoid
 - **Copy (the format):** length, number of beats, hook type, reversal ending, caption look, title pattern, posting time, series packaging. The radar updates these daily.
 - **Never copy (the content):** characters, stories, footage, voices, brands. Our cast is ours.
@@ -112,3 +145,22 @@ HQ research for the Studio test. The radar refreshes this daily once built (see 
 - Google, Gemini API regions: https://ai.google.dev/gemini-api/docs/available-regions
 - YouTube Data API, quota costs: https://developers.google.com/youtube/v3/determine_quota_cost
 - YouTube Data API, videos resource: https://developers.google.com/youtube/v3/docs/videos
+- youtubers.me, Cat Ai Network: https://us.youtubers.me/cat-ai-network/youtuber-stats
+- 36Kr / TopKlout, AI pet accounts: https://eu.36kr.com/en/p/3965569995120132
+- vling, CatVerse Studio: https://vling.net/en/channel/UCbesT1EbaRc9BPaloYbfrRg/channel-info
+- AIR, 2026 YouTube changes month by month: https://air.io/en/trending/youtube-algorithm-in-2026-month-by-month-changes-that-affect-your-views
+- The Next Web, YouTube AI slop crackdown: https://thenextweb.com/news/youtube-ai-slop-crackdown-faceless-creators-collateral-damage
+- AITuber, Shorts originality update: https://aituber.app/blog/youtube-shorts-originality-update/
+- PPC Land, YPP changes 2027: https://ppc.land/youtube-doubles-monetization-thresholds-and-adds-a-rolling-shorts-test/
+- OutlierKit, YPP 2027 clauses: https://outlierkit.com/resources/youtube-partner-program-changes-2027/
+- Kapwing, TikTok AI slop report: https://www.kapwing.com/resources/the-tiktok-ai-slop-report/
+- TechCrunch, TikTok AI content control: https://techcrunch.com/2025/11/18/tiktok-now-lets-you-choose-how-much-ai-generated-content-you-want-to-see/
+- TT Calculator, 2026 TikTok algorithm: https://ttcalculator.net/blog/tiktok-algorithm-changes-2026-roundup/
+- CineRads, TikTok AI policy: https://www.cinerads.com/blog/tiktok-ai-content-policy
+- ReelForge, Instagram Reels reach 2026: https://reelforgeai.io/blog/instagram-reels-reach-collapse-q1-2026
+- CreatorFlow, Instagram AI profile label: https://creatorflow.so/blog/instagram-ai-generated-profile-label/
+- Alici, AI accounts on Instagram: https://alici.ai/blog/how-ai-influencers-make-money-on-instagram-2026
+- Scenemakers, YPP cases from Reddit: https://scenemakers.club/guides/youtube-ai-monetization
+- Scenemakers, rejections and appeals: https://scenemakers.club/guides/youtube-inauthentic-content
+- Dexerto, "unsatisfying or off-putting": https://www.dexerto.com/youtube/youtube-cracks-down-on-unsatisfying-or-off-putting-videos-with-demonetization-3387786/
+- Tom's Guide, AI cats with jobs: https://www.tomsguide.com/ai/ai-image-video/ai-cat-videos-are-suddenly-everywhere-heres-why-the-internet-cant-stop-watching

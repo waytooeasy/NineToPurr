@@ -8,7 +8,7 @@
 |---|---|
 | **In** | `series/<slug>/BIBLE.md` (prompt-cached), `waves.json`, `library.md`, the last 14 days of results, the continuity log, past premises (similarity) |
 | **Out** | 10 premises → self-critique → top 5 to Telegram (`premises`). For the pick: `episodes` + `shots` rows: per shot the Omni prompt (subject, action beats, camera, SFX, "no dialogue", the bible's style line), ref order, first-frame plan, seconds; on-screen text cards with times; title, description, hashtags; cost estimate |
-| **Engine** | Claude Sonnet 5.5, Lucas's API key (separate Studio key, same account) |
+| **Engine** | Claude Sonnet 5.5, Lucas's existing API key (S8) |
 | **Runs** | 08:00 Asunción; script right after the pick (or the 11:00 auto-pick) |
 | **Cost** | cents/day |
 

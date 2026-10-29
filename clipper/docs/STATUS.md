@@ -1,11 +1,10 @@
-# Clipper status (live)
+# Clipper status: PAUSED
 
-**Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
-**Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
+**PRM's active project is Nine to Purr: read [`../../studio/docs/STATUS.md`](../../studio/docs/STATUS.md) first.** This file is the clipper's state, kept for reference. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 
-_Last updated: 2026-10-29 (Studio design PR)_
+_Last updated: 2026-10-29 (go for Nine to Purr)_
 
-> **2026-10-29: pivot test approved in principle (D66, Studio S1).** Nothing below changes until Lucas says go. At go, HQ stops `clipper-remake.timer`, `clipper-pipeline.timer` and `clipper-upload.timer`; Peakz Recaps stays up, dormant, with its remakes set to private. New project: [`../../studio/docs/STATUS.md`](../../studio/docs/STATUS.md).
+> **2026-10-29 19:35 UTC: clipper paused (D67).** HQ set `REMAKES_PER_DAY=0` in `/opt/clipper/.env`: remake runs exit at once (no downloads, no API spend). Lucas disables `clipper-remake.timer`, `clipper-pipeline.timer`, `clipper-upload.timer` and `clipper-approve-bot.service` (Studio setup step 1, needs sudo). The channel is renamed **Nine to Purr** (@NineToPurr) after its Shorts are deleted (Studio S8). One clip sat in `qc_passed`; it never uploads with the upload timer off. Everything below is the state before the pause. Restart only on an HQ decision with new data.
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |

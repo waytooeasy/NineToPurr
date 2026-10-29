@@ -4,12 +4,12 @@ PRM = Puro Rico o Muerto. Lucas's money projects. One folder per project.
 
 **Read first, every session:** the `docs/STATUS.md` of the project you touch (what runs now), then its `STRATEGY.md` and `DECISIONS.md`. Clipper: `clipper/docs/`. Studio: `studio/docs/`.
 
-## Studio (design only, 2026-10-29)
-- Original AI character Shorts on a new channel: a recurring animal cast living adult human life, playing whatever format is popping in AI Shorts today. **Copy formats, never content (S2).**
-- **No Studio code and no spend until Lucas says go (S1).** Until then only HQ edits `studio/`.
-- Separate stack on the same VM: `/opt/studio`, own Google Cloud project, channel, Telegram bot, budget cap (S3). Tools: Gemini Omni 1.1 Flash (video), Nano Banana 2 Lite (refs), Gemini 3.8 Flash (watching Shorts, QC), Claude Sonnet 5.5 (writing) (S4). Format rules: `.claude/skills/studio-format`.
+## Studio: Nine to Purr (active, go 2026-10-29)
+- **Focal point (S7):** one AI cat office comedy on YouTube, "Nine to Purr" (@NineToPurr): Mochi, Pearl and Gus at Clawporate Inc. (S9). Goal: YouTube Partner Program before Feb 1, 2027. Bible: `studio/series/nine-to-purr/BIBLE.md`.
+- **Copy formats, never content (S2).** Every Short is a real joke with a payoff, 20–40 s, wordless + SFX + on-screen text. YouTube only for now (S10).
+- **Reuse (S8):** Peakz Recaps renamed Nine to Purr; same Google Cloud project, keys (`/opt/clipper/.env`, plus `GEMINI_API_KEY`), upload token and Telegram bot. Studio data in `/opt/studio`. Tools: Gemini Omni 1.1 Flash (video), Nano Banana 2 Lite (refs), Gemini 3.8 Flash (watching Shorts, QC), Claude Sonnet 5.5 (writing) (S4). Format rules: `.claude/skills/studio-format`.
 
-## Clipper (active)
+## Clipper (paused 2026-10-29, D67)
 - One YouTube Shorts channel, multi-streamer brand; the Heat Index picks streamers daily. No ties to streamers. Paid by YouTube Shorts ads.
 - **Follow the market (D36):** copy what works for the top clip channels today; don't invent rules. Every clip: hook + story captions in today's style + our title. **Structure = the clipper's (D56):** layout (full / wide shot over blur / face-on-top stack), captions, length and title are copied from the clippers of that moment or streamer, never our own invention. **Remakes (D58):** every Short is a frame-faithful remake of a popping clipper Short, rebuilt from the streamer's own VOD (their seconds, cuts, zooms, captions, look); our title, no music, never their pixels. Market length ≤60 s. Max 5/day, posted as soon as Lucas taps ✅ Post. Streamer audio, no raw re-uploads.
 - Stack: Python + systemd timers + SQLite + Telegram approval bot. Per-clip LLM = **Claude Haiku 5.5** (Anthropic API); daily Analyst = Sonnet 5.5. Runtime n8n/agent team only after the gate in STRATEGY.md.
