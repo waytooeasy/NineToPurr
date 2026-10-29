@@ -97,6 +97,7 @@ HQ research for the Studio test. The radar refreshes this daily once built (see 
 - YouTube Help, made for kids: https://support.google.com/youtube/answer/9528076
 - Tech Times, made-for-kids revenue cut: https://www.techtimes.com/articles/320340/20260713/ai-kids-cartoon-gold-rush-has-hidden-tax-coppa-cuts-revenue-80.htm
 - AIR Media-Tech, Shorts RPM: https://air.io/en/monetization/what-rpm-can-you-expect-from-shorts-in-2026
+- Income Reality Check, 2026 Shorts RPM fact-check: https://income-reality-check.pages.dev/a/how-a-faceless-channel-made-39k-with-claude-chatgpt/
 - Autonolab, faceless animation niche: https://blog.autonolab.com/niches/2026-01-01-faceless-youtube-animation/
 - Google, Gemini Omni docs: https://ai.google.dev/gemini-api/docs/omni
 - eesel, Omni 1.1 Flash pricing: https://www.eesel.ai/blog/gemini-omni-1-1-flash-pricing
