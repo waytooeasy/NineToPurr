@@ -3,7 +3,9 @@
 **Read this first in any new PRM chat.** It says what is running right now, what is waiting and who it waits on. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · the box and how to get a shell: [`../infra/VM.md`](../infra/VM.md).
 **Rule:** any session that changes what runs, what's next or who something waits on updates this file in the same PR.
 
-_Last updated: 2026-10-27 13:00 UTC_
+_Last updated: 2026-10-29 (Studio design PR)_
+
+> **2026-10-29: pivot test approved in principle (D66, Studio S1).** Nothing below changes until Lucas says go. At go, HQ stops `clipper-remake.timer`, `clipper-pipeline.timer` and `clipper-upload.timer`; Peakz Recaps stays up, dormant, with its remakes set to private. New project: [`../../studio/docs/STATUS.md`](../../studio/docs/STATUS.md).
 
 ## Running now (VM `prm-clipper` on moon)
 | Piece | State |
@@ -37,6 +39,7 @@ _Last updated: 2026-10-27 13:00 UTC_
 Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"` on the VM.
 
 ## Waiting on Lucas
+- **Go for the Studio test (D66).** With it: set Peakz's remakes to private in YouTube Studio (one termination would bar the new channel too).
 - After merging the refine PR: `sudo cp /opt/clipper/repo/clipper/infra/systemd/clipper-remake.service /etc/systemd/system/ && sudo systemctl daemon-reload` (75 min stop instead of 60).
 - **Edit the description of [GSiO8GujwEs](https://youtube.com/shorts/GSiO8GujwEs) in YouTube Studio:** delete the first line (`Remake of : "Jason And Ron…"`). The upload token only has the `youtube.upload` scope, so Claude can't edit it.
 - AdSense signup + W-8BEN.
@@ -52,6 +55,7 @@ Check live: `sqlite3 /opt/clipper/db/clip.db "select id,state,title from clips"`
 - Ship as a PR; Lucas merges; deploy = `git pull` on the VM (+ bot restart if `publisher/` changed).
 
 ## Next for Claude
+- **At Lucas's go (D66):** `sudo systemctl stop clipper-remake.timer clipper-pipeline.timer clipper-upload.timer` (and `disable` them), confirm nothing is `approved` and waiting, then update this file: Running now → paused. Everything below is on hold from then on.
 - **Ops (2026-10-27):** quality gate (picture ≥ 80 %, captions ≥ 70 %, env `REMAKE_MIN_*`) and Telegram health alerts (disk, cookies, failing/idle remakes) run every pipeline pass. Precision work is queued as GitHub issues (label `remake-precision`); add `agent` to one to start it.
 - **Learning loop:** after 2-3 weeks compare each remake's match % (render sidecar json) with its views: is more precision worth it, or is moment picking the lever?
 - **Remake engine (D58, D60, D61):** 2026-10-21: the two Agent00 remakes (clips 24, 25) came out with the wrong caption look and were deleted by Lucas (state `removed`). D61 build: caption look measured per clipper (68 fonts by glyph shape, size, box, colours, position, pop), caption states frame-exact from their pixels, per-frame colour effects, video resynced to their pixels, match score per remake. Next: picture misses where the map loses frames (fast cuts, punch-in zooms), 4K export, hook edits for remakes. Ludwig `NlN2y6YvX0E` used both attempts; reset `attempts` to retry. Stacked / overlay layouts (facecam + gameplay) are remade since #130 instead of skipped. Twitch sections are cut from their own segments since 2026-10-28 (Plaqueboymax's partly muted streams gave soundless sections: 6 found Shorts crashed in one night); a muted moment is a skip. A remake that shakes more than theirs or shows another app's watermark / a player's UI theirs doesn't is skipped (2026-10-28). A finished remake starts the pipeline pass at once (QC, visual check, Telegram; was up to 20 min). A Short whose clipper added no captions (the text on screen is the stream's own) is remade without ours and judged on picture (2026-10-28). Kick streamers (Adin Ross, N3on, Clavicular, Ice Poseidon, xQc) are remade from their Kick streams since 2026-10-28 (36 of their popping Shorts in one day's market file were never tried). Source search (#131): a Short is also searched in partners' streams (Agent00's Shorts came from Kai Cenat's), only the stream before it went up, and given up after 10 min (a miss cost up to an hour); most skips are still Shorts that aren't in any stream we search (0 snippets of 8). See `clipper/remake/README.md`.

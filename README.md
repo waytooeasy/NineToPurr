@@ -5,7 +5,13 @@
 
 | Folder | Project | Status |
 |---|---|---|
-| [`clipper/`](clipper/) | YouTube Shorts channel of big-streamer clips, run by agents | Phase 0, live ([status](clipper/docs/STATUS.md)) |
+| [`clipper/`](clipper/) | YouTube Shorts channel of big-streamer clips, run by agents | Live since 2026-10-19; pauses at Studio's go (D66) ([status](clipper/docs/STATUS.md)) |
+| [`studio/`](studio/) | Original AI character Shorts: a recurring animal cast in today's popping formats | Design only, waits for Lucas's go ([status](studio/docs/STATUS.md)) |
+
+## Studio at a glance
+- One new channel, one recurring cast of animals living adult human life; every Short plays a format that's popping in AI Shorts today, with an original story.
+- Gemini Omni makes the shots, Claude writes, a radar follows the market, Lucas picks and approves in Telegram.
+- 2-week test: 14 Shorts, $50 hard cap, Day-14 keep/kill numbers in [`studio/docs/STRATEGY.md`](studio/docs/STRATEGY.md).
 
 ## Clipper at a glance
 - One Shorts channel, multi-streamer (Heat Index picks daily). Follows the market's format daily; every clip gets our hook + story captions + title. ≤60 s, max 5/day.
@@ -25,6 +31,7 @@ clipper/
 ├── editor/      clip.py: cut, 9:16, captions
 ├── publisher/   YouTube uploads
 └── analyst/     metrics, ledger, daily report
+studio/          design only: docs/, series/, formats/ + one README per future module (see studio/README.md)
 ```
 
 ## Quick start (on the VM)
