@@ -1,40 +1,39 @@
-# Format Library (updated 2026-10-28)
-Use patterns only. Write original titles. Never copy or re-upload competitor videos.
+# Format Library (updated 2026-10-29)
+_Copy structure only. Use our own clips, and never re-upload other channels' videos._
 
-## Title formats (ranked by vph)
-1. {S} vs {guest/brand} GAUNTLET! (214k vph, event/crossover)
-2. {Game} {object} CHALLENGE! (179k vph, 29s, one mechanic)
-3. TEAM {S} {object} CHALLENGE! (88k vph)
-4. I spent {N} hours in {location}! (35k vph, 59s)
-5. {S}'s {thing} is crazy 💀💀 (33k vph, 23s)
-6. Imagine {doing X} and still losing TWICE 😭😭 (32k vph)
-7. {Person} is also a huge {S} fan ❤️‍🩹 #{S} (32k vph)
-8. No way {person} found him everywhere 😳 #{S} (27k vph)
-9. That {X} was NOT having it 💀💀 (23k vph)
-10. {S} was about to learn the real lesson 😳 #{S} (19k vph)
+## Title hooks (best first)
+1. `Imagine {absurd setup} and still {twist} 😭😭`: top performer, works without a named streamer
+2. `{S} was about to learn the real lesson 😳 #{streamer}`: curiosity gap plus a hashtag
+3. `Bro {unexpected action} 💀💀`
+4. `He couldn't stop smiling after watching this 😂❤️‍🩹`: wholesome reaction
+5. `That {person} was NOT having it 💀💀`: confrontation or refusal
+- Extra patterns: `{S} finds {funny thing}! 💀😭` (short official-style clip) and `{S} almost {did thing} 😭💔`.
 
-## Style rules
-- Titles are short, lowercase-friendly, and end with 1-2 emoji (💀 😭 😳 😂 ❤️‍🩹).
-- Add #{streamer} on reaction/recap-style titles.
-- Open on the payoff or the twist within the first 2s.
-- Reaction titles with no streamer name also work ("bro was just making sure😂", ~11k vph). Use them as filler.
+## Title rules
+- Keep titles under about 60 characters.
+- Use 1-2 emojis at the end, mostly 💀 😭 😂 😳.
+- Add the streamer hashtag when the streamer is the draw (#ishowspeed worked for Nexxo).
+- Use "Bro" or "He" as the subject when the clip stands alone.
+- Use a streamer name only when they are the draw.
 
 ## Length
-- 16-30s for single-beat gags/challenges (best for a quick loop).
-- 46-60s for story or event clips.
-- 31-45s is weakest so far, so avoid the dead middle unless the clip needs it.
-- Evidence is thin (20 videos, outlier-driven).
+- Primary: 31-60s (avg 16-21k vph).
+- Test: <=15s for one punchline, and clips under 10s on high-demand moments.
+- Avoid 16-30s unless the payoff is very strong (avg 8.4k vph).
+- Avoid >60s (1 video at 4.8k vph, too little data).
 
-## Timing
-- 14:00 UTC (11:00 Asuncion) is the peak, but it reflects Speed's official release schedule.
-- Test 16:00-17:00 UTC (13:00-14:00 Asuncion) for our uploads.
+## Clip structure
+- The payoff or the setup question must show within the first 2 seconds.
+- Cut to one beat: setup, then reaction or twist, then end.
+- Reaction and wholesome moments, fails and "bro did X" moments all perform.
 
-## Streamer priority
-- IShowSpeed first, then CaseOh and Kai Cenat (merge the "Kai Cenat"/"kaicenat" duplicate).
+## Post times
+- Post 12-17 UTC (09-14 Asuncion, UTC-3).
+- Avoid 01-04 UTC.
+- The data is thin, so keep testing.
 
-## Watchlist
-- #yourrage tag (1 channel, unproven).
-- Twitch ranking is all new, with no history yet.
-
-## Retired
-- None yet (library was empty).
+## Streamer slots
+- IShowSpeed: high demand but saturated. Pick specific moments.
+- CaseOh: low competition, strong 7d total (test slot).
+- Kai Cenat: strong. Merge the "Kai Cenat" and "kaicenat" labels.
+- PGL: watchlist only.

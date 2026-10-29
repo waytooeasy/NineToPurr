@@ -1,32 +1,33 @@
 {
-  "updated": "2026-10-28",
+  "updated": "2026-10-29",
   "sample": [
-    "NDFE8W8wQ-Y",
-    "WJhWVD5zPQ8",
-    "EkYXY7UeqTI",
-    "kNzT5aWaDgg",
-    "EGeUtjaRi-4",
     "qGQDl_3q2AE",
-    "PomI_EZhtPM",
-    "CRUtic_pytc"
+    "hXWYzOPCyuc",
+    "h602c51kG0s",
+    "5QNkccVsEzA",
+    "f7B5ByZjObY",
+    "H_kEnMJXSew",
+    "yZtkH0ePVCs",
+    "vRL1OYNdgBU"
   ],
-  "seen": 4,
+  "seen": 9,
   "caption": {
     "case": "upper",
-    "fill": "#FFFFFF",
-    "highlight": "#FFD21F",
+    "fill": "#FFFF00",
+    "highlight": "#FF2020",
     "outline": "#000000",
-    "words": 1,
+    "words": 2,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FFD21F",
-      "#FF2A2A",
-      "#7CFF3A"
+      "#FF2020",
+      "#80FF00",
+      "#A020F0",
+      "#00FF00"
     ]
   },
-  "layout": "fullbleed",
-  "notes": "Captions appear in a few thumbnails; the Hour Six and Home Depot clips show none."
+  "layout": "stack",
+  "notes": "Bold uppercase captions with black outline, yellow default and varied colored emphasis words; many frames are split-screen stacks."
 }
