@@ -52,6 +52,7 @@ Commands: `/status`, `/stats`, `/budget`, `/waves`, `/pause`, `/resume`. Only `T
 - Every paid call writes a row in `generations` (model, seconds or images or tokens, unit price, cost).
 - Before each call: spent + this call's estimate ≤ `STUDIO_BUDGET_USD` (test: 50) and the episode's spend ≤ `EPISODE_MAX_USD` (test: 4). Otherwise the episode goes `over_budget` and Lucas gets an alert. Nothing raises the cap except Lucas.
 - Unit prices live in config with the date they were checked; prices change on Jan 1, 2027 (Gemini Flash and TTS double).
+- Second cap outside our code: the Gemini API is prepaid (new accounts default to Prepay). At a $0 balance Google answers HTTP 402; the generator treats 402 as `over_budget` and alerts, never retries.
 
 ## Failure handling
 - Omni error or timeout: 2 retries with backoff, then `failed` + alert.

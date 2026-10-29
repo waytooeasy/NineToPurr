@@ -1,12 +1,13 @@
 # What Lucas sets up (after go)
 
-~50 minutes. Keys and tokens go straight into `/opt/studio/.env` or token files on the VM, **never in chat**, never in git. Steps 1–2 first; the rest can happen while HQ makes the pilot.
+~55 minutes, **$30 upfront** (+$20 after the week-1 check). Keys and tokens go straight into `/opt/studio/.env` or token files on the VM, **never in chat**, never in git. Steps 1–2 first; the rest can happen while HQ makes the pilot.
 
 | # | What | How | Time |
 |---|---|---|---|
 | 1 | **Decide** | Say go; pick the cast (A/B/C, [`CAST-OPTIONS.md`](../series/CAST-OPTIONS.md)) and the voice default (wordless or narrator) | 2 min |
 | 2 | **Peakz on hold** | YouTube Studio → Peakz Recaps → Content → select the remakes → Visibility: **Private**. HQ stops the clipper timers the same day (clipper D66) | 5 min |
-| 3 | **Google Cloud project `prm-studio`** | console.cloud.google.com → new project → enable **YouTube Data API v3**, **YouTube Analytics API**, **Generative Language API** → link billing → Budgets & alerts: **$50**, alerts at 50/90/100% | 10 min |
+| 3 | **Google Cloud project `prm-studio`** | console.cloud.google.com → new project → enable **YouTube Data API v3**, **YouTube Analytics API**, **Generative Language API** → link billing. Note: since March 2026 the $300 Google Cloud free trial doesn't pay for the Gemini API | 10 min |
+| 3b | **Prepaid Gemini credit: $30 now** | aistudio.google.com → Billing → buy **$30** (new accounts default to Prepay; min $5; credits last 12 months, non-refundable). At $0 Google stops every call, so the credit is a second hard cap behind our code's. **Top up $20 only if the week-1 check passes** ([`TEST-PLAN.md`](TEST-PLAN.md)) | 3 min |
 | 4 | **Gemini + YouTube API keys** | aistudio.google.com → API keys → create a key **in `prm-studio`** → `/opt/studio/.env` as `GEMINI_API_KEY`. Then Cloud console → Credentials → API key restricted to YouTube Data API v3 → `YOUTUBE_API_KEY` (the radar's own search quota) | 5 min |
 | 5 | **New YouTube channel** | youtube.com → Settings → Add or manage your channels → Create a channel (brand account on the same Google account). Name: HQ proposes 3 after the cast pick | 5 min |
 | 6 | **Upload + analytics tokens** | OAuth client (Desktop app) in `prm-studio`, consent screen **published**, then the same `upload.py --auth` flow as the clipper (`clipper/docs/READINESS.md` steps 1–3), signed in as the **new channel** → `/opt/studio/youtube_token.json`; repeat read-only for `/opt/studio/analytics_token.json` | 10 min |

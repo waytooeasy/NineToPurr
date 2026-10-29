@@ -5,11 +5,12 @@ Goal: find out in 14 Shorts whether an original AI cast in today's popping forma
 ## Calendar (example: go on Fri Oct 30)
 | Day | Date | Who | What |
 |---|---|---|---|
-| 0 | Oct 30 | Lucas | Says go, picks the cast (A/B/C) and the voice default, does [`SETUP.md`](SETUP.md) (~50 min) |
+| 0 | Oct 30 | Lucas | Says go, picks the cast (A/B/C) and the voice default, does [`SETUP.md`](SETUP.md) (~55 min, $30 prepaid Gemini credit) |
 | 1 | Oct 31 | HQ | Writes the bible; ~10 Nano Banana ref candidates per character (~$1) → Lucas picks one each |
 | 1–2 | Oct 31–Nov 1 | HQ | **Pilot:** 3 episodes made by hand on the VM (throwaway scripts, not merged). The look is iterated at 360p ($0.03/s); once Lucas says it's right, the 3 are rendered at 720p and become Shorts 1–3 |
 | 2 | Nov 1 | Lucas | First Short goes up (manual upload with the Studio token) |
 | 2–15 | Nov 1–14 | everyone | **1 Short/day at 15:00 Asunción.** Build agents ship the pipeline in parallel; each module replaces a manual step when it lands |
+| 10 | Nov 9 | HQ + Lucas | **Week-1 check** on Shorts 1–7 (all ≥48 h old): pass → Lucas tops up $20; fail → stop early |
 | 17 | Nov 16 | HQ + Lucas | Day-14 call, once the last Short is ≥48 h old |
 
 ## What we post
@@ -32,7 +33,15 @@ Goal: find out in 14 Shorts whether an original AI cast in today's popping forma
 | Character refs (Nano Banana 2 Lite) | ~$1 |
 | Radar (~40 Shorts watched/day from day 0) | ~$4 |
 | Writing, checks, optional narrator | ~$1–2 |
-| **Total** | **~$48–49; $50 hard stop in code** + Google Cloud budget alert at 50/90/100% |
+| **Total** | **~$48–49; $50 hard stop in code** |
+
+**Paid in two steps** as prepaid Gemini credit (Claude's ~$1–2 comes from the existing Anthropic balance):
+| When | Amount | Covers |
+|---|---|---|
+| Setup (day 0) | **$30** | Refs, key test, pilot drafts (~$5), Shorts 1–7 (~$19), radar and checks for ~9 days (~$3) |
+| Week-1 check passes (day 10) | **$20** | Shorts 8–14 (~$19), radar to the end (~$1) |
+
+Week-1 check: **stop early** if the best of Shorts 1–7 has <5k views **and** their median is <200. That saves the second $20. Prepaid credit at $0 makes Google refuse calls, so it's a second hard cap behind the code's.
 
 Real cost per Short is measured from the ledger; if it runs above $3.50, the room shifts to cheaper formats (`pov`, `expect_reality`, `meme_twist`).
 

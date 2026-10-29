@@ -34,7 +34,7 @@ Owner: **PRM · 00 HQ**. Decisions: [`DECISIONS.md`](DECISIONS.md) · live state
 | Phase | What | Gate to the next |
 |---|---|---|
 | **0. Pilot** (2–3 days after go) | Lucas picks the cast. Character refs made. 3 episodes made by hand in a session (no pipeline yet). Lucas judges the look | Lucas says the look is right: no stutter, characters consistent, colours right |
-| **1. Test** (14 days) | 1 Short/day, $50 hard cap, Lucas ✅ each. Pipeline built in parallel by Build agents | Day-14 call (below) |
+| **1. Test** (14 days) | 1 Short/day, $50 hard cap ($30 + $20), Lucas ✅ each. Pipeline built in parallel by Build agents | Week-1 check (early stop), then the Day-14 call (below) |
 | **2. Scale** (to ~day 60) | 2 Shorts/day, weekly long-form compilation, audience-vote arcs, auto-post with 🛑 Stop. Budget ~$180/month: Lucas approves it at the Day-14 call | Day-60 money check (below) |
 | **3. Expand** (2027) | YPP, Shorts Series, a second format or cast only once the first holds | ≥$1,100 net/month for 2 months |
 
@@ -56,7 +56,7 @@ Continue only with **median ≥20k views per Short**, or **≥3.3M Shorts views/
 - No animal distress or rescue, no gore, no sexual or cheating tropes.
 - Every Short is a new story: premise similarity check against the last 30, unique titles and descriptions, a human pick every day.
 - ≤60 s per Short (test default 20–30 s). Never more than 3/day (spam policy); the test runs 1/day.
-- Budget: a hard stop in code plus a Google Cloud budget alert. Never a second Google or Anthropic account. Keys only in `/opt/studio/.env`.
+- Budget: a hard stop in code plus prepaid Gemini credit (Google refuses calls at $0). Never a second Google or Anthropic account. Keys only in `/opt/studio/.env`.
 - One channel. No backup channels. Peakz remakes set to private before Studio's first upload (one termination bars every channel).
 
 ## Budget for the 2-week test
@@ -68,6 +68,8 @@ Continue only with **median ≥20k views per Short**, or **≥3.3M Shorts views/
 | Radar: Gemini watches ~40 popping Shorts/day | ~$4 |
 | Writing and checks (Claude, Gemini) + optional narrator TTS | ~$1–2 |
 | **Total (hard cap $50)** | **~$48–49** |
+
+**Upfront: $30** of prepaid Gemini credit at setup, **+$20 only if the week-1 check passes** (Shorts 1–7: stop early if the best has <5k views and the median <200). With Paraguay's 10% IVA on foreign digital services, ~G. 315k in total at G. 5,740/USD. Claude's ~$1–2 comes from the existing Anthropic balance. No subscriptions.
 
 2 Shorts/day instead of 1: +~$38.
 
