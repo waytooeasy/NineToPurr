@@ -14,6 +14,9 @@ Checked 2026-10-29 ([`MARKET.md`](MARKET.md#policy-facts) has the sources). If a
 | Copyright | Original characters, no lookalikes of existing ones, no outside music or trending sounds, no real brands | room prompt rules, QC |
 | Others' videos | The radar only reads public metadata and lets Gemini watch public URLs; we never download, reuse or re-upload their videos | radar |
 | Shorts pay floor (Feb 1, 2027): 10M qualified views per 90 d | Shorts are reach; money plan includes long-form compilations | STRATEGY |
-| One termination bars every channel of the person | One Studio channel, no backups; Peakz remakes private before Studio's first upload | SETUP |
+| YPP entry doubles Feb 1, 2027 (8,000 h or 20M Shorts views); partners already in stay in | Sprint to apply by mid-January under today's bar (S7) | STRATEGY, TEST-PLAN |
+| YouTube's "AI slop" viewer survey; channel-level enforcement on recent uploads | Every upload holds the bar; a weak day posts nothing | QC, room |
+| YPP reviewers and appeals ask how AI content was made | Keep each Short's script, prompts, refs, rejected takes and edit log (appeal pack) | generator ledger, `work/` sidecars |
+| One termination bars every channel of the person | One channel: Peakz Recaps renamed Nine to Purr, its remakes deleted first; no backups (S8) | SETUP |
 | Gemini/Omni terms | No recognizable people or minors as inputs; outputs carry SynthID | generator |
 | Taxes | W-8BEN in AdSense before money arrives; contador for Paraguay IRP | SETUP |

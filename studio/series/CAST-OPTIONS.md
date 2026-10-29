@@ -1,5 +1,7 @@
 # Cast options (pick one)
 
+> **Decided 2026-10-29 (S9): A, with a change.** The capybara is replaced by a second cat (cats are the proven draw): Mochi, Pearl, Gus at Clawporate Inc. Show: **Nine to Purr**. Bible: [`nine-to-purr/BIBLE.md`](nine-to-purr/BIBLE.md). B and C stay here for reference.
+
 All three ride the same wave: animals or objects living adult human life ([`../docs/MARKET.md`](../docs/MARKET.md)). Same look for all: cinematic 3D film style, soft realistic fur or texture, natural light, muted adult palette, real-world settings. Not a toddler cartoon.
 
 Names are working names; the channel name comes after the pick (coined brand, like D43's research found for clip channels).

@@ -3,8 +3,8 @@ name: studio-format
 description: How a PRM Studio Short must look and what it may contain. Use when writing room prompts, Omni shot prompts, caption presets, QC rules or upload metadata for studio/.
 ---
 - **Follow the market for the format, never the content (S2).** Today's popping formats, title patterns and caption look come from `/opt/studio/formats/` (radar). Our cast, stories, jokes and look are always our own.
-- **Cast:** only the characters in `studio/series/<slug>/BIBLE.md`, with their fixed look words and refs. No real people, babies or kids, lookalikes of existing characters, real brands or logos.
-- **Shape:** hook in the first 1.5 s (≤7 words on screen, plain words, no emoji); one situation; payoff in the last 2–3 s; ≤60 s (test default 20–30 s); 9:16, 1080×1920.
+- **Cast:** only the characters in `studio/series/nine-to-purr/BIBLE.md` (Mochi, Pearl, Gus at Clawporate Inc.; the CEO is never shown), with their fixed look words and refs. Every Short is a real joke with a payoff: no vibe clips. No real people, babies or kids, lookalikes of existing characters, real brands or logos.
+- **Shape:** hook in the first 1.5 s (≤7 words on screen, plain words, no emoji); one situation; payoff in the last 2–3 s; ≤60 s (default 20–40 s); 9:16, 1080×1920.
 - **Sound:** wordless cast by default (S5): sighs, gasps, laughs, real-world SFX, original ambience. Narrator (Gemini TTS, fixed voice) only for formats that need one. No outside music or trending sounds.
 - **Look:** cinematic 3D film style, soft realistic fur, natural light, muted adult palette, real-world adult settings. Never a toddler cartoon (made-for-kids risk).
 - **Topics:** adult life (work, money, rent, dating, chores, commuting). Never animal distress or rescue, gore, sexual or cheating tropes.

@@ -1,74 +1,68 @@
-# 2-week test plan
+# Test plan: pilot, 14-day test, sprint
 
-Goal: find out in 14 Shorts whether an original AI cast in today's popping formats gets real views. Not money yet; that's the Day-60 check ([`STRATEGY.md`](STRATEGY.md)).
+Goal: find out fast whether Nine to Purr gets real views, then sprint to the YouTube Partner Program before Feb 1, 2027 ([`STRATEGY.md`](STRATEGY.md)).
 
-## Calendar (example: go on Fri Oct 30)
+## Calendar
 | Day | Date | Who | What |
 |---|---|---|---|
-| 0 | Oct 30 | Lucas | Says go, picks the cast (A/B/C) and the voice default, does [`SETUP.md`](SETUP.md) (~55 min, $30 prepaid Gemini credit) |
-| 1 | Oct 31 | HQ | Writes the bible; ~10 Nano Banana ref candidates per character (~$1) → Lucas picks one each |
-| 1–2 | Oct 31–Nov 1 | HQ | **Pilot:** 3 episodes made by hand on the VM (throwaway scripts, not merged). The look is iterated at 360p ($0.03/s); once Lucas says it's right, the 3 are rendered at 720p and become Shorts 1–3 |
-| 2 | Nov 1 | Lucas | First Short goes up (manual upload with the Studio token) |
+| 0 | Oct 29–30 | Lucas | [`SETUP.md`](SETUP.md): clipper off, channel renamed, Gemini key + $30 (~25 min) |
+| 1 | Oct 30–31 | HQ | Ref candidates per character (~$1) → Lucas picks in Telegram/chat; profile picture and banner from the picks |
+| 1–2 | Oct 31–Nov 1 | HQ | **Pilot:** 3 episodes by hand on the VM. Look iterated at 360p ($0.03/s); once Lucas says it's right, rendered at 720p → Shorts 1–3 |
 | 2–15 | Nov 1–14 | everyone | **1 Short/day at 15:00 Asunción.** Build agents ship the pipeline in parallel; each module replaces a manual step when it lands |
-| 10 | Nov 9 | HQ + Lucas | **Week-1 check** on Shorts 1–7 (all ≥48 h old): pass → Lucas tops up $20; fail → stop early |
-| 17 | Nov 16 | HQ + Lucas | Day-14 call, once the last Short is ≥48 h old |
+| 10 | Nov 10 | HQ + Lucas | **Day-10 check** (Shorts 1–7, each ≥48 h old): pass → Lucas tops up $20; fail → stop |
+| 16 | Nov 16 | HQ + Lucas | **Day-14 call** (all 14 ≥48 h old) |
+| 17–75 | Nov 17–Jan 14 | everyone | **Sprint** (if kept): 2–3 Shorts/day + weekly 10-min compilation |
+| 45 | ~Dec 14 | HQ + Lucas | **Pace check:** ≥3M Shorts views in the last 30 days, else drop the YPP-before-Feb-1 goal |
+| ~75 | mid-Jan | Lucas | Apply to YPP |
 
-## What we post
-- 14 Shorts, 1/day, 20–30 s by default (the radar may move a format's length).
-- At least 4 different formats from [`../formats/README.md`](../formats/README.md), so the test says which one wins. Planned mix: 4 `reversal`, 3 `day_in_life`, 2 `fake_ad`, 2 `pov`, 2 `episode` (one 2-part arc, ~30 s per part), 1 `meme_twist`; swapped toward whatever the radar shows rising that week. At 720p with ~15% retakes this mix costs ~$38.
-- Every Short: our cast, an original story, English text on screen, no outside music.
+## What we post in the test
+- 14 Shorts, 1/day, 20–40 s, from the pilot seeds and the radar's formats ([`../formats/README.md`](../formats/README.md)).
+- At least 4 formats, so the test says which one wins: ~4 `reversal`, 3 `day_in_life`, 2 `pov`, 2 `expect_reality`, 2 `episode` (one 2-part arc), 1 `meme_twist`. `fake_ad` waits until a narrator voice is tested.
+- Every Short: our cast, an original joke with a payoff, English text on screen, no outside music.
 
 ## Lucas's daily routine (~5 min)
 | Time | Tap |
 |---|---|
-| 08:00–11:00 | Pick 1 of 5 premises (or let #1 auto-pick at 11:00) |
+| 08:00–11:00 | Pick 1 of 5 premises (or #1 auto-picks at 11:00) |
 | ~12:00 | ✅ Post / ❌ Kill / 🔁 Retake on the finished Short |
 | 23:00 | Read the recap |
 
-## Budget
-| Item | Est. |
-|---|---|
-| 14 Shorts at 720p, retakes included (mix above) | ~$38 |
-| Pilot look drafts at 360p + key test | ~$4 |
-| Character refs (Nano Banana 2 Lite) | ~$1 |
-| Radar (~40 Shorts watched/day from day 0) | ~$4 |
-| Writing, checks, optional narrator | ~$1–2 |
-| **Total** | **~$48–49; $50 hard stop in code** |
+During the pilot, before the bot is rebuilt, HQ sends previews to Telegram and Lucas answers in chat.
 
-**Paid in two steps** as prepaid Gemini credit (Claude's ~$1–2 comes from the existing Anthropic balance):
-| When | Amount | Covers |
+## Money
+| When | Pay | Covers |
 |---|---|---|
-| Setup (day 0) | **$30** | Refs, key test, pilot drafts (~$5), Shorts 1–7 (~$19), radar and checks for ~9 days (~$3) |
-| Week-1 check passes (day 10) | **$20** | Shorts 8–14 (~$19), radar to the end (~$1) |
+| Setup | **$30** prepaid Gemini credit | Refs, key test, pilot drafts (~$5), Shorts 1–7 (~$19), radar and checks (~$3) |
+| Day-10 check passes | **$20** | Shorts 8–14 (~$19), radar (~$1) |
+| Day-14 keep | ~$180–270/month (Lucas decides) | Sprint: 2–3 Shorts/day |
 
-Week-1 check: **stop early** if the best of Shorts 1–7 has <5k views **and** their median is <200. That saves the second $20. Prepaid credit at $0 makes Google refuse calls, so it's a second hard cap behind the code's.
+Hard stop in code at the approved amount; prepaid credit at $0 makes Google refuse calls (second cap). If real cost per Short runs above $3.50, the room shifts to cheaper formats (`pov`, `expect_reality`, `meme_twist`).
 
-Real cost per Short is measured from the ledger; if it runs above $3.50, the room shifts to cheaper formats (`pov`, `expect_reality`, `meme_twist`).
+## Keep / kill
+| Check | Stop | Keep |
+|---|---|---|
+| Day 10 (Shorts 1–7) | best <5k views **and** median <200 | otherwise |
+| Day 14 (Shorts 1–14) | median <500 **and** best <20k | any Short ≥100k, **or** median ≥3k with ≥65% stayed |
+| Day 45 (sprint pace) | <1M Shorts views in the last 30 days | ≥3M (on pace for 10M/90 d) |
+
+Between the two: one more week (~$25), double down on the best format.
+Clip channel for comparison: median ~24 views per Short.
 
 ## What we measure (per Short, at 24 / 48 / 72 h)
 | Metric | Source | Why |
 |---|---|---|
 | Views, engaged views, **stayed %** (engaged ÷ views) | Data API + Analytics (D53 method) | Hook strength |
 | Average % viewed | Analytics | Payoff and pacing |
-| Subs gained per 1k views | Analytics | Does the cast make people come back |
-| Comments, shares | Data API / Analytics | Talkability; votes for `episode` arcs |
-| Format, cast members, length, cost | our DB | What to repeat |
+| Subs per 1k views | Analytics | Does the cast make people come back (YPP needs 1k subs) |
+| Comments, shares | Data API / Analytics | Talkability |
+| Format, cast, length, cost | our DB | What to repeat |
 | Made for kids as YouTube reports it | Data API | General-audience check |
 
-## Day-14 call
-| Result | Call |
-|---|---|
-| Any Short ≥100k views, **or** median ≥3k with ≥65% stayed | **Keep** → Phase 2 (2/day, weekly long-form compilation, L1 autonomy; ~$180/month, Lucas's OK) |
-| Median 500–3k, **or** best ≥20k | **One more week** (~$25): double the best format, drop the worst two |
-| Median <500 **and** best <20k | **Kill this cast.** Next: the radar's top rising lane with a new cast, or long-form |
-
-Clip channel for comparison: median ~24 views per Short.
-
-## Risks during the test
+## Risks
 | Risk | Watch | Answer |
 |---|---|---|
-| Omni can't hold our characters steady | Pilot; shot QC character score | Better refs (clean mid-shot portraits), shorter shots, first-frame anchors; worst case fewer characters per shot |
-| New channel's first Shorts get tiny test audiences | Views in the first 24 h | Judge at 48–72 h, not the first hour |
-| YouTube marks a Short made for kids | Daily status check | Change the look and topics; appeal by setting the audience in Studio |
-| Lucas busy one day | Premise auto-picks at 11:00 | The Short waits for his ✅ from the phone; a missed day is a missed day, not a weaker Short |
-| Spend runs ahead | Ledger, alerts at 50/80/100% | Hard stop at $50; cheaper formats |
+| Omni can't hold the characters steady | Pilot; shot QC character score | Clean mid-shot refs, shorter shots, first-frame anchors, fewer characters per shot |
+| New-channel test audiences are tiny | Views in the first 24 h | Judge at 48–72 h |
+| YouTube marks a Short made for kids | Daily status check | Adjust look and topics; set the audience in Studio |
+| YPP review rejects AI content | Review at application | Policy-safe show, human picks every day, appeal pack (scripts, prompts, refs, takes, edit logs) |
+| Spend runs ahead | Ledger, alerts at 50/80/100% | Hard stop; cheaper formats |

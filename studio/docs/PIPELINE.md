@@ -33,12 +33,12 @@ Side states: `needs_retake` (a shot failed QC; retakes left), `needs_human` (ret
 | [`generator/`](../generator/) | Character refs; shots via Omni; spend ledger and budget guard | Gemini API (Nano Banana, Omni) | on pick | ~$2.40–3/episode |
 | [`assembler/`](../assembler/) | Concat, on-screen text, sound mix, upscale | ffmpeg + the clipper's caption renderer | per episode | $0 |
 | [`qc/`](../qc/) | Shot checks and final checks ([`QC.md`](QC.md)) | rules + Gemini 3.8 Flash watching the file | per shot / episode | ~$0.01–0.02 |
-| [`publisher/`](../publisher/) | Telegram bot (pick, approve, retake, stop) + YouTube upload | the clipper's uploader and bot pattern, new token and bot | always on / every 15 min | $0 |
+| [`publisher/`](../publisher/) | Telegram bot (pick, approve, retake, stop) + YouTube upload | the clipper's uploader and bot pattern; same bot token and upload token (S8) | always on / every 15 min | $0 |
 | [`analyst/`](../analyst/) | Stats, analytics, made-for-kids watch, recap, weekly learn | the clipper's metrics puller + Sonnet weekly | hourly / 6 h / weekly | cents |
 | [`db/`](../db/) | Schema and migrations ([`DATA.md`](DATA.md)) | SQLite | — | — |
 | [`infra/`](../infra/) | Units, `.env`, health alerts, setup | systemd | — | — |
 
-## Human touchpoints (Telegram, new bot)
+## Human touchpoints (Telegram, the clipper's bot renamed, S8)
 | When | Lucas sees | Buttons | If no answer |
 |---|---|---|---|
 | ~08:00 | 5 premises: format, one-line story, why now (wave + its numbers), est. cost | 1–5 · 🔄 5 more · ⏭️ skip today | #1 auto-picked at 11:00 (logged as `auto`) |
@@ -71,4 +71,4 @@ Commands: `/status`, `/stats`, `/budget`, `/waves`, `/pause`, `/resume`. Only `T
 ## What we reuse from the clipper
 - `publisher/upload.py` (uploads, slots, quota handling, idempotent posts row), `publisher/approve_bot.py` (bot pattern), `analyst/metrics.py` (`post_metrics` / `post_analytics`), the caption renderer behind `style.json`, `infra/health.py`, `db/migrate.py`.
 - First build issue: move those into a `shared/` package with their tests, the clipper's behavior unchanged and CI green. If that's risky, import them with Studio config instead.
-- Separate: DB (`/opt/studio/studio.db`), `.env`, OAuth tokens, bot token, Google Cloud project (S3).
+- Shared with the clipper (S8): `/opt/clipper/.env` keys, Google Cloud project, upload token, bot token (the clipper's bot is off). Separate: DB and data in `/opt/studio`.

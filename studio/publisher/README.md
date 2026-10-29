@@ -1,6 +1,6 @@
 # Publisher (design only)
 
-**Status:** not built. Build order 6. Reuses the clipper's `upload.py` and bot pattern (moved to `shared/`) with Studio's own bot token, OAuth token and DB.
+**Status:** not built. Build order 6. Reuses the clipper's `upload.py` and bot pattern (moved to `shared/`) with the clipper's bot token and upload token (S8; the clipper is off) and Studio's own DB.
 
 **Scope:** the Telegram bot (premise pick, ✅ Post / ❌ Kill / 🔁 Retake, `/status`, `/stats`, `/budget`, `/waves`, `/pause`, `/resume`, alerts, recap) and the YouTube upload.
 

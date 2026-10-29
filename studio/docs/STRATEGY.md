@@ -1,80 +1,65 @@
-# PRM Studio — strategy (v1, 2026-10-29)
+# Nine to Purr — strategy (v2, 2026-10-29)
 
-Owner: **PRM · 00 HQ**. Decisions: [`DECISIONS.md`](DECISIONS.md) · live state: [`STATUS.md`](STATUS.md) · evidence: [`MARKET.md`](MARKET.md). Mirrored in the Claude project doc `claude/11-studio-plan.md` (the repo wins).
-**Status: design only. Nothing is built or bought until Lucas says go.**
+Owner: **PRM · 00 HQ**. Decisions: [`DECISIONS.md`](DECISIONS.md) · live state: [`STATUS.md`](STATUS.md) · evidence: [`MARKET.md`](MARKET.md) · cast: [`../series/nine-to-purr/BIBLE.md`](../series/nine-to-purr/BIBLE.md). Mirrored in the Claude project doc `claude/11-studio-plan.md` (the repo wins).
+
+## Focal point
+**One AI cat office comedy on YouTube, "Nine to Purr" (@NineToPurr). One goal: get into the YouTube Partner Program before Feb 1, 2027** (S7).
 
 ## The model
-- **One YouTube channel of original AI character Shorts:** a recurring cast of animals living adult human life (work, rent, commute, dating, groceries). Cast options: [`../series/CAST-OPTIONS.md`](../series/CAST-OPTIONS.md).
-- **Ride the wave, own the cast:** every Short plays a format that is popping in AI Shorts *today* (the radar decides), with our characters and an original story. We copy formats, never content (S2).
-- **Money:** YouTube ads. Shorts bring reach; long-form compilations bring watch hours and ~20–100× the RPM. English/US audience.
-- **Lucas's role:** picks the day's premise in Telegram (auto-picks after 3 h) and taps ✅ on each Short during the test. About 5 minutes a day.
+- **Show:** three coworkers at Clawporate Inc.: Mochi (lazy orange cat who somehow wins), Pearl (overachiever white cat who somehow loses), Gus (pigeon boss who calls a meeting about it). Comedy, adult work life, never sad stories (S9).
+- **Shorts, 20–40 s:** one situation, a turn, a payoff in the last 2–3 s. Wordless cast, sound effects, on-screen text. Formats follow what's popping in AI Shorts (radar, S2).
+- **Channel:** Peakz Recaps renamed to Nine to Purr; same keys, project, upload token and bot (S8). YouTube only until a hit (S10).
+- **Money:** YouTube Partner Program (Shorts pool + long-form ads), then brand deals and merch once a character has an audience.
+- **Lucas:** picks the day's premise and taps ✅ in Telegram (~5 min/day).
 
-## Why this
+## Why
 | Fact | Number |
 |---|---|
-| Clip channel so far | 21 Shorts, ~512 views → ~24 views per Short. At 6/day that's ~4.3k views/month vs ~3.3M/month needed to hold the 10M/90 d Shorts floor: **~770× short** |
-| Remake engine | 71 tries overnight Oct 28–29, 0 made; 52 failed on "footage not found". Original content has no footage to find |
-| The live wave | AI animals in human life: one AI cat daily-life series ~450M views (China, Oct 26); same lane on IG/TikTok/YouTube in the West |
-| Rules | July 2026: a recurring character or mascot is explicitly allowed; template clones and animal-distress bait are not |
-| Recurring casts win | Fruit Love Island, Bandar Apna Dost (~2.07B views), FUNTASTIC YT (best month $9k) all run one cast across every video |
+| AI cats are YouTube's biggest live lane | Cat Ai Network ~73M views and ~203k subs in the last 30 days (tracker); Batysyr 100M views in a month from 20 AI cat videos; Cat channel 91 grew to 2M subs after switching to AI cats |
+| Generic AI cat channels die | CatVerse Studio: 94 Shorts → 26 subs. Meowffice (office cats, our concept): 399 six-second vibe clips, recent ones ~15 views |
+| Rivals sell sadness | Sad or abandoned-cat stories are common; YouTube stopped paying for animal distress in July 2026. We stay monetizable with comedy |
+| Deadline | From Feb 1, 2027 joining YPP takes 8,000 watch hours or 20M Shorts views (double). Channels already in stay in |
+| Only YouTube pays us | TikTok doesn't pay Paraguay; Instagram pays only through brand deals |
+| Clip channel | ~24 views per Short; remake engine 0 of 71 overnight; paused (clipper D66–D67) |
 
 ## Unit economics (prices of 2026-10-29)
 | | |
 |---|---|
-| Cost per Short (3 shots × 8 s, Omni 720p, retakes and checks included) | **~$3** |
-| Cheapest format (1 shot × 10 s) | ~$1 |
-| Break-even views per Short on Shorts ads ($3 ÷ RPM) | 10k at $0.30 · **20k at $0.15** · 60k at $0.05 |
-| Shorts pay floor from Feb 1, 2027 | 10M qualified views per rolling 90 d (~3.3M/month); below it Shorts earn $0 |
-| Long-form YPP route | 1k subs + 4,000 watch hours in 12 months |
+| Cost per Short (2–4 Omni shots at 720p, retakes and checks included) | **~$2–3** |
+| YPP entry today | 1k subs + **10M Shorts views in 90 days**, or 1k subs + 4,000 watch hours in 12 months |
+| 10M in 90 days means | ~3.3M Shorts views/month: a few breakout Shorts, or ~45k average over ~220 Shorts |
+| Shorts RPM | ~$0.03–0.33 per 1k views; Shorts revenue also needs ≥10M views per rolling 90 days from Feb 1, 2027 |
 | Long-form RPM | ~$5–15 general audience; $1–3 if flagged made for kids |
 
-**What that means:** Shorts alone pay only at millions of views a month. The money path is Shorts for reach → weekly long-form compilations of the best Shorts (no new generation cost) for watch hours, YPP and higher RPM. Scaling to 2/day costs ~$180/month, so it happens only after the numbers say so.
+## Plan and gates
+| Phase | When | What | Cost | Gate |
+|---|---|---|---|---|
+| **0. Pilot** | Oct 30–Nov 1 | Character refs; 3 episodes by hand; Lucas judges the look | in the $30 | Look is right: no stutter, consistent characters, right colours |
+| **1. Test** | 14 days | 1 Short/day | $30 + $20 | Day 10: stop if best <5k views and median <200. Day 14: keep if any Short ≥100k or median ≥3k |
+| **2. Sprint** | weeks 3–12 | 2–3 Shorts/day + a weekly 10-min compilation (watch hours) | ~$180–270/month, Lucas's call at day 14 | Day 45: continue only at ≥3M Shorts views in the last 30 days |
+| **3. Apply** | mid-January 2027 | Apply to YPP (10M/90 d or 4,000 h route) | — | Accepted before Feb 1, 2027 |
+| **4. Expand** | 2027 | Shorts Series, brand deals, merch, TikTok/IG on a hit | — | ≥$1,100 net/month for 2 months |
 
-## Phases and gates
-| Phase | What | Gate to the next |
-|---|---|---|
-| **0. Pilot** (2–3 days after go) | Lucas picks the cast. Character refs made. 3 episodes made by hand in a session (no pipeline yet). Lucas judges the look | Lucas says the look is right: no stutter, characters consistent, colours right |
-| **1. Test** (14 days) | 1 Short/day, $50 hard cap ($30 + $20), Lucas ✅ each. Pipeline built in parallel by Build agents | Week-1 check (early stop), then the Day-14 call (below) |
-| **2. Scale** (to ~day 60) | 2 Shorts/day, weekly long-form compilation, audience-vote arcs, auto-post with 🛑 Stop. Budget ~$180/month: Lucas approves it at the Day-14 call | Day-60 money check (below) |
-| **3. Expand** (2027) | YPP, Shorts Series, a second format or cast only once the first holds | ≥$1,100 net/month for 2 months |
-
-### Day-14 call (each Short measured at ≥48 h)
-| Result | Call |
-|---|---|
-| Any Short ≥100k views, **or** median ≥3k views with ≥65% stayed (engaged/views) | **Keep** → Phase 2 |
-| Median 500–3k, **or** best ≥20k | One more week (~$25), double down on the best format |
-| Median <500 **and** best <20k | **Kill** this cast; next lane from the radar, or long-form |
-
-Clip channel for comparison: median ~24.
-
-### Day-60 money check
-Continue only with **median ≥20k views per Short**, or **≥3.3M Shorts views/month**, or **≥1,000 long-form watch hours/month**. Otherwise stop the ad model for Studio.
+**Honest odds:** most AI cat channels never take off; a few make $10k+/month. $30–50 tells us which side we're on.
 
 ## Hard rules
-- Original characters only. No real people, no babies or kids, no lookalikes of existing characters, no real brands or logos, no copyrighted music.
-- General audience, not made for kids: adult-life topics, cinematic look (not a toddler cartoon), `selfDeclaredMadeForKids=false`. Alert if YouTube flips a video to made for kids.
-- No animal distress or rescue, no gore, no sexual or cheating tropes.
-- Every Short is a new story: premise similarity check against the last 30, unique titles and descriptions, a human pick every day.
-- ≤60 s per Short (test default 20–30 s). Never more than 3/day (spam policy); the test runs 1/day.
-- Budget: a hard stop in code plus prepaid Gemini credit (Google refuses calls at $0). Never a second Google or Anthropic account. Keys only in `/opt/studio/.env`.
-- One channel. No backup channels. Peakz remakes set to private before Studio's first upload (one termination bars every channel).
+- Original characters only. No real people, no babies or kids, no lookalikes of existing characters, no real brands or logos, no outside music.
+- General audience: adult work-life topics, cinematic look (not a toddler cartoon), `selfDeclaredMadeForKids=false`.
+- No animal distress, rescue, injury, gore, sexual or cheating tropes, shock, politics.
+- Every Short is a new story with a real joke (Meowffice's lesson); premise similarity < 0.85 vs the last 30; unique titles.
+- ≤60 s. At most 3/day. Quality over quantity: a weak day posts nothing.
+- YPP-ready from day 1: keep each Short's script, prompts, refs, rejected takes and edit log (what YouTube asks for in appeals).
+- Budget: hard stop in code + prepaid Gemini credit. Never a second Google or Anthropic account. Keys only in `/opt/clipper/.env` (shared, S8).
+- One channel. No backups.
 
 ## Budget for the 2-week test
 | Item | Cost |
 |---|---|
-| 14 Shorts at Omni 720p, retakes included (format mix in [`TEST-PLAN.md`](TEST-PLAN.md)) | ~$38 |
+| 14 Shorts at Omni 720p, retakes included | ~$38 |
 | Pilot look drafts at 360p + key test | ~$4 |
-| Character refs (Nano Banana 2 Lite, ~30 images) | ~$1 |
+| Character refs (Nano Banana 2 Lite) | ~$1 |
 | Radar: Gemini watches ~40 popping Shorts/day | ~$4 |
-| Writing and checks (Claude, Gemini) + optional narrator TTS | ~$1–2 |
+| Writing and checks | ~$1–2 |
 | **Total (hard cap $50)** | **~$48–49** |
 
-**Upfront: $30** of prepaid Gemini credit at setup, **+$20 only if the week-1 check passes** (Shorts 1–7: stop early if the best has <5k views and the median <200). With Paraguay's 10% IVA on foreign digital services, ~G. 315k in total at G. 5,740/USD. Claude's ~$1–2 comes from the existing Anthropic balance. No subscriptions.
-
-2 Shorts/day instead of 1: +~$38.
-
-## Open questions for Lucas
-1. **Cast:** A, B or C ([`CAST-OPTIONS.md`](../series/CAST-OPTIONS.md)). HQ pick: A.
-2. **Voice:** wordless cast + SFX (HQ default; no voice drift, no language barrier) or a narrator voice.
-3. **Peakz:** set the 21 remakes to private and pause the clipper at go (D66)?
-4. **Repo:** it's public, so this plan is readable by anyone. Keep it public or make it private?
+Paid as prepaid Gemini credit: **$30 at setup, +$20 only if the day-10 check passes.** ~G. 315k in total with Paraguay's 10% IVA (G. 5,740/USD). Claude's share comes from the existing Anthropic balance.

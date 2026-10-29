@@ -13,6 +13,6 @@
 | `studio-bot.service` | always on |
 | `studio-learn.timer` | Sundays |
 
-**`.env` keys (names only; values never in git or chat):** `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` (a separate Studio key on Lucas's account), `YOUTUBE_API_KEY` (in `prm-studio`), `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_TOKEN_FILE`, `YOUTUBE_ANALYTICS_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_ID`, `STUDIO_DB`, `STUDIO_BUDGET_USD`, `EPISODE_MAX_USD`, `STUDIO_SLOT_LOCAL`, `STUDIO_TZ`.
+**Keys (S8): shared `/opt/clipper/.env`** (names only; values never in git or chat): `GEMINI_API_KEY` (added at setup), `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_TOKEN_FILE`, `YOUTUBE_ANALYTICS_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_ALLOWED_CHAT_ID`, `STUDIO_DB`, `STUDIO_BUDGET_USD`, `EPISODE_MAX_USD`, `STUDIO_SLOT_LOCAL`, `STUDIO_TZ`.
 
 **Health (every pass):** disk (the root volume is 38.5 GB, shared with the clipper; alert at 80%), budget at 50/80/100%, generation failures, quota errors, bot heartbeat.
