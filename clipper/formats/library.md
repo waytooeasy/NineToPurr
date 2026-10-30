@@ -1,39 +1,30 @@
-# Format Library (updated 2026-10-29)
-_Copy structure only. Use our own clips, and never re-upload other channels' videos._
+# Format Library (updated 2026-10-30)
 
-## Title hooks (best first)
-1. `Imagine {absurd setup} and still {twist} 😭😭`: top performer, works without a named streamer
-2. `{S} was about to learn the real lesson 😳 #{streamer}`: curiosity gap plus a hashtag
-3. `Bro {unexpected action} 💀💀`
-4. `He couldn't stop smiling after watching this 😂❤️‍🩹`: wholesome reaction
-5. `That {person} was NOT having it 💀💀`: confrontation or refusal
-- Extra patterns: `{S} finds {funny thing}! 💀😭` (short official-style clip) and `{S} almost {did thing} 😭💔`.
+Rule: copy structure, timing and caption style only. Never download or re-upload competitor videos.
 
-## Title rules
-- Keep titles under about 60 characters.
-- Use 1-2 emojis at the end, mostly 💀 😭 😂 😳.
-- Add the streamer hashtag when the streamer is the draw (#ishowspeed worked for Nexxo).
-- Use "Bro" or "He" as the subject when the clip stands alone.
-- Use a streamer name only when they are the draw.
+## Formats that work
+1. **Versus / contest (≤15s):** `{Streamer} vs {Opponent} {game} contest`. Cut to the single payoff beat. Best observed vph (n=1, treat as a hypothesis).
+2. **Challenge clip (25-35s):** `{Streamer} {challenge} CHALLENGE!`. Show the setup in 3s, then the attempt, then the reaction.
+3. **Fail / karma story (40-47s):** `Imagine {X} and still {Y} TWICE 😭😭`. Hold the payoff until the second half.
+4. **Shock one-liner (15-25s):** `Bro really {absurd action} 💀💀`.
+5. **Setup-then-lesson teaser (35-45s):** `{Streamer} was about to learn the real lesson 😳 #{streamer}`.
+6. **Wholesome / emotional (≈40s):** `He couldn't stop smiling after watching this 😂❤️‍🩹`.
+7. **Funny-reaction hook (~9-17s):** `{Streamer} didn't expect that! 💀🥶`, `{Streamer} finds a {funny thing}! 💀😭`.
 
-## Length
-- Primary: 31-60s (avg 16-21k vph).
-- Test: <=15s for one punchline, and clips under 10s on high-demand moments.
-- Avoid 16-30s unless the payoff is very strong (avg 8.4k vph).
-- Avoid >60s (1 video at 4.8k vph, too little data).
-
-## Clip structure
-- The payoff or the setup question must show within the first 2 seconds.
-- Cut to one beat: setup, then reaction or twist, then end.
-- Reaction and wholesome moments, fails and "bro did X" moments all perform.
+## Style rules
+- Titles are lowercase-casual or ALL CAPS for challenges. Use 1-2 emojis at the end (💀 😭 😳 are the most common).
+- Add the streamer hashtag when a recap-style title doesn't name him.
+- Length: aim for 31-45s by default and ≤15s for versus clips. Avoid >60s.
+- Hook inside the first 1-2s with the payoff or conflict visible.
 
 ## Post times
-- Post 12-17 UTC (09-14 Asuncion, UTC-3).
-- Avoid 01-04 UTC.
-- The data is thin, so keep testing.
+- Primary: 14:00 UTC (11:00 Asuncion).
+- Secondary: 12:00-13:00 UTC, 16:00-18:00 UTC, 21:00 UTC.
+- Avoid 01:00-04:00 UTC.
 
-## Streamer slots
-- IShowSpeed: high demand but saturated. Pick specific moments.
-- CaseOh: low competition, strong 7d total (test slot).
-- Kai Cenat: strong. Merge the "Kai Cenat" and "kaicenat" labels.
-- PGL: watchlist only.
+## Not replicable
+- Giveaway titles ("Win $250,000", "Win an iPhone") belong to the official channel.
+
+## Open questions (retest next report)
+- Does ≤15s beat 31-45s once the Jamal outlier is removed?
+- Do non-Speed streamers (Kai Cenat, CaseOh) respond to the same formats?

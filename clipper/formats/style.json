@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-29",
+  "updated": "2026-10-30",
   "sample": [
-    "qGQDl_3q2AE",
-    "hXWYzOPCyuc",
+    "nAE2VivLmew",
+    "EkYXY7UeqTI",
+    "WJhWVD5zPQ8",
+    "FLkdWK-01EY",
     "h602c51kG0s",
-    "5QNkccVsEzA",
+    "qGQDl_3q2AE",
     "f7B5ByZjObY",
-    "H_kEnMJXSew",
-    "yZtkH0ePVCs",
-    "vRL1OYNdgBU"
+    "5QNkccVsEzA"
   ],
-  "seen": 9,
+  "seen": 4,
   "caption": {
     "case": "upper",
-    "fill": "#FFFF00",
-    "highlight": "#FF2020",
+    "fill": "#FFFFFF",
+    "highlight": "#FFFF00",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,12 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FF2020",
-      "#80FF00",
-      "#A020F0",
-      "#00FF00"
+      "#FFFF00",
+      "#00FF00",
+      "#39FF14"
     ]
   },
-  "layout": "stack",
-  "notes": "Bold uppercase captions with black outline, yellow default and varied colored emphasis words; many frames are split-screen stacks."
+  "layout": "fullbleed",
+  "notes": "Captions appear mid-frame in bold uppercase, occasionally green or yellow emphasis words."
 }
