@@ -1,30 +1,35 @@
-# Format Library (updated 2026-10-30)
+# Format Library (updated 2026-10-31)
 
-Rule: copy structure, timing and caption style only. Never download or re-upload competitor videos.
+## Rules
+- Copy structures and hooks only, never competitor footage. Cut from sources we have rights to.
+- The hook must land in the first 1-2s. Put the reaction or payoff early.
+- Title: short, 1-2 emojis (💀😭 🥶 ❤️‍🩹), plus #streamer when it is a single-streamer clip.
 
 ## Formats that work
-1. **Versus / contest (≤15s):** `{Streamer} vs {Opponent} {game} contest`. Cut to the single payoff beat. Best observed vph (n=1, treat as a hypothesis).
-2. **Challenge clip (25-35s):** `{Streamer} {challenge} CHALLENGE!`. Show the setup in 3s, then the attempt, then the reaction.
-3. **Fail / karma story (40-47s):** `Imagine {X} and still {Y} TWICE 😭😭`. Hold the payoff until the second half.
-4. **Shock one-liner (15-25s):** `Bro really {absurd action} 💀💀`.
-5. **Setup-then-lesson teaser (35-45s):** `{Streamer} was about to learn the real lesson 😳 #{streamer}`.
-6. **Wholesome / emotional (≈40s):** `He couldn't stop smiling after watching this 😂❤️‍🩹`.
-7. **Funny-reaction hook (~9-17s):** `{Streamer} didn't expect that! 💀🥶`, `{Streamer} finds a {funny thing}! 💀😭`.
+1. **Challenge / contest cut** (hammer, gong, 3-point, vs guest): <=30s, ideally <=15s, with the result in the title or on screen.
+2. **"Bro..." reaction recap**: one absurd moment, 20-45s, title "Bro {did X} 💀😭".
+3. **Surprise reaction**: "{S} didn't expect that! 💀🥶", 15-30s, cut at the reaction.
+4. **Wholesome moment**: "{Person} was the real one for {S} ❤️‍🩹", 35-60s.
+5. **Confrontation / security**: "That {role} was NOT having it 💀💀", 30-55s.
+6. **Event / seasonal** (Halloween party, guest crashes): "{S} caught {X} trying to {Y}!", about 40s. Post within hours of the stream.
+7. **Long special / 24h challenge**: >60s is only worth it for big events (Ocky Way hit 94k vph).
 
-## Style rules
-- Titles are lowercase-casual or ALL CAPS for challenges. Use 1-2 emojis at the end (💀 😭 😳 are the most common).
-- Add the streamer hashtag when a recap-style title doesn't name him.
-- Length: aim for 31-45s by default and ≤15s for versus clips. Avoid >60s.
-- Hook inside the first 1-2s with the payoff or conflict visible.
+## Length guide
+- Default 31-45s (best volume avg, 23k vph).
+- Test <=15s punchlines (54k avg vph, low sample).
+- 46-60s is weaker (16k avg).
 
-## Post times
-- Primary: 14:00 UTC (11:00 Asuncion).
-- Secondary: 12:00-13:00 UTC, 16:00-18:00 UTC, 21:00 UTC.
-- Avoid 01:00-04:00 UTC.
+## Timing
+- Primary: 13-14 UTC (10-11 Asuncion).
+- Secondary: 17 UTC (14 Asuncion).
+- Backup: 21 UTC (18 Asuncion).
+- Post fast after the stream moment, since freshness drives vph.
 
-## Not replicable
-- Giveaway titles ("Win $250,000", "Win an iPhone") belong to the official channel.
+## Streamer priority
+1. IShowSpeed (volume)
+2. Kai Cenat (best avg vph, under-clipped)
+3. CaseOh (watch)
 
-## Open questions (retest next report)
-- Does ≤15s beat 31-45s once the Jamal outlier is removed?
-- Do non-Speed streamers (Kai Cenat, CaseOh) respond to the same formats?
+## Watching
+- Tags gaming and funnyclips (weak signal).
+- Hashtag #ishowspeed on recap channels.

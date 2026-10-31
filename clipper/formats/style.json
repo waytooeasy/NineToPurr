@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-30",
+  "updated": "2026-10-31",
   "sample": [
+    "KnNKRKtPZSU",
     "nAE2VivLmew",
     "EkYXY7UeqTI",
     "WJhWVD5zPQ8",
-    "FLkdWK-01EY",
     "h602c51kG0s",
-    "qGQDl_3q2AE",
     "f7B5ByZjObY",
-    "5QNkccVsEzA"
+    "yWNhz7ioy5U",
+    "FLkdWK-01EY"
   ],
-  "seen": 4,
+  "seen": 3,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FFFF00",
+    "highlight": "#39FF14",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,11 +22,9 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FFFF00",
-      "#00FF00",
       "#39FF14"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear mid-frame in bold uppercase, occasionally green or yellow emphasis words."
+  "notes": "Bold white captions with black outline; green highlighted emphasis words in middle of frame."
 }
