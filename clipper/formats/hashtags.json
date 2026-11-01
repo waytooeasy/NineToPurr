@@ -1,11 +1,12 @@
 {
-  "updated": "2026-10-31",
+  "updated": "2026-11-01",
   "sample": 40,
-  "title_share": 0.118,
+  "title_share": 0.146,
   "title_tags": 1,
   "generic": [
     "#edit",
-    "#funny"
+    "#funny",
+    "#wholesome"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",

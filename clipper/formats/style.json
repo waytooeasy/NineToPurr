@@ -1,30 +1,32 @@
 {
-  "updated": "2026-10-31",
+  "updated": "2026-11-01",
   "sample": [
-    "KnNKRKtPZSU",
+    "Gmq8L3Xa4jM",
+    "ZtLxKPIqaoI",
     "nAE2VivLmew",
-    "EkYXY7UeqTI",
-    "WJhWVD5zPQ8",
-    "h602c51kG0s",
-    "f7B5ByZjObY",
+    "KnNKRKtPZSU",
+    "nRWfRcjz1Uk",
+    "Woh3OFM2OUw",
     "yWNhz7ioy5U",
-    "FLkdWK-01EY"
+    "f7B5ByZjObY"
   ],
   "seen": 3,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#39FF14",
+    "highlight": "#00E676",
     "outline": "#000000",
-    "words": 2,
+    "words": 3,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#39FF14"
+      "#00E676",
+      "#FF3B3B",
+      "#00E5FF"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Bold white captions with black outline; green highlighted emphasis words in middle of frame."
+  "notes": "Captions appear over full-bleed vertical video, mostly mid-frame, with color-highlighted keywords."
 }
