@@ -1,36 +1,36 @@
-# Format Library (Editor copies from here)
+# Format Library (updated 2026-11-02)
+Editor: copy structure, never competitor footage. Metadata-derived; sample sizes are small.
 
-## Hook/title templates (proven, 2026-11-01)
-1. Bro was NOT ready for {moment/person} 💀🔥
-2. {Streamer} vs {Person} {challenge}
-3. {Person} got the best {brother/friend} ❤️‍🩹 #{streamer}
-4. Bro HAD TO get out of there 😭🙏
-5. {Streamer} humbled {celebrity} fr 🥶 #{streamer}
-- Also works: That {X} was NOT having it 💀💀 | No way {X} found him everywhere 😳 | Bro sent him to {place} 😭
+## Title formats (ranked by vph)
+1. `Bro was NOT {ready for / playing around} {X} 💀🔥`: best clipper format (30-100k vph).
+2. `{Streamer} humbled {guest} fr 🥶 #{streamer}` (39k).
+3. `{Streamer} {dramatic action} {co-star} 💔🕷️`: story or pun hook (25-33k).
+4. `{Streamer} vs {co-star} {challenge}` (58k, 14s).
+5. `{Co-star} got the best {X}! ❤️‍🩹 #{streamer}`: wholesome (24k).
+6. `{Streamer} DIDN'T expect that! 💀🥶` (14k, 17s).
+7. `Bro HAD TO get out of there 😭🙏` (51k): escape / awkward moment.
+
+## Style rules
+- Emojis go at the end: 💀 😭 🥶 🔥, max 2.
+- Name the streamer in the title or hashtag, except for "Bro..." titles.
+- The payoff or the face reaction must land in the first 2s.
 
 ## Length
-- Default 12-15s for challenge or punchline clips.
-- 31-45s for reaction or story clips.
-- Test one 60-90s story clip per week (n=1 signal, unproven).
+- Reaction or hit clips: 15-30s.
+- Story-arc clips: 40-59s.
+- Avoid padding.
 
-## Style notes
-- Titles are lowercase-casual with 1-2 emojis (💀 😭 🔥 🥶 ❤️‍🩹) and end on the reaction.
-- Add #{streamer} on recap-style titles.
-- Beats that work: celebrity or athlete aura, family or wholesome moments, streamer getting humbled, security or guard confrontations, challenge or contest.
-- Open on the payoff within the first second.
+## Posting windows
+- UTC 10-12 (Asuncion 07-09).
+- UTC 21-02 (Asuncion 18-23).
+- Backup UTC 13-14 (Asuncion 10-11).
+- Low confidence: A/B test.
 
-## Posting windows (UTC / Asuncion UTC-3)
-- 12-14 / 09-11
-- 16-17 / 13-14
-- 21 / 18
-- Avoid 13 UTC and 07-10 UTC.
+## Topics
+- **Hot:** Speed Spider-Man / Miles Morales arc, Speed vs Jamal, Speed Goes Pro S2 trailer (new 11-02), Ashton Hall and Messi moments.
+- **Cooling:** Halloween.
+- **Evergreen:** challenges and contests, wholesome sibling moments.
 
-## Priority streamers
-1. IShowSpeed
-2. CaseOh
-3. Kai Cenat
-
-## Rules
-- Original clips from streamer VODs or streams only.
-- Metadata for ideas only. Never download or re-upload competitor videos.
-- Ignore single-channel rising tags (yourrage, etc.).
+## Watch / test
+- Kai Cenat and CaseOh slots.
+- Tags gaming and funnyclips: no signal yet.

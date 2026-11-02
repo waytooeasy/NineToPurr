@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-01",
+  "updated": "2026-11-02",
   "sample": [
+    "q9ksz4oHuZw",
+    "EFdLYWHgs5A",
     "Gmq8L3Xa4jM",
     "ZtLxKPIqaoI",
     "nAE2VivLmew",
     "KnNKRKtPZSU",
-    "nRWfRcjz1Uk",
-    "Woh3OFM2OUw",
     "yWNhz7ioy5U",
-    "f7B5ByZjObY"
+    "aCt-AwZi380"
   ],
-  "seen": 3,
+  "seen": 4,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#00E676",
+    "highlight": "#FFFF00",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,11 +22,12 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#00E676",
-      "#FF3B3B",
-      "#00E5FF"
+      "#FFFF00",
+      "#00FF00",
+      "#FF0000",
+      "#00FFFF"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear over full-bleed vertical video, mostly mid-frame, with color-highlighted keywords."
+  "notes": "Captions appear in bold uppercase over fullbleed vertical video, with colored emphasis words."
 }
