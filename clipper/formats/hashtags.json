@@ -1,12 +1,11 @@
 {
-  "updated": "2026-11-02",
+  "updated": "2026-11-04",
   "sample": 40,
-  "title_share": 0.106,
+  "title_share": 0.118,
   "title_tags": 1,
   "generic": [
     "#edit",
-    "#spiderman",
-    "#wholesome"
+    "#spiderman"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",
