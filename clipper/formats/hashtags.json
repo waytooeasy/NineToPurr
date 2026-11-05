@@ -1,11 +1,12 @@
 {
-  "updated": "2026-11-04",
+  "updated": "2026-11-05",
   "sample": 40,
-  "title_share": 0.118,
+  "title_share": 0.124,
   "title_tags": 1,
   "generic": [
     "#edit",
-    "#spiderman"
+    "#spiderman",
+    "#wholesome"
   ],
   "streamers": {
     "IShowSpeed": "#ishowspeed",
@@ -17,8 +18,8 @@
     "gaming",
     "horror",
     "horror gaming",
-    "jumpscare",
     "scary",
-    "streamer"
+    "streamer",
+    "jumpscare"
   ]
 }
