@@ -1,14 +1,14 @@
 {
-  "updated": "2026-11-05",
+  "updated": "2026-11-07",
   "sample": [
+    "MSizEHlSsTs",
     "q9ksz4oHuZw",
+    "kDLY56pnDlo",
     "5Hcu9KALHRk",
-    "yWNhz7ioy5U",
     "EFdLYWHgs5A",
     "aCt-AwZi380",
-    "nAE2VivLmew",
-    "ZtLxKPIqaoI",
-    "KnNKRKtPZSU"
+    "cYJD2IhYp7k",
+    "ZtLxKPIqaoI"
   ],
   "seen": 6,
   "caption": {
@@ -23,11 +23,11 @@
     "highlight_on": true,
     "highlights": [
       "#FFFF00",
-      "#FF2A1F",
-      "#00E5FF",
-      "#39FF14"
+      "#FF0000",
+      "#00FF00",
+      "#00FFFF"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Vertical fullbleed shorts; burned-in uppercase bold captions with coloured emphasis words and small handle watermark."
+  "notes": "Bold uppercase captions, yellow/red emphasis words, black outline, centered over full-bleed vertical video."
 }
