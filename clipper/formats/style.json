@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-07",
+  "updated": "2026-11-08",
   "sample": [
-    "MSizEHlSsTs",
+    "n3GlNNBwMcg",
     "q9ksz4oHuZw",
-    "kDLY56pnDlo",
+    "MSizEHlSsTs",
     "5Hcu9KALHRk",
     "EFdLYWHgs5A",
-    "aCt-AwZi380",
-    "cYJD2IhYp7k",
-    "ZtLxKPIqaoI"
+    "PEOl5luGQrs",
+    "lcaWjyBMOB8",
+    "cYJD2IhYp7k"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FFFF00",
+    "highlight": "#FFE600",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,12 +22,12 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FFFF00",
-      "#FF0000",
-      "#00FF00",
-      "#00FFFF"
+      "#FFE600",
+      "#FF2A2A",
+      "#E040FB",
+      "#00FF66"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Bold uppercase captions, yellow/red emphasis words, black outline, centered over full-bleed vertical video."
+  "notes": "Bold uppercase captions, yellow/red/pink/green emphasis colours, dark outlines; mostly centred."
 }

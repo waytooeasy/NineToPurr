@@ -1,29 +1,34 @@
-# Format Library (updated 2026-11-07)
-
-## Title/hook templates (lowercase, casual, 1-2 emoji at end)
-- `bro was NOT {ready for / playing around with} {thing} 💀💀`: top performer, 30-52k vph
-- `that {moment} was personal lowk 💀💀`: 42k vph
-- `{streamer} humbled {person} fr 🥶`: 40k vph
-- `{streamer} didn't even know {person} was behind him 💀`: 16k vph
-- `bro just continued {doing X} 💀` / `imagine he {did X} 💀`: 10-22k vph
-- `{streamer} can't believe {X} 😂`: 9k vph, weaker, use as filler
-- Rule: a vague "bro" or name-light title beats a descriptive one. Put the emoji last. Avoid hashtag-only titles (17k vph).
+# Format Library (updated 2026-11-08)
 
 ## Length
-- Target 20-45s. 16-30s is the safe default and 31-45s is worth testing for bigger moments.
-- 15s or under averages lowest (21k vph). Skip anything over 60s.
+- Target 16-30s. Best average vph in current data.
+- 7-15s works for single-punchline Kai moments.
+- Over 60s only for event-style Speed moments.
 
-## Content themes that work
-- Streamer reaction or "caught off guard" moments
-- Sports icon moments (Ronaldo, Messi) when the streamer reacts
-- Speed's Spider-Man bit (Miles Morales, Speeder-Man, Prowler, backflip race)
-- Kai Cenat live moments, especially the GTA San Andreas series
+## Title formulas (end with 💀 or 😂; keep under about 10 words)
+- `{Streamer} Didn't Even Know {Person} Was Behind Him 💀`
+- `Bro Just {Unexpected Action} 💀💀`
+- `{Streamer} Can't Believe How Much {Thing} Costs 😂`
+- `{Streamer} Got Cooked On {Platform/Situation} 😂`
+- `{Streamer} Was Hyped To Witness The Legendary "{meme quote}" 😂`
+- `{Streamer} Reacts to {Specific Object/Event} 😭💀`
+- Milestone or event: `Thank You {Name} ❤️‍🩹`, `{N} Hours As {Character}!` (Speed)
+- Emotional titles (😭/💔) only when the clip context is genuine.
 
-## Post windows (tentative, thin data)
-- 10:00-12:00 UTC (07:00-09:00 Asuncion)
-- 19:00-22:00 UTC (16:00-19:00 Asuncion)
-- Avoid UTC 8-9, 15 and 18.
+## Structure
+- Open on the reaction or punchline setup within the first 1-2s. No intro.
+- Cut at the peak, with no tail. One moment per Short.
+- Use a name or cameo (Fanum, Ronaldo) in the title when it is in the clip.
 
-## Rules
-- Metadata and format signals only. Cut from our own source footage and never download or re-upload competitor videos.
-- Ignore the "rising tag" list unless 3+ channels use a tag.
+## Posting
+- Primary window: 15:00-19:00 UTC (12:00-16:00 Asuncion).
+- Secondary window: 22:00-23:00 UTC (19:00-20:00 Asuncion).
+- Unconfirmed, keep testing.
+
+## Sources
+- Our own VOD or stream clips only.
+- Competitor channels are for title, length and timing reference only. Never download or re-upload their videos.
+
+## Data notes
+- Exclude livestreams (duration 0) from format stats.
+- vph is biased by video age, so compare same-age clips.
