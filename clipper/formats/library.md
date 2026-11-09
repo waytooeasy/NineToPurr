@@ -1,34 +1,38 @@
-# Format Library (updated 2026-11-08)
+# Format Library (updated 2026-11-09)
+_Editor: copy structure and pacing from here. Edit original footage only; never reuse competitor uploads._
 
 ## Length
-- Target 16-30s. Best average vph in current data.
-- 7-15s works for single-punchline Kai moments.
-- Over 60s only for event-style Speed moments.
+- Target **7-15s**. Acceptable up to 30s if there's a clear payoff. Avoid over 45s.
+- Open on the peak moment or reaction in the first 1s. No intro.
+- Trim dead air. End right after the punchline, with a hard cut and no outro.
 
-## Title formulas (end with 💀 or 😂; keep under about 10 words)
-- `{Streamer} Didn't Even Know {Person} Was Behind Him 💀`
-- `Bro Just {Unexpected Action} 💀💀`
-- `{Streamer} Can't Believe How Much {Thing} Costs 😂`
-- `{Streamer} Got Cooked On {Platform/Situation} 😂`
-- `{Streamer} Was Hyped To Witness The Legendary "{meme quote}" 😂`
-- `{Streamer} Reacts to {Specific Object/Event} 😭💀`
-- Milestone or event: `Thank You {Name} ❤️‍🩹`, `{N} Hours As {Character}!` (Speed)
-- Emotional titles (😭/💔) only when the clip context is genuine.
+## Title rules
+- Under 10 words, ends with 1-2 emojis (😂 💀 are the best performers).
+- Name the streamer, or use "Bro" as the subject.
+- Describe one specific odd detail. Don't over-explain.
 
-## Structure
-- Open on the reaction or punchline setup within the first 1-2s. No intro.
-- Cut at the peak, with no tail. One moment per Short.
-- Use a name or cameo (Fanum, Ronaldo) in the title when it is in the clip.
+## Hook templates
+1. `Never Tell {Streamer} {debate take}😂` (rivalry and debate, top performer)
+2. `{Streamer} Can't Believe {specific odd detail} 😂`
+3. `{Streamer} Finds Out What {person} Did In {place} 😂` (curiosity gap)
+4. `Bro Just {unexpected action}💀`
+5. `Imagine {Streamer} {hypothetical}💀💀`
 
-## Posting
-- Primary window: 15:00-19:00 UTC (12:00-16:00 Asuncion).
-- Secondary window: 22:00-23:00 UTC (19:00-20:00 Asuncion).
-- Unconfirmed, keep testing.
+## Also working
+- Emotional or tribute clip: `thank you {X} ❤️‍🩹` (strong for Speed/Ronaldo moments).
+- Roast: `{Streamer} Got Cooked On {platform}😂`.
+- Hype reaction to a famous phrase or meme moment.
+- Skill or athletic fails and wins (backflips, kicks), with a short punchy caption.
 
-## Sources
-- Our own VOD or stream clips only.
-- Competitor channels are for title, length and timing reference only. Never download or re-upload their videos.
+## Post windows
+- Primary: 19-23 UTC (16-20 Asuncion). Secondary: 12-15 UTC (09-12 Asuncion).
+- Test one overnight slot, 05-09 UTC (02-06 Asuncion), for recap-style clips.
 
-## Data notes
-- Exclude livestreams (duration 0) from format stats.
-- vph is biased by video age, so compare same-age clips.
+## Priorities
+- Kai Cenat is the top subject and has less competition.
+- Speed is crowded, so use a sharper angle.
+- CaseOh is low priority.
+
+## Caveats
+- The sample is small (20 videos). Re-check each week.
+- Exclude live streams (duration 0) from Shorts benchmarks.
