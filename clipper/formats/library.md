@@ -1,38 +1,36 @@
-# Format Library (updated 2026-11-09)
-_Editor: copy structure and pacing from here. Edit original footage only; never reuse competitor uploads._
+# Format Library (updated 2026-11-10)
+Metadata-derived patterns only. Write original titles and cut from our own sourced footage; never copy or re-upload competitor videos.
 
 ## Length
-- Target **7-15s**. Acceptable up to 30s if there's a clear payoff. Avoid over 45s.
-- Open on the peak moment or reaction in the first 1s. No intro.
-- Trim dead air. End right after the punchline, with a hard cut and no outro.
+- Target 7-30s. 15s or less is best (avg 29k vph). Avoid 31s or more (avg about 8k vph).
+- One beat per clip: setup, then payoff fast. Cut dead air before the moment.
 
-## Title rules
-- Under 10 words, ends with 1-2 emojis (😂 💀 are the best performers).
-- Name the streamer, or use "Bro" as the subject.
-- Describe one specific odd detail. Don't over-explain.
+## Title style
+- Short, lowercase-casual, one subject. Almost always ends with 💀 or 😂 (😭 for wholesome moments).
+- Name the streamer in reaction formats.
 
 ## Hook templates
-1. `Never Tell {Streamer} {debate take}😂` (rivalry and debate, top performer)
-2. `{Streamer} Can't Believe {specific odd detail} 😂`
-3. `{Streamer} Finds Out What {person} Did In {place} 😂` (curiosity gap)
-4. `Bro Just {unexpected action}💀`
-5. `Imagine {Streamer} {hypothetical}💀💀`
+1. `Never tell {S} {{opinion/rival}} 😂`
+2. `{S} can't believe {{specific detail}} 😂` (7-13s reaction clips)
+3. `Bro just {{unexpected action}} 💀`
+4. `When {S} made {{celebrity}} {{reaction}} 😂`
+5. `That {{moment}} was personal lowk 💀`
 
-## Also working
-- Emotional or tribute clip: `thank you {X} ❤️‍🩹` (strong for Speed/Ronaldo moments).
-- Roast: `{Streamer} Got Cooked On {platform}😂`.
-- Hype reaction to a famous phrase or meme moment.
-- Skill or athletic fails and wins (backflips, kicks), with a short punchy caption.
+## Content angles that work now
+- Speed pranks and the Speed x Ronaldo storyline (meets, reactions, tributes).
+- Kai Cenat reaction clips: Kai discovering something wild, with the subject in the title.
+- Sports-rival banter (Messi vs Ronaldo).
+- Streamer self-own or meme moments ("became NPC on his own stream").
+- Skill highlights (backflips, kicks) with a one-line hype caption.
 
-## Post windows
-- Primary: 19-23 UTC (16-20 Asuncion). Secondary: 12-15 UTC (09-12 Asuncion).
-- Test one overnight slot, 05-09 UTC (02-06 Asuncion), for recap-style clips.
+## Post times (UTC / Asuncion)
+- 15:00 / 12:00 (primary), 22:00 / 19:00 (secondary), 19:00 / 16:00 (test).
+- Avoid 05:00-09:00 UTC unless the clip is breaking news.
 
-## Priorities
-- Kai Cenat is the top subject and has less competition.
-- Speed is crowded, so use a sharper angle.
-- CaseOh is low priority.
+## Roster
+- Core: IShowSpeed, Kai Cenat. Secondary: CaseOh.
+- Watchlist (not enough signal): forsen, LIRIK.
 
-## Caveats
-- The sample is small (20 videos). Re-check each week.
-- Exclude live streams (duration 0) from Shorts benchmarks.
+## Do not use
+- Livestream-length videos as Shorts references (duration 0 or over 60s).
+- Single-channel tags (yourrage, art/draw) as trend evidence.
