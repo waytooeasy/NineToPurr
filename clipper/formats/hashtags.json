@@ -1,23 +1,20 @@
 {
-  "updated": "2026-11-10",
+  "updated": "2026-11-11",
   "sample": 40,
-  "title_share": 0.0,
-  "title_tags": 0,
+  "title_share": 0.003,
+  "title_tags": 1,
   "generic": [
-    "#edit"
+    "#edit",
+    "#funny",
+    "#ronaldo",
+    "#art"
   ],
   "streamers": {
+    "CaseOh": "#caseoh",
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
   "keywords": [
-    "kai live",
-    "case",
-    "funny",
-    "gaming",
-    "horror",
-    "horror gaming",
-    "jumpscare",
-    "scary"
+    "kai live"
   ]
 }
