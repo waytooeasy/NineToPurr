@@ -1,37 +1,39 @@
-# Format Library (Editor copies from here)
-Updated 2026-11-11. Metadata-derived. Original edits only; never reuse competitor footage.
+# Format Library (updated 2026-11-12)
 
-## Title formats (emoji at end, 1 line, <70 chars)
-- `{S} {specific prank/stunt} prank!` (best: 103k vph)
-- `Never tell {S} {X} is better😂` (rivalry bait, 46k vph)
-- `Bro became {meme role} on his own stream 🥀` (26k vph)
-- `{S} finds out what {friend} did in {place} 😂` (10k vph)
-- `{S} can't believe {thing} 🔥` (6.7k vph, good for live reactions)
-- `When {S} made {celeb} laugh😂` (7.7k vph)
-- Emotional icon moment: `thank you {icon} ❤️` (27k vph)
-- Reaction-meme short: `Bro just continued watching the video💀` (12.7k vph)
+## Rules
+- Metadata is inspiration only. Never download or re-upload competitor videos. Edit our own clips from permitted sources.
+- Lead with the payoff or reaction in the first 1–2s. No intros.
 
 ## Length
-- 16-30s: default for pranks and reactions (best avg vph).
-- 7-15s: live-stream moments with one clear beat.
-- 31-45s: only when there is a story arc.
-- Avoid >60s for Shorts.
+- Sweet spot: 16–30s (best avg). 7–15s works for single-beat reactions.
+- 31–45s is OK if there is a story. Avoid >60s.
 
-## Emoji style
-- 😂 💀 🥀 😭 🔥. Use 1-2 max, at the end.
+## Title formula
+- Short, 3–10 words, ending with one reaction emoji (😂 💀 🥀 😭).
+- Name the streamer when the clip is a known moment.
+- Keep the title as the hook, not a description.
 
-## Timing
-- Post 14-16 UTC (11-13 Asuncion) as the first test slot.
-- For live moments, post within the hour. Cluster: 19-20 UTC (16-17 Asuncion).
-- Secondary: 22-23 UTC (19-20 Asuncion).
+## Hook templates
+1. `{S} {stunt} prank!` (event in few words)
+2. `Bro became {NPC/role} on his own stream 🥀`
+3. `Never tell {S} {X} is better 😂`
+4. `{S} finds out what {X} did in {Y}'s room 😂`
+5. `{Name} is worried he'd have to skip {event} to play {game} 😂`
 
-## Content angles that work
-- Pranks and stunts with a visible payoff in the first 3s.
-- Messi vs Ronaldo or other fan-debate bait.
-- Celebrity or icon encounters.
-- Streamer's friends reacting (Fanum, Pudgie) on live GTA moments.
-- Meme-role labels (NPC) on awkward stream moments.
+## Themes that still work
+- IShowSpeed pranks and reactions, Ronaldo/Messi moments.
+- GTA / NPC jokes (GTA VI hype). Use Thanksgiving (Nov 26) timing.
+- Stuck-in-game, "bro just…" and "imagine he…" reaction beats.
+
+## Post windows
+- UTC 14:00–15:00 (Asuncion 11:00–12:00)
+- UTC 19:00 (Asuncion 16:00), most consistent
+- UTC 22:00 (Asuncion 19:00), test
+- Avoid 00:00–08:00 UTC.
 
 ## Watchlist
-- Tags: funnyclips, gaming (ignore art/draw/yourrage).
-- Streamers: Kai Cenat (promote), IShowSpeed (track), Fanum and Pudgie (cameos).
+- Tracked focus: IShowSpeed, Kai Cenat, CaseOh.
+- Test: stableronaldo, Sick_Nerd. Backups: HutchMF, Payo.
+
+## Not worth chasing
+- Art/draw tags (single channel), clips over 60s.

@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-11",
+  "updated": "2026-11-12",
   "sample": [
     "nDxYSoFZxAM",
+    "-rumnXioCL8",
     "qSj8XCkwbPE",
     "MSizEHlSsTs",
-    "-rumnXioCL8",
-    "lcaWjyBMOB8",
     "6rsPRMXT09A",
-    "mBntIGR7gHc",
-    "XtjCQwpX_9o"
+    "v6uqo9DkBGs",
+    "lcaWjyBMOB8",
+    "mBntIGR7gHc"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#00E5C8",
+    "highlight": "#3ADBC5",
     "outline": "#000000",
     "words": 2,
     "position": "middle",
@@ -22,11 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#00E5C8",
-      "#FF3B9A",
-      "#7CFF3B"
+      "#3ADBC5",
+      "#E0F7A0",
+      "#FF4FA3"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions appear in several images; styles vary slightly, with cyan, pink, and green highlights."
+  "notes": "Bold uppercase captions, cyan or pink emphasis, black outline; some words animated, centered mid-frame."
 }
