@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12",
+  "updated": "2026-11-13",
   "sample": 40,
   "title_share": 0.0,
   "title_tags": 0,
@@ -8,6 +8,7 @@
     "#ronaldo"
   ],
   "streamers": {
+    "Adin Ross": "#adinross",
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
