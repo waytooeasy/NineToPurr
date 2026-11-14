@@ -1,32 +1,32 @@
 {
-  "updated": "2026-11-13",
+  "updated": "2026-11-14",
   "sample": [
+    "N2JhM6zom4Q",
     "M1V5cpbdwtQ",
     "nDxYSoFZxAM",
     "-rumnXioCL8",
-    "qSj8XCkwbPE",
-    "6rsPRMXT09A",
-    "N2JhM6zom4Q",
+    "Xp94jJx5yxE",
+    "4o3N0dqeoxU",
     "ssA7PxksW4k",
-    "TLhZl5oe1PU"
+    "qSj8XCkwbPE"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#00FF00",
+    "highlight": "#39FF14",
     "outline": "#000000",
-    "words": 2,
+    "words": 3,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#00FF00",
+      "#39FF14",
       "#FF00FF",
-      "#00E5D4"
+      "#00FFFF"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Bold uppercase captions, mostly white with green/magenta/cyan emphasis words; some black boxed subtitles."
+  "notes": "Bold uppercase captions with colored emphasis words; varied neon highlights across clips; some use outlined black stroke styling."
 }

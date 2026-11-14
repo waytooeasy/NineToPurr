@@ -1,23 +1,22 @@
-# Format Library (updated 2026-11-13)
-Use as patterns only. Always cut from our own source footage, never from competitor videos.
+# Format Library (updated 2026-11-14)
+Copy the structure, never competitor footage. Replace {S} with the streamer.
 
-## Formats
-1. **Breaking event**: `{S} wins {award/news}! 🏆`. Post within hours. 30-55s. Best seen: 260k vph.
-2. **Prank or visual gag**: `{S} {bit} prank!`. 15-30s, no setup. Best seen: 76k vph, 5.7M views.
-3. **Caption meme**: `Bro became {NPC/role} on his own stream 🥀`. 30-40s. 41k vph.
-4. **Hot-take reaction**: `Never tell {S} {take} 😂`. 10-15s. 28k vph.
-5. **Collab or co-star bit**: `{Co-star} is worried he'll have to {X} to play {game} 😂`. 10-22s. 10-20k vph.
-6. **Game-moment clip**: `{S} gets help from {person} to beat the {game} level! 😂💀`. 20s. 10k vph.
+## Title hooks (ranked by vph)
+1. `Bro is the {famous figure} of streaming 👑🔥` (168k vph)
+2. `{S} wins {award}! 🏆🏆🏆` (155k, news, post fast)
+3. `{S} {prank/event}!` e.g. door closing prank (68k)
+4. `Bro became {NPC / role} on his own stream 🥀🥀` (47k)
+5. `Never tell {S} {taboo opinion} 😂` (24k, 3.4M views at 14s)
+6. `{S} {absurd action} in {game}! 😭` (12-21k)
+7. `{Co-star} {reveals/worries} about {GTA / release date} 😂💀` (6-20k)
 
-## Rules of thumb
-- Length: 15-45s default. 50-60s only for event or story clips. Avoid over 60s (avg 3.9k vph).
-- Title: first-person or "Bro..." phrasing with 1-3 emojis (😂 💀 🥀 🏆) at the end. Put the payoff or name up front.
-- Hook: the punchline or a visual surprise comes in the first 2s.
-- Trending moment (award, stream event, game reveal): clip and post fast, since a fresh Speed clip beats an evergreen one.
-- Timing tests: 08-09 UTC (05-06 Asuncion), 14-15 UTC (11-12 Asuncion), 22 UTC (19 Asuncion). Avoid 12 UTC.
+## Rules
+- Lowercase, casual "bro" voice. End with 1-2 emojis: 😭 🥀 😂 💀 🔥 (🏆 for awards).
+- Open on the punchline or the reaction in the first 2s.
+- **Length:** 46-60s for big moments and stories, 15-30s for a single joke. Under 15s works for a one-line debate.
+- **Timing:** post news and awards within hours. Prime UTC 14-16 (Asuncion 11-13). Early UTC 08-10 (Asuncion 05-07). Kai clips UTC 19-20 (Asuncion 16-17).
+- **Streamers:** priority Speed, Kai, CaseOh. Fanum as a co-star.
 
-## Priority streamers
-IShowSpeed > Kai Cenat (plus Fanum clips) > CaseOh. Watch QTCinderella.
-
-## Ignore
-`yourrage`, art and drawing tags (single-channel noise).
+## Watch (unproven)
+- #yourrage: 1 channel only, not a trend.
+- Re-check the 46-60s edge and the hour windows next run (small sample, event-driven).
