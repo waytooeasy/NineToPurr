@@ -1,32 +1,33 @@
 {
-  "updated": "2026-11-14",
+  "updated": "2026-11-15",
   "sample": [
     "N2JhM6zom4Q",
-    "M1V5cpbdwtQ",
-    "nDxYSoFZxAM",
     "-rumnXioCL8",
-    "Xp94jJx5yxE",
     "4o3N0dqeoxU",
+    "Xp94jJx5yxE",
+    "qSj8XCkwbPE",
+    "6rsPRMXT09A",
     "ssA7PxksW4k",
-    "qSj8XCkwbPE"
+    "8-SWb5FMf0I"
   ],
-  "seen": 6,
+  "seen": 9,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
     "highlight": "#39FF14",
     "outline": "#000000",
-    "words": 3,
+    "words": 2,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
       "#39FF14",
-      "#FF00FF",
-      "#00FFFF"
+      "#FF2BD6",
+      "#00E5E5",
+      "#FF0000"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Bold uppercase captions with colored emphasis words; varied neon highlights across clips; some use outlined black stroke styling."
+  "notes": "Captions are bold uppercase, usually centred mid-frame, with neon or colour-highlighted emphasis words."
 }

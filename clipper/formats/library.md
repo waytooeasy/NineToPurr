@@ -1,22 +1,30 @@
-# Format Library (updated 2026-11-14)
-Copy the structure, never competitor footage. Replace {S} with the streamer.
+# Format Library (updated 2026-11-15)
 
-## Title hooks (ranked by vph)
-1. `Bro is the {famous figure} of streaming 👑🔥` (168k vph)
-2. `{S} wins {award}! 🏆🏆🏆` (155k, news, post fast)
-3. `{S} {prank/event}!` e.g. door closing prank (68k)
-4. `Bro became {NPC / role} on his own stream 🥀🥀` (47k)
-5. `Never tell {S} {taboo opinion} 😂` (24k, 3.4M views at 14s)
-6. `{S} {absurd action} in {game}! 😭` (12-21k)
-7. `{Co-star} {reveals/worries} about {GTA / release date} 😂💀` (6-20k)
+## Title hooks (end with 1-2 emoji: 💀 😭 🥀 🥶 😂 🔥)
+- `Bro is {the X of streaming} 👑🔥`: top performer, 106k vph.
+- `Bro became {role/meme} on his own stream 🥀🥀`: 47k vph.
+- `Never tell {streamer} {opinion}😂`: 22k vph.
+- `{Streamer} won {award} {year}🥶`: event-timed, use within 48h.
+- `The one answer he wasn't ready for💀` / `How did he not know😭`: curiosity gap, no name.
+- `"{Quote from the clip}" 🥀`: quote-as-title works (9k vph).
+- `Teammates ❌ Enemies ✅`: short symbol-contrast format (3.6k vph).
+
+## Structure
+- Open on the punchline setup within 1s. No intro.
+- Short loop-friendly clips of 13-22s suit one-line jokes.
+- 30-60s suits story or escalation clips. The best results came at 46-60s, but that is a small sample.
+- Keep titles lowercase-casual, with 'bro' or 'he' instead of the name when the face carries it.
+- Add #streamer hashtag only when the title doesn't name them.
+
+## Timing
+- Post 14-15 UTC (11-12 Asuncion), 19 UTC (16 Asuncion) or 10 UTC (07 Asuncion).
+- Avoid 12 UTC and 00-01 UTC.
+- Ride event moments (Streamer Awards, GTA VI jokes, Thanksgiving) while fresh.
+
+## Streamer slots
+- Core: Kai Cenat, IShowSpeed, CaseOh.
+- Test: forsen.
 
 ## Rules
-- Lowercase, casual "bro" voice. End with 1-2 emojis: 😭 🥀 😂 💀 🔥 (🏆 for awards).
-- Open on the punchline or the reaction in the first 2s.
-- **Length:** 46-60s for big moments and stories, 15-30s for a single joke. Under 15s works for a one-line debate.
-- **Timing:** post news and awards within hours. Prime UTC 14-16 (Asuncion 11-13). Early UTC 08-10 (Asuncion 05-07). Kai clips UTC 19-20 (Asuncion 16-17).
-- **Streamers:** priority Speed, Kai, CaseOh. Fanum as a co-star.
-
-## Watch (unproven)
-- #yourrage: 1 channel only, not a trend.
-- Re-check the 46-60s edge and the hour windows next run (small sample, event-driven).
+- Original clips from permitted sources only.
+- Competitor channels are used for pattern reference only. Never download or re-upload them.
