@@ -3,7 +3,7 @@
 **Read this first in any Studio session.** What runs, what waits, on whom. Strategy: [`STRATEGY.md`](STRATEGY.md) · decisions: [`DECISIONS.md`](DECISIONS.md) · market: [`MARKET.md`](MARKET.md) · cast: [`../series/nine-to-purr/BIBLE.md`](../series/nine-to-purr/BIBLE.md).
 **Rule:** any PR that changes what runs, what's next or who something waits on updates this file.
 
-_Last updated: 2026-10-29 20:30 UTC (setup steps 1–3 and 6 done)_
+_Last updated: 2026-11-16 18:15 UTC (repo renamed; still waiting on the Gemini key and credit)_
 
 ## Running now
 - **Go given 2026-10-29** (S7). No Studio spend yet.
@@ -13,9 +13,12 @@ _Last updated: 2026-10-29 20:30 UTC (setup steps 1–3 and 6 done)_
 - **Pilot storyboards** in `/opt/studio/series/nine-to-purr/episodes/`: ep001 "He slept through the meeting and still got promoted", ep002 "The printer only respects the lazy coworker", ep003 "Me at 5:00 PM vs my overachiever coworker". Font: `/opt/studio/fonts/Anton-Regular.ttf`.
 
 ## Waiting on Lucas
-1. [`SETUP.md`](SETUP.md) step 4: Gemini key into `/opt/clipper/.env` (not there yet).
+1. [`SETUP.md`](SETUP.md) step 4: Gemini key into `/opt/clipper/.env` (checked 2026-11-16: not there).
 2. Step 5: $30 prepaid credit in AI Studio.
-3. Step 6b: rename the repo to `ninetopurr` (still `waytooeasy/PRM`).
+
+Done since Oct 29: repo renamed to `waytooeasy/NineToPurr` (old links redirect; the VM shell runner still answers; the VM's git remote still uses the old URL and works through the redirect).
+
+**Clock:** the test was planned for Nov 1–14 and hasn't started. Starting Nov 17 puts the Day-14 call at ~Dec 1 and leaves ~6 weeks of sprint before a mid-January YPP application instead of ~8. Pilot spend so far: $0.
 
 ## Next for Claude
 1. After steps 4–5: `pilot.py models`, then `pilot.py omni-test` (360p, ~$0.30) to confirm the key, billing and 9:16 output.
@@ -23,7 +26,7 @@ _Last updated: 2026-10-29 20:30 UTC (setup steps 1–3 and 6 done)_
 3. Profile picture + banner from the picked refs.
 4. `pilot.py episode …/ep001.json --res 360p` (~$0.75 each) → look check with Lucas → `--res 720p` (~$2.50 each) → `upload --at` 15:00 Asunción. Shorts 1–3 ([`TEST-PLAN.md`](TEST-PLAN.md)).
 5. Build issues in this order (each `Depends on` the one before; unpause agents first): `shared/` extraction + `db` → `generator` (ledger + budget guard first) → `radar` → `assembler` → `qc` → `publisher` (bot + upload, reusing the clipper's bot token and upload token) → `room` → `analyst`. Until a module lands, HQ does its step by hand.
-6. After the repo rename: check the VM shell runner still answers; update links in `CLAUDE.md`, `clipper/infra/VM.md` and the project docs.
+6. Repo rename follow-up: runner checked (works). Still to do: point old `waytooeasy/PRM` links and the VM's git remote at `waytooeasy/NineToPurr` (cosmetic; redirects work).
 
 ## Shorts so far
 | Date | Made | Posted | Notes |
