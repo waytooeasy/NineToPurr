@@ -1,33 +1,32 @@
 {
-  "updated": "2026-11-15",
+  "updated": "2026-11-16",
   "sample": [
     "N2JhM6zom4Q",
+    "M1V5cpbdwtQ",
+    "nDxYSoFZxAM",
     "-rumnXioCL8",
-    "4o3N0dqeoxU",
+    "UntTF_ioRXA",
     "Xp94jJx5yxE",
-    "qSj8XCkwbPE",
-    "6rsPRMXT09A",
     "ssA7PxksW4k",
-    "8-SWb5FMf0I"
+    "v6uqo9DkBGs"
   ],
-  "seen": 9,
+  "seen": 5,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
     "highlight": "#39FF14",
     "outline": "#000000",
-    "words": 2,
+    "words": 3,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
       "#39FF14",
-      "#FF2BD6",
-      "#00E5E5",
-      "#FF0000"
+      "#FF2DD1",
+      "#00E5D4"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions are bold uppercase, usually centred mid-frame, with neon or colour-highlighted emphasis words."
+  "notes": "Captions are bold uppercase sans-serif, with neon green/magenta/teal emphasis words over fullbleed vertical footage."
 }

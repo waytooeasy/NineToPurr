@@ -1,30 +1,33 @@
-# Format Library (updated 2026-11-15)
+# Format Library (updated 2026-11-16)
 
-## Title hooks (end with 1-2 emoji: 💀 😭 🥀 🥶 😂 🔥)
-- `Bro is {the X of streaming} 👑🔥`: top performer, 106k vph.
-- `Bro became {role/meme} on his own stream 🥀🥀`: 47k vph.
-- `Never tell {streamer} {opinion}😂`: 22k vph.
-- `{Streamer} won {award} {year}🥶`: event-timed, use within 48h.
-- `The one answer he wasn't ready for💀` / `How did he not know😭`: curiosity gap, no name.
-- `"{Quote from the clip}" 🥀`: quote-as-title works (9k vph).
-- `Teammates ❌ Enemies ✅`: short symbol-contrast format (3.6k vph).
+## Title formulas (ending with 1-2 emojis, no hashtags needed)
+- `Bro is {X} of streaming 👑🔥`: top performer, ~88k vph.
+- `Bro became {NPC/role} on his own stream 🥀🥀`: ~45k vph.
+- `{Name} is NOT surviving when {situation} 💀💀`: ~37k vph.
+- `{Streamer} wins {event}! 🏆🏆🏆`: ~70k vph, only valid while news is fresh (24-48h).
+- `{Streamer} {prank/challenge}!`: ~60k vph for a 26s prank.
+- `How did he not know 😭😭`, `The one answer he wasn't ready for 💀`: curiosity gap, 2k-7k vph.
 
-## Structure
-- Open on the punchline setup within 1s. No intro.
-- Short loop-friendly clips of 13-22s suit one-line jokes.
-- 30-60s suits story or escalation clips. The best results came at 46-60s, but that is a small sample.
-- Keep titles lowercase-casual, with 'bro' or 'he' instead of the name when the face carries it.
-- Add #streamer hashtag only when the title doesn't name them.
+## Length
+- Default 16-30s: one beat, setup then payoff.
+- Test 46-60s for story or escalation clips. Highest avg vph, but small sample.
+- Avoid over 60s.
 
-## Timing
-- Post 14-15 UTC (11-12 Asuncion), 19 UTC (16 Asuncion) or 10 UTC (07 Asuncion).
-- Avoid 12 UTC and 00-01 UTC.
-- Ride event moments (Streamer Awards, GTA VI jokes, Thanksgiving) while fresh.
+## Hook and structure
+- Payoff or the strangest moment in the first 2 seconds, with the title as the hook line.
+- Cut dead air and end on the reaction.
+- Use a caption or on-screen text naming the streamer.
 
-## Streamer slots
-- Core: Kai Cenat, IShowSpeed, CaseOh.
-- Test: forsen.
+## Post windows (UTC / Asuncion)
+- 14:00-15:00 / 11:00-12:00 (best)
+- 08:00-09:00 / 05:00-06:00
+- 21:00 / 18:00 (test)
+- Avoid 02:00 / 23:00.
+
+## Topics
+- IShowSpeed first priority (pranks, awards, reactions).
+- CaseOh: short cuts only.
+- Test once each: Backrooms or scary reaction, Kai Cenat.
 
 ## Rules
-- Original clips from permitted sources only.
-- Competitor channels are used for pattern reference only. Never download or re-upload them.
+- Metadata and trends only. Edit our own sourced footage and never re-upload competitor videos.
