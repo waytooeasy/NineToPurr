@@ -1,16 +1,16 @@
 {
-  "updated": "2026-11-16",
+  "updated": "2026-11-17",
   "sample": [
     "N2JhM6zom4Q",
-    "M1V5cpbdwtQ",
-    "nDxYSoFZxAM",
-    "-rumnXioCL8",
+    "2BRL4ALMCyA",
+    "5MVKzG417DM",
     "UntTF_ioRXA",
-    "Xp94jJx5yxE",
-    "ssA7PxksW4k",
-    "v6uqo9DkBGs"
+    "M1V5cpbdwtQ",
+    "o3xA1J8BoHs",
+    "tOXL72pBgaY",
+    "Xp94jJx5yxE"
   ],
-  "seen": 5,
+  "seen": 4,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
@@ -23,10 +23,10 @@
     "highlight_on": true,
     "highlights": [
       "#39FF14",
-      "#FF2DD1",
-      "#00E5D4"
+      "#FFFF00",
+      "#FF2A2A"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Captions are bold uppercase sans-serif, with neon green/magenta/teal emphasis words over fullbleed vertical footage."
+  "notes": "Vertical fullbleed shorts; captions in bold uppercase with glow; green highlight on key words."
 }

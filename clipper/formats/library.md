@@ -1,33 +1,35 @@
-# Format Library (updated 2026-11-16)
+# Format Library (updated 2026-11-17)
 
-## Title formulas (ending with 1-2 emojis, no hashtags needed)
-- `Bro is {X} of streaming 👑🔥`: top performer, ~88k vph.
-- `Bro became {NPC/role} on his own stream 🥀🥀`: ~45k vph.
-- `{Name} is NOT surviving when {situation} 💀💀`: ~37k vph.
-- `{Streamer} wins {event}! 🏆🏆🏆`: ~70k vph, only valid while news is fresh (24-48h).
-- `{Streamer} {prank/challenge}!`: ~60k vph for a 26s prank.
-- `How did he not know 😭😭`, `The one answer he wasn't ready for 💀`: curiosity gap, 2k-7k vph.
+## Title hooks (keep emoji at the end, lowercase-casual tone)
+- `Bro is {superlative} of streaming 👑🔥` is the top performer.
+- `{Name} is NOT surviving when he gets home 💀💀` works for a consequence tease.
+- `Bro can finally say he made it 😭` works for an emotional payoff.
+- `{S} meets {celebrity}!` / `{S} wins {award}! 🏆🏆🏆` are news-event templates. Post fast.
+- `Don't let {S} find this out 💀` is a gag filler. `That man thought {S} was poor 💀` is a similar filler.
+- Weak (under 2k vph): `The one answer he wasn't ready for`, `Teammates ❌ Enemies ✅`. Use only as filler.
 
 ## Length
-- Default 16-30s: one beat, setup then payoff.
-- Test 46-60s for story or escalation clips. Highest avg vph, but small sample.
-- Avoid over 60s.
+- 45-60s for event or story clips (best avg).
+- 16-30s for single-beat gags.
+- Avoid the 31-45s dead zone unless the clip needs it.
 
-## Hook and structure
-- Payoff or the strangest moment in the first 2 seconds, with the title as the hook line.
-- Cut dead air and end on the reaction.
-- Use a caption or on-screen text naming the streamer.
+## Structure
+- Open on the reaction or payoff frame in the first second, with the caption stating the stakes.
+- Single-beat gags run 16-30s. Story clips get one setup and one payoff.
+- For event clips (awards, trailers, celebrity meets), publish within hours.
 
-## Post windows (UTC / Asuncion)
-- 14:00-15:00 / 11:00-12:00 (best)
-- 08:00-09:00 / 05:00-06:00
-- 21:00 / 18:00 (test)
-- Avoid 02:00 / 23:00.
+## Timing
+- Prime slots are 21:00-22:59 UTC (18:00-19:59 Asuncion) and 15:00 UTC (12:00 Asuncion).
+- Secondary slot is 08:00 UTC (05:00 Asuncion).
+- Avoid 02:00 and 07:00 UTC.
 
-## Topics
-- IShowSpeed first priority (pranks, awards, reactions).
-- CaseOh: short cuts only.
-- Test once each: Backrooms or scary reaction, Kai Cenat.
+## Streamer priority
+1. IShowSpeed
+2. CaseOh (long-ish 100-120s clips also pull views)
+3. Test slots: Jynxzi, Xaryu, Northernlion
+
+## Tags to test
+#ishowspeed, #backrooms, #aura, #funnyclips. #yourrage is single-channel, so low confidence.
 
 ## Rules
-- Metadata and trends only. Edit our own sourced footage and never re-upload competitor videos.
+- Original edits from our own sourced footage only. Competitor data is for pattern reference, never for copying or re-uploading.

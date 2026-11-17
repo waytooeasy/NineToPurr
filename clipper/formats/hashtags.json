@@ -1,18 +1,18 @@
 {
-  "updated": "2026-11-16",
+  "updated": "2026-11-17",
   "sample": 40,
-  "title_share": 0.041,
+  "title_share": 0.056,
   "title_tags": 1,
   "generic": [
     "#edit",
     "#ronaldo",
-    "#streamer"
+    "#streamer",
+    "#fortnite"
   ],
   "streamers": {
     "Adin Ross": "#adinross",
     "CaseOh": "#caseoh",
-    "IShowSpeed": "#ishowspeed",
-    "Kai Cenat": "#kaicenat"
+    "IShowSpeed": "#ishowspeed"
   },
   "keywords": [
     "case",
