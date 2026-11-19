@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-17",
+  "updated": "2026-11-19",
   "sample": [
+    "5tdj53ioJ-c",
     "N2JhM6zom4Q",
-    "2BRL4ALMCyA",
-    "5MVKzG417DM",
     "UntTF_ioRXA",
-    "M1V5cpbdwtQ",
-    "o3xA1J8BoHs",
+    "dZRv4QxSGeY",
+    "OoeMUcea4q4",
+    "_AY5krZErfg",
     "tOXL72pBgaY",
-    "Xp94jJx5yxE"
+    "4o3N0dqeoxU"
   ],
-  "seen": 4,
+  "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#39FF14",
+    "highlight": "#2BFF2B",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,11 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#39FF14",
-      "#FFFF00",
-      "#FF2A2A"
+      "#2BFF2B",
+      "#FF3B3B",
+      "#FFD700"
     ]
   },
   "layout": "fullbleed",
-  "notes": "Vertical fullbleed shorts; captions in bold uppercase with glow; green highlight on key words."
+  "notes": "Shorts use bold uppercase captions with green glow highlights; mixed red and yellow accent emphasis in some frames."
 }
