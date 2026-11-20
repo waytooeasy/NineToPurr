@@ -1,37 +1,37 @@
-# Format Library (updated 2026-11-19)
-The Editor copies from this. Source footage is our own only. Competitor data is for patterns, never for re-use.
+# Format Library (updated 2026-11-20)
 
-## Length
-- **Kai or event reactions:** 9-15s, one beat, punchline at the end.
-- **Speed, CaseOh and general clips:** 46-60s, hook in the first 2s, clear payoff.
-- **Avoid:** 31-45s (weakest bucket).
+**Titles**
+- Casual, lowercase-ish, one idea, ending with 1-2 emojis (💀 😭 💔 🙏 🔥). Add the streamer's hashtag where it fits (#ishowspeed).
+- Templates:
+  - `{Streamer} finds out {person} is cheating on him 💔`
+  - `{Streamer} thought {X} died… 😢`
+  - `{Name} is NOT SURVIVING when he gets home 💀💀`
+  - `{Streamer} should listen to this guy 😭🙏`
+  - `{Streamer}'s first {hot game} stream will be CHAOS 😭🔥`
+  - `Bro went through EVERY emotion 💀💀`
+  - `Bro can finally say he made it 😭`
+  - `{Streamer} did everything for {event} 💀`
+- Use CAPS on one key word only.
 
-## Title hooks (ranked by VPH evidence)
-1. `Bro is {absurd superlative} of streaming 👑🔥`
-2. `{Name} is NOT SURVIVING when he {gets home / does X} 💀💀`
-3. `{Streamer} should listen to this guy 😭🙏`
-4. `{Streamer} did everything for his {event} 💀`
-5. `{Streamer} when he's {situation} 🤣`
-- **Event teaser:** `{Streamer}'s first {event} stream will be CHAOS 😭🔥`
-- **Plain-descriptive (CaseOh lane):** `THIS almost made {Streamer} quit {game}!` or `The biggest {thing} {Streamer} has EVER seen!`
+**Length**
+- Default 45-59s for story or reaction clips (Speed recaps).
+- 8-15s punchline clips work for Kai-style quick moments.
+- Avoid >60s.
 
-## Style rules
-- Use 1-2 emojis at the end of the title. Common ones are 💀 😭 🔥 🥶 🤣.
-- Use ALL CAPS on one key word only.
-- Say "Bro" or the name up front, with no setup.
-- Hashtag the streamer only when the clip is a big moment, e.g. `#ishowspeed`.
+**Topics**
+- Current: GTA VI streams (Kai, Speed, CaseOh), reaction moments, drama or misunderstanding beats, fan interactions, CaseOh's mom, Minecraft rage.
+- Refresh weekly. Event-driven spikes fade.
 
-## Topics
-- **Hot now:** Kai's GTA VI marathon, plus the Speed moments (WWE, NYC, awards).
-- **Steady:** CaseOh game reactions.
-- **Time-limited:** GTA VI content. Reassess when the marathon ends.
+**Post times** (UTC / Asuncion, UTC-3)
+- 11-12 / 08-09
+- 15-17 / 12-14
+- 21-22 / 18-19
+- Avoid 02 UTC.
 
-## Posting
-- **Primary:** 15-17 UTC (12-14 Asuncion).
-- **Secondary:** 19-21 UTC (16-18 Asuncion).
-- **Avoid:** 01-02 and 08 UTC.
+**Roster**
+- Kai Cenat (test slot), IShowSpeed, CaseOh.
+- Watch: Ludwig, stableronaldo, Maya, ohnePixel.
 
-## Do not
-- Do not chase single-channel tags like #yourrage.
-- Do not copy the format of the live VOD. It is not a Short.
-- Do not download or re-upload competitor videos.
+**Rules**
+- Metadata and patterns only. Never download or re-upload competitor videos.
+- Treat small-sample stats as directional.

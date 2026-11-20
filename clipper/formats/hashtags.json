@@ -1,14 +1,15 @@
 {
-  "updated": "2026-11-19",
+  "updated": "2026-11-20",
   "sample": 40,
-  "title_share": 0.08,
+  "title_share": 0.078,
   "title_tags": 1,
   "generic": [
     "#edit",
-    "#fortnite",
-    "#streamer"
+    "#messi",
+    "#fortnite"
   ],
   "streamers": {
+    "CaseOh": "#caseoh",
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
@@ -17,9 +18,9 @@
     "case",
     "funny",
     "gaming",
+    "streamer",
     "horror",
     "horror gaming",
-    "jumpscare",
-    "scary"
+    "jumpscare"
   ]
 }

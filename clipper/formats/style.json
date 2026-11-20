@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-19",
+  "updated": "2026-11-20",
   "sample": [
-    "5tdj53ioJ-c",
-    "N2JhM6zom4Q",
+    "LHoHInbPkk0",
+    "fvqacXZMdcI",
     "UntTF_ioRXA",
     "dZRv4QxSGeY",
+    "9OnZGMWDQ88",
     "OoeMUcea4q4",
-    "_AY5krZErfg",
-    "tOXL72pBgaY",
-    "4o3N0dqeoxU"
+    "LffmQGjFVXU",
+    "tOXL72pBgaY"
   ],
   "seen": 6,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#2BFF2B",
+    "highlight": "#00E5CC",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,11 +22,12 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#2BFF2B",
-      "#FF3B3B",
-      "#FFD700"
+      "#00E5CC",
+      "#39FF14",
+      "#FF3B30",
+      "#FFD60A"
     ]
   },
-  "layout": "fullbleed",
-  "notes": "Shorts use bold uppercase captions with green glow highlights; mixed red and yellow accent emphasis in some frames."
+  "layout": "stack",
+  "notes": "Captions appear mid-frame in bold uppercase; emphasis words are recolored, often neon green, cyan, or red."
 }
