@@ -1,23 +1,21 @@
 {
-  "updated": "2026-11-20",
+  "updated": "2026-11-21",
   "sample": 40,
-  "title_share": 0.078,
+  "title_share": 0.108,
   "title_tags": 1,
   "generic": [
     "#edit",
-    "#messi",
-    "#fortnite"
+    "#messi"
   ],
   "streamers": {
-    "CaseOh": "#caseoh",
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
   "keywords": [
     "kai live",
-    "case",
     "funny",
     "gaming",
+    "case",
     "streamer",
     "horror",
     "horror gaming",

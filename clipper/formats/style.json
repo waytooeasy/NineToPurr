@@ -1,16 +1,16 @@
 {
-  "updated": "2026-11-20",
+  "updated": "2026-11-21",
   "sample": [
-    "LHoHInbPkk0",
     "fvqacXZMdcI",
     "UntTF_ioRXA",
+    "ZUCTpO1DLQQ",
+    "J08vhgd5kZ8",
     "dZRv4QxSGeY",
-    "9OnZGMWDQ88",
-    "OoeMUcea4q4",
-    "LffmQGjFVXU",
-    "tOXL72pBgaY"
+    "tOXL72pBgaY",
+    "OsaJhvAnWkg",
+    "Y_6J8SthWTw"
   ],
-  "seen": 6,
+  "seen": 10,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
@@ -23,11 +23,11 @@
     "highlight_on": true,
     "highlights": [
       "#00E5CC",
-      "#39FF14",
-      "#FF3B30",
-      "#FFD60A"
+      "#00FF00",
+      "#FF2A2A",
+      "#FFE600"
     ]
   },
   "layout": "stack",
-  "notes": "Captions appear mid-frame in bold uppercase; emphasis words are recolored, often neon green, cyan, or red."
+  "notes": "Bold uppercase captions; accent colour on emphasised words; split-screen stacked clips; dark outlines."
 }
