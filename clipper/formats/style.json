@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-21",
+  "updated": "2026-11-23",
   "sample": [
+    "NnEJO63HaJY",
     "fvqacXZMdcI",
-    "UntTF_ioRXA",
-    "ZUCTpO1DLQQ",
-    "J08vhgd5kZ8",
     "dZRv4QxSGeY",
     "tOXL72pBgaY",
-    "OsaJhvAnWkg",
-    "Y_6J8SthWTw"
+    "ZUCTpO1DLQQ",
+    "Y_6J8SthWTw",
+    "oOzXeZItxBw",
+    "J08vhgd5kZ8"
   ],
   "seen": 10,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#00E5CC",
+    "highlight": "#FF0000",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,12 +22,12 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#00E5CC",
-      "#00FF00",
-      "#FF2A2A",
-      "#FFE600"
+      "#FF0000",
+      "#00E5D4",
+      "#FFFF00",
+      "#00FF66"
     ]
   },
   "layout": "stack",
-  "notes": "Bold uppercase captions; accent colour on emphasised words; split-screen stacked clips; dark outlines."
+  "notes": "Split-screen stacked clips; captions sit mid-frame, mostly uppercase with color-highlighted keywords."
 }

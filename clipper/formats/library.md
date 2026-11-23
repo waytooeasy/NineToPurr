@@ -1,44 +1,31 @@
-# Format Library (updated 2026-11-21)
+# Format Library (updated 2026-11-23)
 
-Metadata-driven only. Never download or re-upload competitor videos; cut from our own sources.
+## Title hooks (emoji at end, 1–2 max: 😭💀🔥)
+- Bro is good at EVERY {thing} 🔥🔥 (generic, no name; best vph)
+- Bro went through EVERY emotion 💀💀 (multi-beat reaction)
+- {S} should listen to this guy 😭🙏 (advice or callout moment)
+- {S} got humbled on {game} 😭 / {S} finds out {bad news} 💔 (Kai-style drama)
+- {S} went to help… then {twist} 💀😭 (setup, then twist)
+- {S} thought {X} died… 😢 (misunderstanding, emotional)
+- Nah I'm sure bro meant it at the end 😭 #{S} (tease the ending)
+- Add #{streamer} on Speed titles when it fits.
 
 ## Length
-- **Default: 46-60s.** Best avg vph (~39k).
-- 16-30s is OK for punchy single-beat clips (~25k).
-- <=15s: test for Kai only. Results are confounded by the official channel.
-- **Avoid >60s** (~5k vph).
+- Default 46–60s for story or reaction clips, 16–30s for single-gag clips.
+- 9–11s for Kai drama one-liners (they work, but have a lower ceiling).
+- Avoid >60s unless it is a CaseOh-style run that already has traction.
 
-## Title formula
-- Plain-language reaction or reveal, with the streamer name or "Bro" up front.
-- End with 1-2 emojis (💀 😭 first choice; 😳 🥶 💔 🔥 as secondary).
-- Keep it to one short line.
-- Hashtag the streamer only if it fits (e.g. #ishowspeed).
+## Structure
+- Payoff or reaction visible in the first 2s; title promises an ending and the ending delivers.
+- A twist or caught-at-the-end moment is a proven retention hook.
+- Topical: GTA VI reactions are hot now (humbled, nerfed, first stream chaos).
 
-## Hook templates
-1. `{Streamer} finds out {shock reveal} 💀`
-2. `{Name} is NOT surviving when {consequence} 💀💀`
-3. `Bro went through EVERY emotion 😭`
-4. `{Streamer} should listen to this guy 😭🙏`
-5. `{Streamer} got humbled on GTA VI 😭`
+## Timing
+- Prefer 15:00 UTC (12:00 Asuncion). Morning window 10–13 UTC (07–10 Asuncion). Late slot 03:00 UTC (00:00 Asuncion).
 
-## Reusable story angles
-- Fan interaction ("most honest fan", "took it way too far")
-- Game humbling or nerf (GTA VI)
-- Relationship drama arcs (multi-part)
-- Big-moment payoff ("can finally say he made it")
-- "Thought X died" misunderstandings
+## Source rules
+- Clip only from streamers' own streams and VODs. Never download or re-upload competitor Shorts.
+- Speed is crowded, so favor fresh moments there; Kai and CaseOh are under-clipped.
 
-## Timing (UTC / Asuncion UTC-3)
-- Prime: 15:00 UTC / 12:00
-- Strong: 11-13 and 17 UTC / 08-10 and 14
-- Secondary: 21 UTC / 18
-- Kai: post right after the stream moment, any hour.
-
-## Streamer priority
-1. Kai Cenat (hot, 1 clipper, open lane)
-2. IShowSpeed (high volume, cooling)
-3. CaseOh (steady, low vph; keep clips short)
-
-## Notes
-- Sample is small, so re-check each run.
-- #yourrage is a single-channel tag. Watch only.
+## Watch list (unconfirmed)
+- #yourrage tag (1 channel only)
