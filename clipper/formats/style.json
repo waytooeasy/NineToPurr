@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-23",
+  "updated": "2026-11-24",
   "sample": [
     "NnEJO63HaJY",
-    "fvqacXZMdcI",
     "dZRv4QxSGeY",
-    "tOXL72pBgaY",
+    "fvqacXZMdcI",
     "ZUCTpO1DLQQ",
-    "Y_6J8SthWTw",
+    "kEgS7FQqfRM",
+    "eI3Ti2oXN7s",
     "oOzXeZItxBw",
     "J08vhgd5kZ8"
   ],
-  "seen": 10,
+  "seen": 9,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FF0000",
+    "highlight": "#FF2A1A",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,12 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FF0000",
-      "#00E5D4",
-      "#FFFF00",
-      "#00FF66"
+      "#FF2A1A",
+      "#FFE600",
+      "#1EE8D2"
     ]
   },
   "layout": "stack",
-  "notes": "Split-screen stacked clips; captions sit mid-frame, mostly uppercase with color-highlighted keywords."
+  "notes": "Shorts mostly use stacked split-screen with bold uppercase burned-in captions and colored emphasis words."
 }
