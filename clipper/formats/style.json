@@ -1,20 +1,20 @@
 {
-  "updated": "2026-11-24",
+  "updated": "2026-11-25",
   "sample": [
+    "rgeu73E-4e0",
     "NnEJO63HaJY",
-    "dZRv4QxSGeY",
     "fvqacXZMdcI",
     "ZUCTpO1DLQQ",
-    "kEgS7FQqfRM",
     "eI3Ti2oXN7s",
     "oOzXeZItxBw",
-    "J08vhgd5kZ8"
+    "U4t6DJ0o3PQ",
+    "jNV7dpcfl60"
   ],
   "seen": 9,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
-    "highlight": "#FF2A1A",
+    "highlight": "#FF0000",
     "outline": "#000000",
     "words": 3,
     "position": "middle",
@@ -22,11 +22,11 @@
     "header": "none",
     "highlight_on": true,
     "highlights": [
-      "#FF2A1A",
-      "#FFE600",
-      "#1EE8D2"
+      "#FF0000",
+      "#00E5D4",
+      "#FFFF00"
     ]
   },
   "layout": "stack",
-  "notes": "Shorts mostly use stacked split-screen with bold uppercase burned-in captions and colored emphasis words."
+  "notes": "Mostly full-frame clips; split-screen stacks appear in several thumbnails with captions on the divider."
 }
