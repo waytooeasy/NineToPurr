@@ -1,14 +1,14 @@
 {
-  "updated": "2026-11-25",
+  "updated": "2026-11-26",
   "sample": [
+    "j2ZtTZ9mv0I",
     "rgeu73E-4e0",
     "NnEJO63HaJY",
-    "fvqacXZMdcI",
     "ZUCTpO1DLQQ",
-    "eI3Ti2oXN7s",
-    "oOzXeZItxBw",
     "U4t6DJ0o3PQ",
-    "jNV7dpcfl60"
+    "VdQNKUbkyrc",
+    "oOzXeZItxBw",
+    "J08vhgd5kZ8"
   ],
   "seen": 9,
   "caption": {
@@ -23,10 +23,9 @@
     "highlight_on": true,
     "highlights": [
       "#FF0000",
-      "#00E5D4",
       "#FFFF00"
     ]
   },
   "layout": "stack",
-  "notes": "Mostly full-frame clips; split-screen stacks appear in several thumbnails with captions on the divider."
+  "notes": "Stacked split-screen layouts with bold uppercase captions; red/yellow emphasis; dark outlines on most captions."
 }

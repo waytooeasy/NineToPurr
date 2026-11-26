@@ -1,13 +1,14 @@
 {
-  "updated": "2026-11-25",
+  "updated": "2026-11-26",
   "sample": 40,
-  "title_share": 0.113,
+  "title_share": 0.039,
   "title_tags": 1,
   "generic": [
     "#edit",
     "#gta6"
   ],
   "streamers": {
+    "CaseOh": "#caseoh",
     "IShowSpeed": "#ishowspeed",
     "Kai Cenat": "#kaicenat"
   },
