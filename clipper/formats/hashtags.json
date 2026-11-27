@@ -1,11 +1,10 @@
 {
-  "updated": "2026-11-26",
+  "updated": "2026-11-27",
   "sample": 40,
-  "title_share": 0.039,
-  "title_tags": 1,
+  "title_share": 0.0,
+  "title_tags": 0,
   "generic": [
-    "#edit",
-    "#gta6"
+    "#edit"
   ],
   "streamers": {
     "CaseOh": "#caseoh",
@@ -13,9 +12,9 @@
     "Kai Cenat": "#kaicenat"
   },
   "keywords": [
+    "kai live",
     "funny",
     "gaming",
-    "kai live",
     "case",
     "streamer",
     "horror",

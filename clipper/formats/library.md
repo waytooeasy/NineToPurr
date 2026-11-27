@@ -1,37 +1,44 @@
-# Format Library (updated 2026-11-26)
+# Format Library (updated 2026-11-27)
 
-## Title formulas (ranked by observed vph)
-1. `{S} reacts to “leaked” {hyped thing} 💀🚀`: only if the clip fits the framing.
-2. `Bro is good at EVERY {X} 🔥🔥` / `{N}m in {N} seconds is just CRAZY 💀🔥`: athletic or skill moments.
-3. `Bro went through EVERY emotion 💀💀`: reaction montage.
-4. `{S} & {S} won’t talk about {storyline}… 💀`: running-storyline teaser.
-5. `{S} trusted the WRONG {thing} 😭💀` / `{S} went to help… then {twist} 💀😭`: mini-story with a twist.
-6. `{S} finds out {news} 💔` / `{S} got humbled on {game} 😭`: reaction plus drama.
-7. `{S} got a FREE {item}… but there’s a catch 💀😭`: curiosity gap.
+## Title rules
+- Short, one idea, under ~60 chars, 1-2 emoji at the end (💀 😭 💔 🔥 👀).
+- Name the streamer (Speed, Kai, CaseOh) in the title.
+- Quotes around the hook word ("leaked") only when the clip actually matches.
+- No misleading claims.
 
-## Style rules
-- Emoji ending: 1-2 of 💀 😭 🔥. Use 💔 for drama.
-- Put ALL-CAPS on one word only.
-- Short punchy titles (about 35-60 characters), hook in the first 3 words.
-- Use "Bro" for unnamed-person moments and the streamer's name for named stories.
+## Hook templates
+1. `{S}'s {event} went horribly wrong 💔` (fail/disaster, top vph)
+2. `{S} watches NEW "{thing}" 💀🚀` (series continuation, "NEW" tag)
+3. `{S} vs {famous rival/record holder} 👀🔥` (race or challenge)
+4. `{S} trusted the WRONG {thing} 😭💀` / `{S} got a free {X}... but there's a catch`
+5. `{S} got humbled on {hot game} 😭` (also: `{S} finds out he got nerfed on {game} 🤣`)
+
+## Also proven
+- `{S} came back... but his {crew/friends} didn't 💔` (CaseOh-type returns)
+- `I {beat/raced} {big thing}!` (first-person Speed moments)
+- `{S} was left speechless after {game ending} 💔`
+- Relationship/drama gag: `{S}'s relationship with {character} is over 💀`
 
 ## Length
-- Default 16-30s: best volume bucket (avg 11.4k vph).
-- Test 31-60s for strong stories or sports moments (46-60s avg 33.8k vph).
-- Under 15s only for fast reaction or drama (avg 8.2k).
-- Avoid over 60s (avg 4k).
+- Sweet spot: 20-40s for challenge/race/story clips.
+- <=15s works for single-punchline reactions (Kai).
+- Avoid >60s.
 
-## Topics working now
-- IShowSpeed: Jupiter storyline, sports and athletic moments, Messi, funny misunderstandings (translator).
-- Kai Cenat: GTA VI reactions, Lucia drama. 9-11s clips work.
-- CaseOh: GTA VI, holiday or family moments. Keep clips under 60s.
-- Crossovers (Speed x CaseOh, Speed x NickEh30) get extra attention.
+## Series angle
+- When a storyline runs (Jupiter footage, GTA VI), post several angles over 1-2 days: react, watch NEW, won't talk about it, aftermath.
 
-## Post times
-- Primary: 10:00-11:00 UTC (07:00-08:00 Asuncion).
-- Secondary: 20:00 UTC (17:00 Asuncion).
-- Avoid 21:00 UTC.
+## Timing
+- Post 19:00-21:00 UTC (16:00-18:00 Asuncion) first.
+- Second slot 10:00 UTC (07:00 Asuncion).
+- Third slot 06:00 UTC (03:00 Asuncion).
+- Avoid 03:00-05:00 UTC.
 
-## Don't
-- Don't chase #yourrage or #speedclips. Each comes from a single channel.
-- Never download or re-upload competitor videos. Use only our own sourced footage.
+## Topics now
+- GTA VI reactions.
+- Speed races and challenges.
+- Holiday fails (Thanksgiving).
+- Jupiter footage series.
+
+## Sourcing
+- Use competitors for title and format ideas only.
+- Cut clips from our own sources; never download or re-upload others' videos.

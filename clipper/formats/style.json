@@ -1,31 +1,32 @@
 {
-  "updated": "2026-11-26",
+  "updated": "2026-11-27",
   "sample": [
+    "Mx2mmPIxv-4",
     "j2ZtTZ9mv0I",
+    "4FSy_BHg5QU",
     "rgeu73E-4e0",
-    "NnEJO63HaJY",
-    "ZUCTpO1DLQQ",
-    "U4t6DJ0o3PQ",
-    "VdQNKUbkyrc",
-    "oOzXeZItxBw",
-    "J08vhgd5kZ8"
+    "friwdO_FIb0",
+    "5N7nuluTjg0",
+    "R8qkdlb-CFA",
+    "kVk_Nwca6Wk"
   ],
-  "seen": 9,
+  "seen": 7,
   "caption": {
     "case": "upper",
     "fill": "#FFFFFF",
     "highlight": "#FF0000",
     "outline": "#000000",
-    "words": 3,
+    "words": 2,
     "position": "middle",
     "font": "geometric",
     "header": "none",
     "highlight_on": true,
     "highlights": [
       "#FF0000",
-      "#FFFF00"
+      "#FFFF00",
+      "#00FF00"
     ]
   },
   "layout": "stack",
-  "notes": "Stacked split-screen layouts with bold uppercase captions; red/yellow emphasis; dark outlines on most captions."
+  "notes": "Captions mostly bold uppercase with black outline; colour emphasis changes per clip, white base text common."
 }
